@@ -1,65 +1,89 @@
-// Código para registrar el Service Worker (añade esto al inicio de main.js)
+// Script para PWA optimizado para Android
+document.addEventListener('DOMContentLoaded', function() {
+  // Comprobar si es Android
+  const isAndroid = /Android/.test(navigator.userAgent);
 
-// Registrar el Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then((registration) => {
-        console.log('Service Worker registrado con éxito:', registration.scope);
-      })
-      .catch((error) => {
-        console.error('Error al registrar el Service Worker:', error);
-      });
-  });
-}
+  // Verificar si la PWA está instalada
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                       window.navigator.standalone;
 
-// Mostrar banner de instalación personalizado (opcional)
-let deferredPrompt;
-const installButton = document.createElement('button');
-installButton.style.display = 'none';
-installButton.classList.add('install-button');
-installButton.textContent = 'Instalar NotasApp';
+  // Crear botón de instalación
+  const installButton = document.createElement('button');
+  installButton.style.display = 'none';
+  installButton.classList.add('btn', 'btn-primary', 'install-button');
+  installButton.innerHTML = `
+    <span class="btn-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4M17 9l-5 5-5-5M12 12.8V2.5"></path>
+      </svg>
+    </span>
+    Instalar App
+  `;
 
-// Verificar si el elemento ya existe en el DOM
-document.addEventListener('DOMContentLoaded', () => {
-  // Agregar un botón de instalación personalizado (opcional)
-  const header = document.querySelector('header .container');
-  if (header && !document.querySelector('.install-button')) {
-    installButton.style.display = 'none';
-    header.appendChild(installButton);
+  // Añadir el botón al DOM
+  const navLinks = document.querySelector('.nav-links');
+  if (navLinks && !document.querySelector('.install-button')) {
+    navLinks.appendChild(installButton);
   }
-});
 
-// Capturar el evento beforeinstallprompt
-window.addEventListener('beforeinstallprompt', (e) => {
-  // Prevenir que Chrome muestre el banner automático
-  e.preventDefault();
-  // Guardar el evento para usarlo después
-  deferredPrompt = e;
-  // Mostrar tu botón de instalación personalizado
-  installButton.style.display = 'block';
-});
+  // Solo mostrar botón de instalación si es Android y no está en modo standalone
+  if (isAndroid && !isStandalone) {
+    // Variable para guardar el evento de instalación
+    let deferredPrompt;
 
-// Manejar el clic en el botón de instalación
-installButton.addEventListener('click', async () => {
-  if (!deferredPrompt) return;
-  // Mostrar el banner de instalación
-  deferredPrompt.prompt();
-  // Esperar a que el usuario responda al banner
-  const { outcome } = await deferredPrompt.userChoice;
-  console.log(`Usuario respondió: ${outcome}`);
-  // Limpiar la variable
-  deferredPrompt = null;
-  // Ocultar el botón de instalación
-  installButton.style.display = 'none';
-});
+    // Capturar evento de instalación
+    window.addEventListener('beforeinstallprompt', (e) => {
+      // Prevenir la visualización automática del banner
+      e.preventDefault();
 
-// Detectar cuándo la app fue instalada
-window.addEventListener('appinstalled', (e) => {
-  console.log('Aplicación instalada');
-  // Ocultar el botón de instalación
-  installButton.style.display = 'none';
-});
+      // Guardar el evento
+      deferredPrompt = e;
+
+      // Mostrar el botón de instalación
+      installButton.style.display = 'inline-flex';
+
+      // Logging
+      console.log('[PWA] Evento beforeinstallprompt capturado');
+    });
+
+    // Manejar clic en el botón de instalación
+    installButton.addEventListener('click', async () => {
+      if (!deferredPrompt) {
+        console.log('[PWA] No hay evento de instalación disponible');
+        return;
+      }
+
+      // Mostrar diálogo de instalación
+      deferredPrompt.prompt();
+
+      // Esperar a que el usuario responda
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`[PWA] Resultado de instalación: ${outcome}`);
+
+      // Limpiar el evento
+      deferredPrompt = null;
+
+      // Ocultar el botón
+      installButton.style.display = 'none';
+    });
+
+    // Detectar cuando la app ha sido instalada
+    window.addEventListener('appinstalled', (e) => {
+      console.log('[PWA] Aplicación instalada correctamente');
+      installButton.style.display = 'none';
+    });
+  }
+
+  // Registrar Service Worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(registration => {
+        console.log('[PWA] Service Worker registrado:', registration.scope);
+      })
+      .catch(error => {
+        console.error('[PWA] Error al registrar Service Worker:', error);
+      });
+  }
 
 // Script principal para NotasApp - Optimizado para móviles
 document.addEventListener('DOMContentLoaded', function() {

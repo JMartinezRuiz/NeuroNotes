@@ -2,11 +2,14 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#4361ee">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
     <title>{% block title %}NotasApp{% endblock %}</title>
+
+    <!-- Meta tags optimizados para Android -->
+    <meta name="description" content="Una aplicación moderna y minimalista de notas">
+    <meta name="theme-color" content="#4361ee">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="NotasApp">
 
     <!-- Precargar fuentes para mejorar rendimiento -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,22 +19,13 @@
     <!-- Estilos modernizados -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
-    <!-- Favicon para múltiples plataformas -->
+    <!-- Iconos para Android -->
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32x32.png') }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
-
-        <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#4361ee">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <!-- PWA Manifest Link -->
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-
-
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='img/icon-192x192.png') }}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='img/icon-512x512.png') }}">
 
     <!-- PWA Manifest -->
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="manifest" href="/manifest.json">
 </head>
 <body>
     <header>
@@ -88,7 +82,7 @@
         </div>
     </footer>
 
-    <!-- Script modernizado optimizado para móviles -->
+    <!-- Script para PWA -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

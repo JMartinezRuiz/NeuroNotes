@@ -21,6 +21,10 @@ def create_app(config_class=Config):
     from app.routes.notes import notes_bp
     app.register_blueprint(notes_bp)
 
+    # Registrar blueprint para PWA
+    from app.routes import pwa_bp
+    app.register_blueprint(pwa_bp)
+
     # Crear tablas de base de datos si no existen
     with app.app_context():
         db.create_all()
