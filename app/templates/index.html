@@ -6,37 +6,49 @@
     <section class="notes-section">
         <div class="section-header">
             <h1>Mis Notas</h1>
-            <a href="{{ url_for('notes.create_note') }}" class="btn btn-primary">Crear Nota</a>
+            <a href="{{ url_for('notes.create_note') }}" class="btn btn-primary desktop-only">
+                <span class="btn-icon">+</span>
+                <span class="btn-text">Nueva nota</span>
+            </a>
         </div>
 
-        <div class="notes-grid">
+        <div class="notes-list">
             {% if notes %}
                 {% for note in notes %}
                     <div class="note-card">
-                        <div class="note-card-header">
-                            <h2 class="note-title">
-                                <a href="{{ url_for('notes.view_note', id=note.id) }}">{{ note.title }}</a>
-                            </h2>
-                            <span class="note-date">{{ note.created_at.strftime('%d/%m/%Y') }}</span>
-                        </div>
-                        <div class="note-card-content">
-                            <p>{{ note.content[:100] }}{% if note.content|length > 100 %}...{% endif %}</p>
-                        </div>
+                        <a href="{{ url_for('notes.view_note', id=note.id) }}" class="note-card-content">
+                            <h2 class="note-title">{{ note.title }}</h2>
+                            <p class="note-excerpt">{{ note.content[:100] }}{% if note.content|length > 100 %}...{% endif %}</p>
+                            <div class="note-meta">
+                                <span class="note-date">{{ note.created_at.strftime('%d/%m/%Y') }}</span>
+                            </div>
+                        </a>
                         <div class="note-card-actions">
-                            <a href="{{ url_for('notes.view_note', id=note.id) }}" class="btn btn-text">Ver</a>
-                            <a href="{{ url_for('notes.edit_note', id=note.id) }}" class="btn btn-text">Editar</a>
+                            <a href="{{ url_for('notes.edit_note', id=note.id) }}" class="action-btn edit-btn" title="Editar">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                            </a>
                             <form action="{{ url_for('notes.delete_note', id=note.id) }}" method="POST" class="inline-form">
-                                <button type="submit" class="btn btn-text btn-danger" onclick="return confirm('¿Estás seguro de que quieres eliminar esta nota?')">Eliminar</button>
+                                <button type="submit" class="action-btn delete-btn" title="Eliminar" onclick="return confirm('¿Estás seguro de que quieres eliminar esta nota?')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                </button>
                             </form>
                         </div>
                     </div>
                 {% endfor %}
             {% else %}
                 <div class="empty-state">
+                    <div class="empty-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    </div>
                     <p>Aún no tienes notas.</p>
                     <a href="{{ url_for('notes.create_note') }}" class="btn btn-primary">Crea tu primera nota</a>
                 </div>
             {% endif %}
         </div>
+
+        <!-- Botón flotante para dispositivos móviles -->
+        <a href="{{ url_for('notes.create_note') }}" class="floating-action-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </a>
     </section>
 {% endblock %}
