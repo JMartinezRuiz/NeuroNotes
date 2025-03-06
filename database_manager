@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+# database_manager.py - Herramienta para gestionar la base de datos de NotasApp
+
+import os
+import sys
+import sqlite3
+import argparse
+
+# Configuración de la base de datos
+base_dir = os.path.abspath(os.path.dirname(__file__))
+database_path = os.path.join(base_dir, 'notas.db')
+schema_path = os.path.join(base_dir, 'schema.sql')
+
+def create_database():
+    """Crea todas las tablas en la base de datos desde el archivo schema.sql."""
+    if not os.path.exists(schema_path):
+        print(f"✗ Error: No se encontró el archivo schema.sql en {schema_path}")
+        return False
+
+    try:
+        # Leer el archivo SQL
+        with open(schema_path, 'r') as f:
+            sql_script = f.read()
+
+        # Crear la conexión a la base de datos y ejecutar el script
+        conn = sqlite3.connect(database_path)
+        conn.executescript(sql_script)
+        conn.commit()
+        conn.close()
+
+        print(f"✓ Base de datos creada en {database_path}")
+        return True
+    except Exception as e:
+        print(f"✗ Error al crear la base de datos: {str(e)}")
+        return False
+
+def drop_database():
+    """Elimina el archivo de la base de datos."""
+    if os.path.exists(database_path):
+        try:
+            os.remove(database_path)
+            print(f"✓ Archivo de base de datos eliminado: {database_path}")
+            return True
+        except Exception as e:
+            print(f"✗ Error al eliminar la base de datos: {str(e)}")
+            return False
+    else:
+        print(f"! El archivo de base de datos no existe: {database_path}")
+        return True
+
+def reset_database():
+    """Elimina y vuelve a crear la base de datos."""
+    drop_database()
+    return create_database()
+
+def check_database():
+    """Verifica el estado de la base de datos."""
+    print("=== Verificación de la base de datos NotasApp ===\n")
+
+    # Verificar si el archivo existe
+    if not os.path.exists(database_path):
+        print(f"✗ El archivo de la base de datos NO existe en {database_path}")
+        return False
+
+    print(f"✓ El archivo de la base de datos existe en {database_path}")
+
+    try:
+        # Conectar a la base de datos SQLite
+        conn = sqlite3.connect(database_path)
+        cursor = conn.cursor()
+
+        # Consulta para obtener todas las tablas
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+
+        if not tables:
+            print("\n✗ No hay tablas en la base de datos.")
+            conn.close()
+            return False
+
+        print("\nTablas existentes en la base de datos:")
+        for table in tables:
+            print(f"- {table[0]}")
+
+            # Obtener estructura de cada tabla
+            cursor.execute(f"PRAGMA table_info({table[0]});")
+            columns = cursor.fetchall()
+
+            print("  Columnas:")
+            for column in columns:
+                col_id, name, type_, not_null, default_value, pk = column
+                nullable = "NOT NULL" if not_null else "NULL"
+                primary = "PRIMARY KEY" if pk else ""
+                print(f"  - {name} ({type_}) {nullable} {primary}")
+
+            # Obtener claves foráneas
+            cursor.execute(f"PRAGMA foreign_key_list({table[0]});")
+            foreign_keys = cursor.fetchall()
+
+            if foreign_keys:
+                print("  Claves foráneas:")
+                for fk in foreign_keys:
+                    id_, seq, ref_table, from_col, to_col, on_update, on_delete, match = fk
+                    print(f"  - {from_col} -> {ref_table}.{to_col}")
+
+            print("-" * 40)
+
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"\n✗ Error al verificar la base de datos: {str(e)}")
+        return False
+
+def main():
+    parser = argparse.ArgumentParser(description='Herramienta para gestionar la base de datos de NotasApp')
+    parser.add_argument('action', choices=['create', 'drop', 'reset', 'check'],
+                        help='Acción a realizar: crear, eliminar, reiniciar o verificar la base de datos')
+
+    args = parser.parse_args()
+
+    if args.action == 'create':
+        create_database()
+    elif args.action == 'drop':
+        drop_database()
+    elif args.action == 'reset':
+        reset_database()
+    elif args.action == 'check':
+        check_database()
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        main()
+    else:
+        print("Por favor, especifique una acción: 'create', 'drop', 'reset' o 'check'.")
+        print("Ejemplo: python database_manager.py create")
