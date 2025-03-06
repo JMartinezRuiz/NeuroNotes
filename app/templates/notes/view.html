@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ note.title }} - NotasApp{% endblock %}
+
+{% block content %}
+    <section class="note-detail">
+        <div class="note-header">
+            <h1>{{ note.title }}</h1>
+            <div class="note-meta">
+                <span>Creada: {{ note.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                <span>Actualizada: {{ note.updated_at.strftime('%d/%m/%Y %H:%M') }}</span>
+            </div>
+            <div class="note-actions">
+                <a href="{{ url_for('notes.edit_note', id=note.id) }}" class="btn btn-primary">Editar</a>
+                <form action="{{ url_for('notes.delete_note', id=note.id) }}" method="POST" class="inline-form">
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('¿Estás seguro de que quieres eliminar esta nota?')">Eliminar</button>
+                </form>
+            </div>
+        </div>
+        <div class="note-content">
+            <p>{{ note.content }}</p>
+        </div>
+        <a href="{{ url_for('notes.index') }}" class="btn btn-text">Volver a Notas</a>
+    </section>
+{% endblock %}

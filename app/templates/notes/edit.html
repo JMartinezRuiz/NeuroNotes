@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Nota - NotasApp{% endblock %}
+
+{% block content %}
+    <section class="form-section">
+        <div class="section-header">
+            <h1>Editar Nota</h1>
+        </div>
+
+        <form action="{{ url_for('notes.edit_note', id=note.id) }}" method="POST" class="note-form">
+            <div class="form-group">
+                <label for="title">Título</label>
+                <input type="text" id="title" name="title" value="{{ note.title }}" required>
+            </div>
+            <div class="form-group">
+                <label for="content">Contenido</label>
+                <textarea id="content" name="content" rows="10" required>{{ note.content }}</textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Actualizar Nota</button>
+                <a href="{{ url_for('notes.view_note', id=note.id) }}" class="btn btn-text">Cancelar</a>
+            </div>
+        </form>
+    </section>
+{% endblock %}

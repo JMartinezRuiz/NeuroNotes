@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Inicio - NotasApp{% endblock %}
+
+{% block content %}
+    <section class="notes-section">
+        <div class="section-header">
+            <h1>Mis Notas</h1>
+            <a href="{{ url_for('notes.create_note') }}" class="btn btn-primary">Crear Nota</a>
+        </div>
+
+        <div class="notes-grid">
+            {% if notes %}
+                {% for note in notes %}
+                    <div class="note-card">
+                        <div class="note-card-header">
+                            <h2 class="note-title">
+                                <a href="{{ url_for('notes.view_note', id=note.id) }}">{{ note.title }}</a>
+                            </h2>
+                            <span class="note-date">{{ note.created_at.strftime('%d/%m/%Y') }}</span>
+                        </div>
+                        <div class="note-card-content">
+                            <p>{{ note.content[:100] }}{% if note.content|length > 100 %}...{% endif %}</p>
+                        </div>
+                        <div class="note-card-actions">
+                            <a href="{{ url_for('notes.view_note', id=note.id) }}" class="btn btn-text">Ver</a>
+                            <a href="{{ url_for('notes.edit_note', id=note.id) }}" class="btn btn-text">Editar</a>
+                            <form action="{{ url_for('notes.delete_note', id=note.id) }}" method="POST" class="inline-form">
+                                <button type="submit" class="btn btn-text btn-danger" onclick="return confirm('¿Estás seguro de que quieres eliminar esta nota?')">Eliminar</button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>Aún no tienes notas.</p>
+                    <a href="{{ url_for('notes.create_note') }}" class="btn btn-primary">Crea tu primera nota</a>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+{% endblock %}
