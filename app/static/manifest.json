@@ -1,13 +1,13 @@
 {
-  "name": "NotasApp",
-  "short_name": "NotasApp",
+  "name": "NeuroNotes",
+  "short_name": "NeuroNotes",
   "description": "Una aplicación moderna y minimalista de notas creada con Flask.",
   "start_url": "/?source=pwa",
   "id": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f8f9fa",
-  "theme_color": "#4361ee",
+  "background_color": "#f8f9fe",
+  "theme_color": "#5e72e4",
   "orientation": "portrait-primary",
   "prefer_related_applications": false,
   "icons": [

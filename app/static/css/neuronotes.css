@@ -1,0 +1,522 @@
+/* Estilos personalizados para NeuroNotes */
+
+/* Actualizar colores principales */
+:root {
+    /* Colores principales */
+    --primary-color: #5e72e4;
+    --primary-light: #748ffc;
+    --primary-dark: #324cdd;
+    --secondary-color: #11cdef;
+    --danger-color: #f5365c;
+    --success-color: #2dce89;
+
+    /* Colores de fondo */
+    --bg-color: #f8f9fe;
+    --card-bg: #ffffff;
+
+    /* Sombras mejoradas */
+    --box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+    --box-shadow-hover: 0 0 20px rgba(94, 114, 228, 0.15);
+}
+
+/* Mejoras visuales generales */
+body {
+    background-color: var(--bg-color);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Header y navegación mejorados */
+header {
+    background-color: var(--card-bg);
+    box-shadow: var(--box-shadow);
+}
+
+.logo a {
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+/* Mejora del menú de navegación */
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.nav-links li {
+    list-style: none;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: var(--text-color);
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.nav-links a:hover {
+    background-color: rgba(94, 114, 228, 0.1);
+    color: var(--primary-color);
+}
+
+.nav-links .btn-primary {
+    color: white;
+    background-color: var(--primary-color);
+}
+
+.nav-links .btn-primary:hover {
+    background-color: var(--primary-dark);
+}
+
+/* Mejorar el diseño del formulario de notas */
+.note-form {
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--box-shadow);
+    padding: var(--spacing-xl);
+    background: var(--card-bg);
+    border: none;
+    transition: all 0.3s ease;
+    margin-bottom: 30px;
+}
+
+.note-form:focus-within {
+    box-shadow: var(--box-shadow-hover);
+}
+
+/* Personalización del input de título */
+.note-form input[type="text"] {
+    border: none;
+    border-bottom: 2px solid var(--border-color);
+    border-radius: 0;
+    padding: 12px 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.note-form input[type="text"]:focus {
+    border-bottom-color: var(--primary-color);
+    box-shadow: none;
+    outline: none;
+}
+
+/* Personalización del textarea de contenido */
+.note-form textarea {
+    border: none;
+    border-radius: var(--border-radius-md);
+    background-color: #f9fafc;
+    padding: 16px;
+    font-size: 1rem;
+    line-height: 1.6;
+    min-height: 200px;
+    transition: all 0.3s ease;
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.note-form textarea:focus {
+    background-color: #f0f4fd;
+    box-shadow: none;
+    outline: none;
+}
+
+/* Mejorar selector de color */
+.color-picker-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+input[type="color"] {
+    -webkit-appearance: none;
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 50%;
+}
+
+.color-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.color-preset {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
+}
+
+.color-preset:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+/* Sistema moderno de categorías */
+.categories-container {
+    margin-top: 20px;
+}
+
+.categories-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.categories-header h4 {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.categories-input-container {
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.categories-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.9rem;
+}
+
+.categories-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(94, 114, 228, 0.1);
+}
+
+.categories-hint {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+.categories-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 32px;
+    margin-bottom: 16px;
+}
+
+/* Estilo mejorado para las etiquetas de categoría */
+.category-tag {
+    display: inline-flex;
+    align-items: center;
+    background-color: rgba(94, 114, 228, 0.1);
+    color: var(--primary-color);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    height: 28px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.category-tag:hover {
+    background-color: rgba(94, 114, 228, 0.2);
+}
+
+.category-tag .remove-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.category-tag .remove-tag:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: white;
+}
+
+/* Botones de formulario mejorados */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    padding: 10px 20px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-dark);
+    box-shadow: 0 4px 10px rgba(50, 76, 221, 0.25);
+    transform: translateY(-1px);
+}
+
+.btn-text {
+    background-color: transparent;
+    color: var(--text-color);
+    border: none;
+    padding: 10px 20px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-text:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Mejoras para la lista de notas */
+.note-card {
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    border: none;
+    box-shadow: var(--box-shadow);
+    transition: all 0.3s ease;
+    margin-bottom: 16px;
+}
+
+.note-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--box-shadow-hover);
+}
+
+.note-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.note-excerpt {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+.note-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-light);
+    font-size: 0.85rem;
+}
+
+/* Categorías para las notas */
+.category-pill {
+    display: inline-flex;
+    padding: 4px 10px;
+    margin-right: 5px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: white;
+    background-color: var(--primary-color);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    height: 24px;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.category-pill:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+}
+
+.note-categories {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+/* Mejoras en la pantalla de detalle de nota */
+.note-detail {
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-xl);
+    box-shadow: var(--box-shadow);
+    margin-bottom: 30px;
+}
+
+.note-header {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.note-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.note-content {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--text-color);
+}
+
+/* Perfil de usuario */
+.profile-card {
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-xl);
+    box-shadow: var(--box-shadow);
+    margin-bottom: 20px;
+}
+
+.profile-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.avatar-placeholder {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-right: 15px;
+}
+
+/* Estado vacío */
+.empty-state {
+    text-align: center;
+    padding: 50px 20px;
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--box-shadow);
+    margin: 30px auto;
+    max-width: 600px;
+}
+
+.empty-state .empty-icon {
+    margin-bottom: 20px;
+    color: var(--text-light);
+}
+
+.empty-state p {
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+/* Ajustes responsivos */
+@media (max-width: 768px) {
+    .note-form {
+        padding: var(--spacing-lg);
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+    }
+
+    .profile-header {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .avatar-placeholder {
+        margin-right: 0;
+        margin-bottom: 15px;
+    }
+}
+
+/* Sugerencias de categorías mientras se escribe */
+.categories-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: white;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--box-shadow);
+    z-index: 10;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+}
+
+.categories-suggestions.active {
+    display: block;
+}
+
+.suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.suggestion-item:hover {
+    background-color: rgba(94, 114, 228, 0.1);
+}
+
+/* Botón de eliminar */
+.btn-danger {
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    padding: 10px 20px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-danger:hover {
+    background-color: #e01f4f;
+    box-shadow: 0 4px 10px rgba(245, 54, 92, 0.25);
+    transform: translateY(-1px);
+}
+
+/* Estilos para formularios inline */
+.inline-form {
+    display: inline-block;
+}

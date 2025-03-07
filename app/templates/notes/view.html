@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ note.title or 'Sin título' }} - NotasApp{% endblock %}
+{% block title %}{{ note.title or 'Sin título' }} - NeuroNotes{% endblock %}
 
 {% block content %}
     <section class="note-detail" {% if note.color != '#ffffff' %}style="background-color: {{ note.color }};"{% endif %}>
@@ -9,24 +9,6 @@
             <div class="note-meta">
                 <span>Creada: {{ note.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
                 <span>Actualizada: {{ note.updated_at.strftime('%d/%m/%Y %H:%M') }}</span>
-                {% if note.group %}
-                    <span class="note-group-badge">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
-                        Grupo: {{ note.group.groupname }}
-                    </span>
-                    <span class="note-author-badge">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="12" cy="7" r="4"></circle>
-                        </svg>
-                        Autor: {{ note.author.username }}
-                    </span>
-                {% endif %}
             </div>
 
             {% if note.categories.count() > 0 %}
@@ -49,13 +31,11 @@
             </div>
         </div>
         <div class="note-content">
-            {{ note.content|nl2br }}
+            {{ note.content|nl2br|safe }}
         </div>
 
-        {% if note.group %}
-            <a href="{{ url_for('notes.group_notes', group_id=note.group_id) }}" class="btn btn-text">Volver a Notas del Grupo</a>
-        {% else %}
+        <div style="margin-top: 20px;">
             <a href="{{ url_for('notes.index') }}" class="btn btn-text">Volver a Notas</a>
-        {% endif %}
+        </div>
     </section>
 {% endblock %}

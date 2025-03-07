@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
-    <title>{% block title %}NotasApp{% endblock %}</title>
+    <title>{% block title %}NeuroNotes{% endblock %}</title>
 
     <!-- Meta tags optimizados para Android -->
     <meta name="description" content="Una aplicación moderna y minimalista de notas">
-    <meta name="theme-color" content="#4361ee">
+    <meta name="theme-color" content="#5e72e4">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="NotasApp">
+    <meta name="application-name" content="NeuroNotes">
 
     <!-- Precargar fuentes para mejorar rendimiento -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,6 +18,7 @@
 
     <!-- Estilos modernizados -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/neuronotes.css') }}">
 
     <!-- Iconos para Android -->
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32x32.png') }}">
@@ -41,35 +42,15 @@
                             <line x1="16" y1="17" x2="8" y2="17"></line>
                             <polyline points="10 9 9 9 8 9"></polyline>
                         </svg>
-                        NotasApp
+                        NeuroNotes
                     </a>
                 </div>
                 <ul class="nav-links">
                     {% if current_user.is_authenticated %}
                         <li><a href="{{ url_for('notes.index') }}">Mis Notas</a></li>
                         <li><a href="{{ url_for('categories.personal_categories') }}">Categorías</a></li>
-                        <li><a href="{{ url_for('groups.index') }}">Grupos</a></li>
-                        <li class="dropdown">
-                            <a href="#" class="dropdown-toggle">
-                                {{ current_user.username }}
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="6 9 12 15 18 9"></polyline>
-                                </svg>
-                            </a>
-                            <div class="dropdown-menu">
-                                <a href="{{ url_for('users.profile') }}">Mi Perfil</a>
-                                <a href="{{ url_for('auth.logout') }}">Cerrar Sesión</a>
-                            </div>
-                        </li>
-                        <li><a href="{{ url_for('notes.create_note') }}" class="btn btn-primary desktop-only">
-                            <span class="btn-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                </svg>
-                            </span>
-                            Nueva nota
-                        </a></li>
+                        <li><a href="{{ url_for('users.profile') }}">Mi Perfil</a></li>
+                        <li><a href="{{ url_for('auth.logout') }}">Cerrar Sesión</a></li>
                     {% else %}
                         <li><a href="{{ url_for('auth.login') }}">Iniciar Sesión</a></li>
                         <li><a href="{{ url_for('auth.register') }}" class="btn btn-primary">Registrarse</a></li>
@@ -97,7 +78,7 @@
 
     <footer>
         <div class="container">
-            <p>&copy; {{ now.year }} NotasApp. Todos los derechos reservados.</p>
+            <p>&copy; {{ now.year }} NeuroNotes. Todos los derechos reservados.</p>
         </div>
     </footer>
 

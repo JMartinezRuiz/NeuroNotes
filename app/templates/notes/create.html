@@ -1,59 +1,61 @@
 {% extends 'base.html' %}
 
-{% block title %}Crear Nota - NotasApp{% endblock %}
+{% block title %}Crear Nota - NeuroNotes{% endblock %}
 
 {% block content %}
     <section class="form-section">
         <div class="section-header">
-            <h1>Crear Nota Personal</h1>
+            <h1>Crear Nota</h1>
+            <p>Organiza tus ideas de manera simple y efectiva</p>
         </div>
 
-        <form action="{{ url_for('notes.create_note') }}" method="POST" class="note-form">
+        <form action="{{ url_for('notes.create_note') }}" method="POST" class="note-form" id="note-form">
             <div class="form-group">
-                <label for="title">Título</label>
-                <input type="text" id="title" name="title" placeholder="Título de la nota (opcional)">
+                <input type="text" id="title" name="title" placeholder="Título (opcional)" autocomplete="off">
             </div>
+
             <div class="form-group">
-                <label for="content">Contenido</label>
-                <textarea id="content" name="content" rows="10" required placeholder="Escribe aquí tu nota..."></textarea>
+                <textarea id="content" name="content" required placeholder="Escribe aquí tu nota...&#10;&#10;Consejo: Usa .categoria. en cualquier parte del texto para crear categorías automáticamente."></textarea>
             </div>
 
             <div class="form-row">
                 <div class="form-group">
-                    <label for="color">Color</label>
+                    <label for="color">Color de la nota</label>
                     <div class="color-picker-wrapper">
                         <input type="color" id="color" name="color" value="#ffffff">
                         <div class="color-presets">
                             <button type="button" class="color-preset" style="background-color: #ffffff;" data-color="#ffffff"></button>
-                            <button type="button" class="color-preset" style="background-color: #f8d7da;" data-color="#f8d7da"></button>
-                            <button type="button" class="color-preset" style="background-color: #d4edda;" data-color="#d4edda"></button>
-                            <button type="button" class="color-preset" style="background-color: #d1ecf1;" data-color="#d1ecf1"></button>
-                            <button type="button" class="color-preset" style="background-color: #fff3cd;" data-color="#fff3cd"></button>
-                            <button type="button" class="color-preset" style="background-color: #e2e3e5;" data-color="#e2e3e5"></button>
+                            <button type="button" class="color-preset" style="background-color: #f8f9fe;" data-color="#f8f9fe"></button>
+                            <button type="button" class="color-preset" style="background-color: #eaecfb;" data-color="#eaecfb"></button>
+                            <button type="button" class="color-preset" style="background-color: #e9f8f4;" data-color="#e9f8f4"></button>
+                            <button type="button" class="color-preset" style="background-color: #fef4f4;" data-color="#fef4f4"></button>
+                            <button type="button" class="color-preset" style="background-color: #fcf8e9;" data-color="#fcf8e9"></button>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="form-group">
-                    <label for="categories">Categorías</label>
-                    <div class="categories-selector">
-                        {% if categories %}
-                            {% for category in categories %}
-                                <div class="category-checkbox">
-                                    <input type="checkbox" id="category-{{ category.id }}" name="categories" value="{{ category.id }}">
-                                    <label for="category-{{ category.id }}" style="--category-color: {{ category.color }}">
-                                        <span class="checkbox-color-indicator" style="background-color: {{ category.color }}"></span>
-                                        {{ category.name }}
-                                    </label>
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <p class="no-categories-message">
-                                No tienes categorías personales.
-                                <a href="{{ url_for('categories.create_personal_category') }}" target="_blank">Crear categoría</a>
-                            </p>
-                        {% endif %}
-                    </div>
+            <div class="categories-container">
+                <div class="categories-header">
+                    <h4>Categorías</h4>
+                </div>
+
+                <div class="categories-input-container">
+                    <input type="text" id="category-input" class="categories-input" placeholder="Añadir categoría..." autocomplete="off">
+                    <div class="categories-suggestions" id="categories-suggestions"></div>
+                    <span class="categories-hint">Presiona Enter para añadir o escribe .categoria. en el texto de la nota</span>
+                </div>
+
+                <div class="categories-tags" id="categories-tags">
+                    {% if categories %}
+                        {% for category in categories %}
+                            <div class="category-tag" data-id="{{ category.id }}">
+                                {{ category.name }}
+                                <span class="remove-tag" onclick="removeTag(this)">×</span>
+                                <input type="hidden" name="categories" value="{{ category.id }}">
+                            </div>
+                        {% endfor %}
+                    {% endif %}
                 </div>
             </div>
 
@@ -65,8 +67,14 @@
     </section>
 
     <script>
-        // Script para los presets de colores
+        // Función para eliminar categorías
+        function removeTag(element) {
+            const tag = element.parentElement;
+            tag.remove();
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            // Script para los presets de colores
             const colorInput = document.getElementById('color');
             const presetButtons = document.querySelectorAll('.color-preset');
 
@@ -74,6 +82,122 @@
                 button.addEventListener('click', function() {
                     const color = this.getAttribute('data-color');
                     colorInput.value = color;
+                });
+            });
+
+            // Manejo de categorías
+            const categoryInput = document.getElementById('category-input');
+            const categoriesTags = document.getElementById('categories-tags');
+            const categoriesSuggestions = document.getElementById('categories-suggestions');
+
+            // Sugerencias de categorías
+            const existingCategories = [
+                {% if categories %}
+                    {% for category in categories %}
+                        {id: {{ category.id }}, name: '{{ category.name }}'},
+                    {% endfor %}
+                {% endif %}
+            ];
+
+            // Añadir una categoría como tag
+            function addCategoryTag(id, name) {
+                // Verificar si ya existe
+                if (document.querySelector(`.category-tag[data-id="${id}"]`)) {
+                    return;
+                }
+
+                const tag = document.createElement('div');
+                tag.className = 'category-tag';
+                tag.setAttribute('data-id', id);
+                tag.innerHTML = `
+                    ${name}
+                    <span class="remove-tag" onclick="removeTag(this)">×</span>
+                    <input type="hidden" name="categories" value="${id}">
+                `;
+
+                categoriesTags.appendChild(tag);
+                categoryInput.value = '';
+            }
+
+            // Crear nueva categoría
+            function createCategory(name) {
+                // ID único para nueva categoría
+                const id = 'new_' + name.replace(/\s+/g, '_').toLowerCase();
+
+                // Verificar si ya existe
+                if (document.querySelector(`.category-tag[data-id="${id}"]`)) {
+                    return;
+                }
+
+                const tag = document.createElement('div');
+                tag.className = 'category-tag';
+                tag.setAttribute('data-id', id);
+                tag.innerHTML = `
+                    ${name}
+                    <span class="remove-tag" onclick="removeTag(this)">×</span>
+                    <input type="hidden" name="new_categories" value="${name}">
+                `;
+
+                categoriesTags.appendChild(tag);
+                categoryInput.value = '';
+            }
+
+            // Manejo del input de categorías
+            categoryInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+
+                    const categoryName = this.value.trim();
+                    if (categoryName) {
+                        // Comprobar si existe
+                        const existingCategory = existingCategories.find(cat =>
+                            cat.name.toLowerCase() === categoryName.toLowerCase()
+                        );
+
+                        if (existingCategory) {
+                            addCategoryTag(existingCategory.id, existingCategory.name);
+                        } else {
+                            createCategory(categoryName);
+                        }
+                    }
+                }
+            });
+
+            // Autodetectar marcado de categorías en el texto
+            const contentTextarea = document.getElementById('content');
+
+            contentTextarea.addEventListener('input', function() {
+                // Si hay cambios en el texto, comprobar el formato .categoria.
+                const text = this.value;
+
+                // Regex para encontrar patrones .categoria.
+                const regex = /\.([a-zA-Z0-9_-]+)\./g;
+                let match;
+
+                // Buscar todas las coincidencias
+                const foundCategories = [];
+                while ((match = regex.exec(text)) !== null) {
+                    foundCategories.push(match[1]);
+                }
+
+                // Para cada categoría encontrada
+                foundCategories.forEach(categoryName => {
+                    // Comprobar si ya existe como tag
+                    const existingTags = Array.from(categoriesTags.querySelectorAll('.category-tag'))
+                        .map(tag => tag.textContent.trim());
+
+                    if (!existingTags.includes(categoryName)) {
+                        // Comprobar si existe en las categorías conocidas
+                        const existingCategory = existingCategories.find(cat =>
+                            cat.name.toLowerCase() === categoryName.toLowerCase()
+                        );
+
+                        if (existingCategory) {
+                            addCategoryTag(existingCategory.id, existingCategory.name);
+                        } else {
+                            createCategory(categoryName);
+                        }
+                    }
                 });
             });
         });

@@ -1,7 +1,7 @@
 # Filtros personalizados para plantillas
 
 from flask import Flask
-from markupsafe import escape, Markup
+from markupsafe import escape
 
 def nl2br(value):
     """
@@ -11,7 +11,7 @@ def nl2br(value):
     if not value:
         return ""
     value = escape(value)
-    return Markup(value.replace('\n', '<br>\n'))
+    return value.replace('\n', '<br>\n')
 
 
 def register_filters(app: Flask):
