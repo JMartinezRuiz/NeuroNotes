@@ -1,10 +1,33 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+{% extends 'base.html' %}
+
+{% block title %}Añadir Miembro - NotasApp{% endblock %}
+
+{% block content %}
+    <section class="form-section">
+        <div class="section-header">
+            <h1>Añadir Miembro a {{ group.groupname }}</h1>
+        </div>
+
+        <form action="{{ url_for('groups.add_member', group_id=group.id) }}" method="POST" class="note-form">
+            <div class="form-group">
+                <label for="username">Nombre de Usuario</label>
+                <input type="text" id="username" name="username" required autofocus>
+                <p class="form-help">Introduce el nombre de usuario exacto de la persona que quieres añadir.</p>
+            </div>
+            
+            <div class="form-group">
+                <label for="role">Rol</label>
+                <select id="role" name="role" required>
+                    <option value="member" selected>Miembro</option>
+                    <option value="admin">Administrador</option>
+                </select>
+                <p class="form-help">Los administradores pueden añadir/eliminar miembros y gestionar categorías del grupo.</p>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Añadir Miembro</button>
+                <a href="{{ url_for('groups.view_group', group_id=group.id) }}" class="btn btn-text">Cancelar</a>
+            </div>
+        </form>
+    </section>
+{% endblock %}

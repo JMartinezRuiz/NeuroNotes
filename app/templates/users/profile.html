@@ -1,10 +1,71 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+{% extends 'base.html' %}
+
+{% block title %}Mi Perfil - NotasApp{% endblock %}
+
+{% block content %}
+    <section class="profile-section">
+        <div class="section-header">
+            <h1>Mi Perfil</h1>
+        </div>
+
+        <div class="profile-card">
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    <span class="avatar-placeholder">{{ user.username[0] | upper }}</span>
+                </div>
+                <div class="profile-title">
+                    <h2>{{ user.username }}</h2>
+                    <p>{{ user.email }}</p>
+                </div>
+            </div>
+
+            <div class="profile-body">
+                <div class="profile-info">
+                    <div class="info-item">
+                        <span class="info-label">Zona horaria:</span>
+                        <span class="info-value">{{ user.timezone }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Miembro desde:</span>
+                        <span class="info-value">{{ user.created_at.strftime('%d/%m/%Y') }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-actions">
+                <a href="{{ url_for('users.edit_profile') }}" class="btn btn-primary">
+                    <span class="btn-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                        </svg>
+                    </span>
+                    Editar Perfil
+                </a>
+                <a href="{{ url_for('users.change_password') }}" class="btn btn-text">
+                    <span class="btn-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                    </span>
+                    Cambiar Contraseña
+                </a>
+            </div>
+        </div>
+
+        <div class="profile-stats">
+            <div class="stat-card">
+                <div class="stat-value">{{ user.notes.count() }}</div>
+                <div class="stat-label">Notas Personales</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ user.personal_categories.count() }}</div>
+                <div class="stat-label">Categorías</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ user.groups.count() }}</div>
+                <div class="stat-label">Grupos</div>
+            </div>
+        </div>
+    </section>
+{% endblock %}

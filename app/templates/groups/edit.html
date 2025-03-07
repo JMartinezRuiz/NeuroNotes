@@ -1,10 +1,23 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+{% extends 'base.html' %}
+
+{% block title %}Editar Grupo - NotasApp{% endblock %}
+
+{% block content %}
+    <section class="form-section">
+        <div class="section-header">
+            <h1>Editar Grupo</h1>
+        </div>
+
+        <form action="{{ url_for('groups.edit_group', group_id=group.id) }}" method="POST" class="note-form">
+            <div class="form-group">
+                <label for="groupname">Nombre del Grupo</label>
+                <input type="text" id="groupname" name="groupname" value="{{ group.groupname }}" required autofocus>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                <a href="{{ url_for('groups.view_group', group_id=group.id) }}" class="btn btn-text">Cancelar</a>
+            </div>
+        </form>
+    </section>
+{% endblock %}

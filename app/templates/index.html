@@ -5,7 +5,7 @@
 {% block content %}
     <section class="notes-section">
         <div class="section-header">
-            <h1>Mis Notas</h1>
+            <h1>Mis Notas Personales</h1>
             <a href="{{ url_for('notes.create_note') }}" class="btn btn-primary desktop-only">
                 <span class="btn-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -20,9 +20,9 @@
         <div class="notes-list">
             {% if notes %}
                 {% for note in notes %}
-                    <div class="note-card">
-                        <a href="{{ url_for('notes.view_note', id=note.id) }}" class="note-card-content">
-                            <h2 class="note-title">{{ note.title }}</h2>
+                    <div class="note-card" {% if note.color != '#ffffff' %}style="background-color: {{ note.color }};"{% endif %}>
+                        <a href="{{ url_for('notes.view_note', note_id=note.id) }}" class="note-card-content">
+                            <h2 class="note-title">{{ note.title or 'Sin título' }}</h2>
                             <p class="note-excerpt">{{ note.content[:100] }}{% if note.content|length > 100 %}...{% endif %}</p>
                             <div class="note-meta">
                                 <span class="note-date">
@@ -32,15 +32,27 @@
                                     </svg>
                                     {{ note.created_at.strftime('%d %b %Y') }}
                                 </span>
+                                {% if note.categories.count() > 0 %}
+                                    <div class="note-categories">
+                                        {% for category in note.categories[:2] %}
+                                            <a href="{{ url_for('categories.category_notes', category_id=category.id) }}" class="category-pill" style="background-color: {{ category.color }}">
+                                                {{ category.name }}
+                                            </a>
+                                        {% endfor %}
+                                        {% if note.categories.count() > 2 %}
+                                            <span class="more-categories">+{{ note.categories.count() - 2 }}</span>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
                             </div>
                         </a>
                         <div class="note-card-actions">
-                            <a href="{{ url_for('notes.edit_note', id=note.id) }}" class="action-btn edit-btn" title="Editar">
+                            <a href="{{ url_for('notes.edit_note', note_id=note.id) }}" class="action-btn edit-btn" title="Editar">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
                                 </svg>
                             </a>
-                            <form action="{{ url_for('notes.delete_note', id=note.id) }}" method="POST" class="inline-form">
+                            <form action="{{ url_for('notes.delete_note', note_id=note.id) }}" method="POST" class="inline-form">
                                 <button type="submit" class="action-btn delete-btn" title="Eliminar" data-confirm="true">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="3 6 5 6 21 6"></polyline>
@@ -72,6 +84,43 @@
                         </span>
                         Crea tu primera nota
                     </a>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="recent-groups-section">
+            <h2 class="section-title">Mis Grupos</h2>
+            {% set groups = current_user.groups.limit(3).all() %}
+
+            {% if groups %}
+                <div class="groups-list-compact">
+                    {% for group in groups %}
+                        <a href="{{ url_for('notes.group_notes', group_id=group.id) }}" class="group-card-compact">
+                            <div class="group-avatar">
+                                <span class="avatar-placeholder">{{ group.groupname[0] | upper }}</span>
+                            </div>
+                            <div class="group-info">
+                                <h3 class="group-name">{{ group.groupname }}</h3>
+                                <span class="group-meta">{{ group.members.count() }} miembros</span>
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </a>
+                    {% endfor %}
+
+                    <a href="{{ url_for('groups.index') }}" class="view-all-link">
+                        Ver todos mis grupos
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </a>
+                </div>
+            {% else %}
+                <div class="empty-state-compact">
+                    <p>No perteneces a ningún grupo</p>
+                    <a href="{{ url_for('groups.create_group') }}" class="btn btn-sm btn-primary">Crear grupo</a>
                 </div>
             {% endif %}
         </div>

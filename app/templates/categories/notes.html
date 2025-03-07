@@ -1,10 +1,143 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+{% extends 'base.html' %}
+
+{% block title %}Notas en {{ category.name }} - NotasApp{% endblock %}
+
+{% block content %}
+    <section class="notes-section">
+        <div class="section-header">
+            <div class="category-header">
+                <div class="category-badge" style="background-color: {{ category.color }}">{{ category.name }}</div>
+                <h1>Notas en esta categoría</h1>
+            </div>
+            
+            <div class="header-actions">
+                {% if category.type == 'personal' %}
+                    <a href="{{ url_for('categories.personal_categories') }}" class="btn btn-text">
+                        Volver a Categorías
+                    </a>
+                    <a href="{{ url_for('notes.create_note') }}" class="btn btn-primary desktop-only">
+                        <span class="btn-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </span>
+                        Nueva nota
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('categories.group_categories', group_id=category.group_id) }}" class="btn btn-text">
+                        Volver a Categorías
+                    </a>
+                    <a href="{{ url_for('notes.create_group_note', group_id=category.group_id) }}" class="btn btn-primary desktop-only">
+                        <span class="btn-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </span>
+                        Nueva nota
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="notes-list">
+            {% if notes %}
+                {% for note in notes %}
+                    <div class="note-card" {% if note.color != '#ffffff' %}style="background-color: {{ note.color }};"{% endif %}>
+                        <a href="{{ url_for('notes.view_note', note_id=note.id) }}" class="note-card-content">
+                            <h2 class="note-title">{{ note.title }}</h2>
+                            <p class="note-excerpt">{{ note.content[:100] }}{% if note.content|length > 100 %}...{% endif %}</p>
+                            <div class="note-meta">
+                                <span class="note-date">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    {{ note.created_at.strftime('%d %b %Y') }}
+                                </span>
+                                {% if note.group_id %}
+                                    <span class="note-group">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                            <circle cx="9" cy="7" r="4"></circle>
+                                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                        </svg>
+                                        {{ note.group.groupname }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </a>
+                        <div class="note-card-actions">
+                            <a href="{{ url_for('notes.edit_note', note_id=note.id) }}" class="action-btn edit-btn" title="Editar">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                                </svg>
+                            </a>
+                            <form action="{{ url_for('notes.delete_note', note_id=note.id) }}" method="POST" class="inline-form">
+                                <button type="submit" class="action-btn delete-btn" title="Eliminar" data-confirm="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                    </div>
+                    <p>No hay notas en esta categoría</p>
+                    {% if category.type == 'personal' %}
+                        <a href="{{ url_for('notes.create_note') }}" class="btn btn-primary">
+                            <span class="btn-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </span>
+                            Crear nota
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('notes.create_group_note', group_id=category.group_id) }}" class="btn btn-primary">
+                            <span class="btn-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </span>
+                            Crear nota
+                        </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Botón flotante para dispositivos móviles -->
+        {% if category.type == 'personal' %}
+            <a href="{{ url_for('notes.create_note') }}" class="floating-action-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </a>
+        {% else %}
+            <a href="{{ url_for('notes.create_group_note', group_id=category.group_id) }}" class="floating-action-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </a>
+        {% endif %}
+    </section>
+{% endblock %}

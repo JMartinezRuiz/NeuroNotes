@@ -45,16 +45,35 @@
                     </a>
                 </div>
                 <ul class="nav-links">
-                    <li><a href="{{ url_for('notes.index') }}">Inicio</a></li>
-                    <li><a href="{{ url_for('notes.create_note') }}" class="btn btn-primary desktop-only">
-                        <span class="btn-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                            </svg>
-                        </span>
-                        Nueva Nota
-                    </a></li>
+                    {% if current_user.is_authenticated %}
+                        <li><a href="{{ url_for('notes.index') }}">Mis Notas</a></li>
+                        <li><a href="{{ url_for('categories.personal_categories') }}">Categorías</a></li>
+                        <li><a href="{{ url_for('groups.index') }}">Grupos</a></li>
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle">
+                                {{ current_user.username }}
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </a>
+                            <div class="dropdown-menu">
+                                <a href="{{ url_for('users.profile') }}">Mi Perfil</a>
+                                <a href="{{ url_for('auth.logout') }}">Cerrar Sesión</a>
+                            </div>
+                        </li>
+                        <li><a href="{{ url_for('notes.create_note') }}" class="btn btn-primary desktop-only">
+                            <span class="btn-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </span>
+                            Nueva nota
+                        </a></li>
+                    {% else %}
+                        <li><a href="{{ url_for('auth.login') }}">Iniciar Sesión</a></li>
+                        <li><a href="{{ url_for('auth.register') }}" class="btn btn-primary">Registrarse</a></li>
+                    {% endif %}
                 </ul>
             </nav>
         </div>

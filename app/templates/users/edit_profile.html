@@ -1,10 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+{% extends 'base.html' %}
+
+{% block title %}Editar Perfil - NotasApp{% endblock %}
+
+{% block content %}
+    <section class="form-section">
+        <div class="section-header">
+            <h1>Editar Perfil</h1>
+        </div>
+
+        <form action="{{ url_for('users.edit_profile') }}" method="POST" class="note-form">
+            <div class="form-group">
+                <label for="username">Nombre de Usuario</label>
+                <input type="text" id="username" name="username" value="{{ user.username }}" required autofocus>
+            </div>
+            <div class="form-group">
+                <label for="email">Correo Electrónico</label>
+                <input type="email" id="email" name="email" value="{{ user.email }}" required>
+            </div>
+            <div class="form-group">
+                <label for="timezone">Zona Horaria</label>
+                <select id="timezone" name="timezone" required>
+                    <option value="UTC" {% if user.timezone == 'UTC' %}selected{% endif %}>UTC</option>
+                    <option value="Europe/Madrid" {% if user.timezone == 'Europe/Madrid' %}selected{% endif %}>Europe/Madrid</option>
+                    <option value="America/Mexico_City" {% if user.timezone == 'America/Mexico_City' %}selected{% endif %}>America/Mexico City</option>
+                    <option value="America/Bogota" {% if user.timezone == 'America/Bogota' %}selected{% endif %}>America/Bogota</option>
+                    <option value="America/Buenos_Aires" {% if user.timezone == 'America/Buenos_Aires' %}selected{% endif %}>America/Buenos Aires</option>
+                    <option value="America/Santiago" {% if user.timezone == 'America/Santiago' %}selected{% endif %}>America/Santiago</option>
+                    <!-- Añadir más zonas horarias según sea necesario -->
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                <a href="{{ url_for('users.profile') }}" class="btn btn-text">Cancelar</a>
+            </div>
+        </form>
+    </section>
+{% endblock %}

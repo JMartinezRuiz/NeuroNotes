@@ -1,25 +1,61 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ note.title }} - NotasApp{% endblock %}
+{% block title %}{{ note.title or 'Sin título' }} - NotasApp{% endblock %}
 
 {% block content %}
-    <section class="note-detail">
+    <section class="note-detail" {% if note.color != '#ffffff' %}style="background-color: {{ note.color }};"{% endif %}>
         <div class="note-header">
-            <h1>{{ note.title }}</h1>
+            <h1>{{ note.title or 'Sin título' }}</h1>
             <div class="note-meta">
                 <span>Creada: {{ note.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
                 <span>Actualizada: {{ note.updated_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                {% if note.group %}
+                    <span class="note-group-badge">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        Grupo: {{ note.group.groupname }}
+                    </span>
+                    <span class="note-author-badge">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        Autor: {{ note.author.username }}
+                    </span>
+                {% endif %}
             </div>
+
+            {% if note.categories.count() > 0 %}
+                <div class="note-categories">
+                    {% for category in note.categories %}
+                        <a href="{{ url_for('categories.category_notes', category_id=category.id) }}" class="category-pill" style="background-color: {{ category.color }}">
+                            {{ category.name }}
+                        </a>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
             <div class="note-actions">
-                <a href="{{ url_for('notes.edit_note', id=note.id) }}" class="btn btn-primary">Editar</a>
-                <form action="{{ url_for('notes.delete_note', id=note.id) }}" method="POST" class="inline-form">
-                    <button type="submit" class="btn btn-danger" onclick="return confirm('¿Estás seguro de que quieres eliminar esta nota?')">Eliminar</button>
-                </form>
+                {% if note.user_id == current_user.id %}
+                    <a href="{{ url_for('notes.edit_note', note_id=note.id) }}" class="btn btn-primary">Editar</a>
+                    <form action="{{ url_for('notes.delete_note', note_id=note.id) }}" method="POST" class="inline-form">
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('¿Estás seguro de que quieres eliminar esta nota?')">Eliminar</button>
+                    </form>
+                {% endif %}
             </div>
         </div>
         <div class="note-content">
-            <p>{{ note.content }}</p>
+            {{ note.content|nl2br }}
         </div>
-        <a href="{{ url_for('notes.index') }}" class="btn btn-text">Volver a Notas</a>
+
+        {% if note.group %}
+            <a href="{{ url_for('notes.group_notes', group_id=note.group_id) }}" class="btn btn-text">Volver a Notas del Grupo</a>
+        {% else %}
+            <a href="{{ url_for('notes.index') }}" class="btn btn-text">Volver a Notas</a>
+        {% endif %}
     </section>
 {% endblock %}

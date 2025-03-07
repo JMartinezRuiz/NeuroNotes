@@ -1,10 +1,54 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+{% extends 'base.html' %}
+
+{% block title %}Editar Categoría - NotasApp{% endblock %}
+
+{% block content %}
+    <section class="form-section">
+        <div class="section-header">
+            <h1>Editar Categoría Personal</h1>
+        </div>
+
+        <form action="{{ url_for('categories.edit_personal_category', category_id=category.id) }}" method="POST" class="note-form">
+            <div class="form-group">
+                <label for="name">Nombre</label>
+                <input type="text" id="name" name="name" value="{{ category.name }}" required autofocus>
+            </div>
+            <div class="form-group">
+                <label for="color">Color</label>
+                <div class="color-picker-wrapper">
+                    <input type="color" id="color" name="color" value="{{ category.color }}">
+                    <div class="color-presets">
+                        <button type="button" class="color-preset" style="background-color: #4361ee;" data-color="#4361ee"></button>
+                        <button type="button" class="color-preset" style="background-color: #3a0ca3;" data-color="#3a0ca3"></button>
+                        <button type="button" class="color-preset" style="background-color: #7209b7;" data-color="#7209b7"></button>
+                        <button type="button" class="color-preset" style="background-color: #f72585;" data-color="#f72585"></button>
+                        <button type="button" class="color-preset" style="background-color: #4cc9f0;" data-color="#4cc9f0"></button>
+                        <button type="button" class="color-preset" style="background-color: #2ecc71;" data-color="#2ecc71"></button>
+                        <button type="button" class="color-preset" style="background-color: #f39c12;" data-color="#f39c12"></button>
+                        <button type="button" class="color-preset" style="background-color: #e74c3c;" data-color="#e74c3c"></button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                <a href="{{ url_for('categories.personal_categories') }}" class="btn btn-text">Cancelar</a>
+            </div>
+        </form>
+    </section>
+    
+    <script>
+        // Script para los presets de colores
+        document.addEventListener('DOMContentLoaded', function() {
+            const colorInput = document.getElementById('color');
+            const presetButtons = document.querySelectorAll('.color-preset');
+            
+            presetButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const color = this.getAttribute('data-color');
+                    colorInput.value = color;
+                });
+            });
+        });
+    </script>
+{% endblock %}

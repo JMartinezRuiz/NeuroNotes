@@ -1,9 +1,10 @@
 from datetime import datetime
 from app import db
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import UserMixin
 
 
-class User(db.Model):
+class User(db.Model, UserMixin):
     """Modelo para los usuarios"""
     __tablename__ = 'users'
 
@@ -51,3 +52,23 @@ class User(db.Model):
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
+
+    # Métodos explícitos requeridos por Flask-Login (aunque UserMixin ya los proporciona)
+    @property
+    def is_authenticated(self):
+        """Método requerido por Flask-Login: ¿usuario autenticado?"""
+        return True
+
+    @property
+    def is_active(self):
+        """Método requerido por Flask-Login: ¿usuario activo?"""
+        return True
+
+    @property
+    def is_anonymous(self):
+        """Método requerido por Flask-Login: ¿usuario anónimo?"""
+        return False
+
+    def get_id(self):
+        """Método requerido por Flask-Login: obtener ID del usuario"""
+        return str(self.id)

@@ -1,10 +1,106 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+{% extends 'base.html' %}
+
+{% block title %}Categorías de {{ group.groupname }} - NotasApp{% endblock %}
+
+{% block content %}
+    <section class="categories-section">
+        <div class="section-header">
+            <h1>Categorías de {{ group.groupname }}</h1>
+            <div class="header-actions">
+                <a href="{{ url_for('groups.view_group', group_id=group.id) }}" class="btn btn-text">
+                    Volver al Grupo
+                </a>
+                {% if is_admin %}
+                    <a href="{{ url_for('categories.create_group_category', group_id=group.id) }}" class="btn btn-primary desktop-only">
+                        <span class="btn-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </span>
+                        Nueva Categoría
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if categories %}
+            <div class="categories-grid">
+                {% for category in categories %}
+                    <div class="category-card" style="border-left-color: {{ category.color }}">
+                        <a href="{{ url_for('categories.category_notes', category_id=category.id) }}" class="category-card-content">
+                            <h3 class="category-name">{{ category.name }}</h3>
+                            <div class="category-meta">
+                                <span class="category-count">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                        <polyline points="10 9 9 9 8 9"></polyline>
+                                    </svg>
+                                    {{ category.notes.count() }} notas
+                                </span>
+                                <span class="category-date">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    {{ category.created_at.strftime('%d/%m/%Y') }}
+                                </span>
+                            </div>
+                        </a>
+                        {% if is_admin %}
+                            <div class="category-card-actions">
+                                <a href="{{ url_for('categories.edit_group_category', group_id=group.id, category_id=category.id) }}" class="action-btn edit-btn" title="Editar">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                                    </svg>
+                                </a>
+                                <form action="{{ url_for('categories.delete_group_category', group_id=group.id, category_id=category.id) }}" method="POST" class="inline-form">
+                                    <button type="submit" class="action-btn delete-btn" title="Eliminar" data-confirm="true">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                        <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                    </svg>
+                </div>
+                <p>Este grupo aún no tiene categorías</p>
+                {% if is_admin %}
+                    <a href="{{ url_for('categories.create_group_category', group_id=group.id) }}" class="btn btn-primary">
+                        <span class="btn-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </span>
+                        Crear categoría
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        <!-- Botón flotante para dispositivos móviles (solo para administradores) -->
+        {% if is_admin %}
+            <a href="{{ url_for('categories.create_group_category', group_id=group.id) }}" class="floating-action-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </a>
+        {% endif %}
+    </section>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Crear Grupo - NotasApp{% endblock %}
+
+{% block content %}
+    <section class="form-section">
+        <div class="section-header">
+            <h1>Crear Grupo</h1>
+        </div>
+
+        <form action="{{ url_for('groups.create_group') }}" method="POST" class="note-form">
+            <div class="form-group">
+                <label for="groupname">Nombre del Grupo</label>
+                <input type="text" id="groupname" name="groupname" required autofocus>
+                <p class="form-help">Elige un nombre descriptivo para tu grupo.</p>
+            </div>
+
+            <div class="form-info-box">
+                <div class="info-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                </div>
+                <div class="info-content">
+                    <p>Como creador, serás administrador del grupo. Podrás:</p>
+                    <ul>
+                        <li>Añadir o eliminar miembros</li>
+                        <li>Crear categorías para organizar las notas</li>
+                        <li>Editar o eliminar el grupo</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Crear Grupo</button>
+                <a href="{{ url_for('groups.index') }}" class="btn btn-text">Cancelar</a>
+            </div>
+        </form>
+    </section>
+{% endblock %}
