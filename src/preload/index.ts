@@ -5,6 +5,7 @@ import {
   AiDiagnosticsResult,
   AiHealth,
   AiRuntimeStartResult,
+  AiSetupCommandResult,
   AnalysisMode,
   AnalyzePendingMode,
   AnalyzePendingResult,
@@ -56,6 +57,7 @@ const api = {
   startAiRuntime: (): Promise<AiRuntimeStartResult> => ipcRenderer.invoke('ai:startRuntime'),
   runAiDiagnostics: (): Promise<AiDiagnosticsResult> => ipcRenderer.invoke('ai:diagnostics'),
   openOllamaDownload: (): Promise<void> => ipcRenderer.invoke('ai:openOllamaDownload'),
+  copyAiSetupCommand: (): Promise<AiSetupCommandResult> => ipcRenderer.invoke('ai:copySetupCommand'),
   onCommand: (callback: (command: AppCommand) => void): (() => void) => {
     const listener = (_event: IpcRendererEvent, command: AppCommand): void => {
       callback(command)

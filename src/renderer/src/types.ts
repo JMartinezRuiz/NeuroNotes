@@ -135,6 +135,12 @@ export interface AiDiagnosticsResult {
   error?: string
 }
 
+export interface AiSetupCommandResult {
+  ok: boolean
+  message: string
+  command: string
+}
+
 export type AnalyzePendingMode = 'qwen' | 'local'
 
 export interface AnalyzePendingResult {

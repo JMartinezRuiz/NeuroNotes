@@ -233,6 +233,7 @@ export default function App(): JSX.Element {
   const [libraryMessage, setLibraryMessage] = useState<string>('')
   const [mcpConfig, setMcpConfig] = useState<McpConnectionConfig | null>(null)
   const [mcpMessage, setMcpMessage] = useState<string>('')
+  const [setupCommandMessage, setSetupCommandMessage] = useState<string>('')
   const [diagnosticsMessage, setDiagnosticsMessage] = useState<string>('')
   const [analysisQueueMessage, setAnalysisQueueMessage] = useState<string>('')
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -662,6 +663,18 @@ export default function App(): JSX.Element {
     }
   }
 
+  async function copyAiSetupCommand(): Promise<void> {
+    setBusy('copyAiSetup')
+    try {
+      const result = await api.copyAiSetupCommand()
+      setSetupCommandMessage(result.message)
+    } catch (error) {
+      setSetupCommandMessage(error instanceof Error ? error.message : 'No se pudieron copiar los comandos de setup')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function createQuickNote(event: FormEvent): Promise<void> {
     event.preventDefault()
     const content = quickNote.trim()
@@ -903,6 +916,7 @@ export default function App(): JSX.Element {
   async function updateSettings(nextSettings: Partial<AppSettings>): Promise<void> {
     setDiagnosticsMessage('')
     setAnalysisQueueMessage('')
+    setSetupCommandMessage('')
     const updated = await api.updateSettings(nextSettings)
     setSettings(updated)
   }
@@ -1248,7 +1262,8 @@ export default function App(): JSX.Element {
                   RAG: {settings.ragMaxNotes} notas, {settings.ragExcerptLength} caracteres por extracto
                 </small>
                 <small>
-                  {diagnosticsMessage ||
+                  {setupCommandMessage ||
+                  diagnosticsMessage ||
                   (health.ok
                     ? 'Listo para resumir, categorizar y enlazar notas.'
                     : health.ollamaAvailable
@@ -1281,6 +1296,16 @@ export default function App(): JSX.Element {
                 >
                   {busy === 'diagnostics' ? <Loader2 className="spin" size={16} /> : <Sparkles size={16} />}
                   Probar
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={copyAiSetupCommand}
+                  disabled={busy === 'copyAiSetup'}
+                  title="Copiar comandos PowerShell de setup"
+                >
+                  {busy === 'copyAiSetup' ? <Loader2 className="spin" size={16} /> : <Copy size={16} />}
+                  Copiar setup
                 </button>
                 <button
                   type="button"

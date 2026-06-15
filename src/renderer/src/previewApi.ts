@@ -139,6 +139,8 @@ const sortActions = (): ActionItem[] =>
   })
 const formatActionCount = (count: number): string => (count === 1 ? '1 accion' : `${count} acciones`)
 const formatExampleCount = (count: number): string => (count === 1 ? '1 ejemplo' : `${count} ejemplos`)
+const qwenSetupCommand = (): string =>
+  ['irm https://ollama.com/install.ps1 | iex', `ollama pull ${settings.model.trim() || 'qwen3.5:0.8b'}`].join('\n')
 const previewMcpConfig = () => {
   const serverPath = 'C:\\Program Files\\Neuronotes\\resources\\mcp\\neuronotes-mcp.mjs'
   const databasePath = 'C:\\Users\\you\\AppData\\Roaming\\Neuronotes\\neuronotes.json'
@@ -662,6 +664,15 @@ export function createPreviewApi(): Api {
     }),
     openOllamaDownload: async () => {
       window.open('https://ollama.com/download', '_blank', 'noopener,noreferrer')
+    },
+    copyAiSetupCommand: async () => {
+      const command = qwenSetupCommand()
+      await navigator.clipboard?.writeText(command)
+      return {
+        ok: true,
+        message: 'Comandos de setup Qwen copiados.',
+        command
+      }
     },
     onCommand: () => {
       return () => undefined

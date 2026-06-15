@@ -26,12 +26,14 @@ import {
   removeDeletedNoteReferences,
   resetAnalysisAfterContentEdit
 } from './noteLifecycle'
+import { buildQwenWindowsSetupCommand } from './qwenSetup'
 import { createNoteDraft, databasePaths, listNotes, mutateDatabase, normalizeDatabase, readDatabase } from './storage'
 import { captureWindowState, readWindowState, writeWindowState } from './windowState'
 import {
   AnalyzePendingResult,
   AnalyzePendingMode,
   AnalysisMode,
+  AiSetupCommandResult,
   AppSettings,
   ActionItemStatus,
   DatabaseFile,
@@ -735,6 +737,19 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('ai:openOllamaDownload', async () => {
     await shell.openExternal('https://ollama.com/download')
+  })
+
+  ipcMain.handle('ai:copySetupCommand', async () => {
+    const database = await readDatabase()
+    const command = buildQwenWindowsSetupCommand(database.settings)
+
+    clipboard.writeText(command)
+
+    return {
+      ok: true,
+      message: 'Comandos de setup Qwen copiados.',
+      command
+    } satisfies AiSetupCommandResult
   })
 }
 
