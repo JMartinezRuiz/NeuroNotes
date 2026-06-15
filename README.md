@@ -41,7 +41,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Late AI results are ignored if the note changed while analysis was running, preventing stale Qwen/local output from overwriting user edits.
 - Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
 - Local action plan: users can save suggested actions, mark them done, delete them, and carry them through library/Markdown export.
-- MCP handoff JSON export for open local actions, including tool hints and source-note context without executing external tools.
+- MCP handoff JSON export for open local actions, including tool summaries, action-kind summaries, tool hints, and source-note context without executing external tools.
 - Fine-tuning dataset JSONL export from analyzed notes, for future local Qwen tuning experiments without sending data outside the machine.
 - Reciprocal note graph synchronization.
 - Manual link and unlink controls.
@@ -90,7 +90,7 @@ MCP tool execution is not wired into the shipped app yet. The intended direction
 
 When MCP lands, it should be added as a separate integration layer with clear permissions, tests, and UI indicators showing what data is being sent to a tool.
 
-The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, and manual-approval flags. That handoff is intentionally inert today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
+The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, manual-approval flags, tool summaries, and action-kind summaries. That handoff is intentionally inert today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
 
 ## Fine-Tuning Dataset
 

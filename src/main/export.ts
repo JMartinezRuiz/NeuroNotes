@@ -27,6 +27,56 @@ export interface FineTuneExample {
   }
 }
 
+export interface McpHandoffPayload {
+  schema: string
+  exportedAt: string
+  execution: {
+    mode: string
+    requiresUserApproval: boolean
+    sideEffects: string
+  }
+  model: string
+  ollamaUrl: string
+  actionCount: number
+  doneActionCount: number
+  toolSummary: Array<{
+    toolHint: string
+    actionCount: number
+    kinds: string[]
+    sourceNoteIds: string[]
+  }>
+  kindSummary: Array<{
+    kind: string
+    actionCount: number
+  }>
+  actions: Array<{
+    id: string
+    kind: string
+    status: string
+    title: string
+    detail: string
+    toolHint: string | null
+    confidence: number
+    createdAt: string
+    updatedAt: string
+    sourceNote: {
+      id: string
+      title: string
+      summary: string
+      category: string
+      tags: string[]
+      contentExcerpt: string
+      relatedNoteIds: string[]
+      analysis: {
+        provider: string
+        model: string
+        analyzedAt: string
+        ragNoteIds: string[]
+      } | null
+    }
+  }>
+}
+
 export function noteToMarkdown(note: NoteRecord, localActions: ActionItem[] = []): string {
   const tags = note.tags.length > 0 ? note.tags.map((tag) => `#${tag}`).join(' ') : 'Sin etiquetas'
   const related = note.related.length > 0
@@ -106,96 +156,63 @@ export function safeMarkdownFileName(title: string): string {
   return `${sanitized || 'nota-neuronotes'}.md`
 }
 
-export function buildMcpHandoffPayload(database: DatabaseFile, exportedAt = new Date().toISOString()): {
-  schema: string
-  exportedAt: string
-  execution: {
-    mode: string
-    requiresUserApproval: boolean
-  }
-  model: string
-  ollamaUrl: string
-  actionCount: number
-  doneActionCount: number
-  actions: Array<{
-    id: string
-    kind: string
-    status: string
-    title: string
-    detail: string
-    toolHint: string | null
-    confidence: number
-    createdAt: string
-    updatedAt: string
-    sourceNote: {
-      id: string
-      title: string
-      summary: string
-      category: string
-      tags: string[]
-      contentExcerpt: string
-      relatedNoteIds: string[]
-      analysis: {
-        provider: string
-        model: string
-        analyzedAt: string
-        ragNoteIds: string[]
-      } | null
-    }
-  }>
-} {
+export function buildMcpHandoffPayload(database: DatabaseFile, exportedAt = new Date().toISOString()): McpHandoffPayload {
   const notesById = new Map(database.notes.map((note) => [note.id, note]))
   const openActions = database.actions
     .filter((action) => action.status === 'open' && notesById.has(action.noteId))
     .sort(compareActionItems)
+  const actions = openActions.map((action) => {
+    const note = notesById.get(action.noteId)
+
+    if (!note) {
+      throw new Error('Accion sin nota fuente')
+    }
+
+    return {
+      id: action.id,
+      kind: action.kind,
+      status: action.status,
+      title: action.title,
+      detail: action.detail,
+      toolHint: action.toolHint ?? null,
+      confidence: action.confidence,
+      createdAt: action.createdAt,
+      updatedAt: action.updatedAt,
+      sourceNote: {
+        id: note.id,
+        title: note.title,
+        summary: note.summary,
+        category: note.category,
+        tags: note.tags,
+        contentExcerpt: excerpt(note.content, 1200),
+        relatedNoteIds: note.related.map((related) => related.noteId),
+        analysis: note.analysisRun
+          ? {
+              provider: note.analysisRun.provider,
+              model: note.analysisRun.model,
+              analyzedAt: note.analysisRun.analyzedAt,
+              ragNoteIds: note.analysisRun.ragNoteIds
+            }
+          : null
+      }
+    }
+  })
 
   return {
     schema: MCP_HANDOFF_SCHEMA,
     exportedAt,
     execution: {
       mode: 'manual-user-approved',
-      requiresUserApproval: true
+      requiresUserApproval: true,
+      sideEffects: 'none-export-only'
     },
     model: database.settings.model,
     ollamaUrl: database.settings.ollamaUrl,
-    actionCount: openActions.length,
+    actionCount: actions.length,
     doneActionCount: database.actions.filter((action) => action.status === 'done').length,
-    actions: openActions.map((action) => {
-      const note = notesById.get(action.noteId)
-
-      if (!note) {
-        throw new Error('Accion sin nota fuente')
-      }
-
-      return {
-        id: action.id,
-        kind: action.kind,
-        status: action.status,
-        title: action.title,
-        detail: action.detail,
-        toolHint: action.toolHint ?? null,
-        confidence: action.confidence,
-        createdAt: action.createdAt,
-        updatedAt: action.updatedAt,
-        sourceNote: {
-          id: note.id,
-          title: note.title,
-          summary: note.summary,
-          category: note.category,
-          tags: note.tags,
-          contentExcerpt: excerpt(note.content, 1200),
-          relatedNoteIds: note.related.map((related) => related.noteId),
-          analysis: note.analysisRun
-            ? {
-                provider: note.analysisRun.provider,
-                model: note.analysisRun.model,
-                analyzedAt: note.analysisRun.analyzedAt,
-                ragNoteIds: note.analysisRun.ragNoteIds
-              }
-            : null
-        }
-      }
-    })
+    toolSummary: buildToolSummary(actions),
+    kindSummary: buildKindSummary(actions),
+    actions
   }
 }
 
@@ -266,6 +283,44 @@ function compareActionItems(a: ActionItem, b: ActionItem): number {
   }
 
   return b.updatedAt.localeCompare(a.updatedAt)
+}
+
+function buildToolSummary(actions: McpHandoffPayload['actions']): McpHandoffPayload['toolSummary'] {
+  const summary = new Map<string, { kinds: Set<string>; sourceNoteIds: Set<string>; actionCount: number }>()
+
+  for (const action of actions) {
+    const toolHint = action.toolHint ?? 'unassigned'
+    const entry = summary.get(toolHint) ?? {
+      kinds: new Set<string>(),
+      sourceNoteIds: new Set<string>(),
+      actionCount: 0
+    }
+    entry.actionCount += 1
+    entry.kinds.add(action.kind)
+    entry.sourceNoteIds.add(action.sourceNote.id)
+    summary.set(toolHint, entry)
+  }
+
+  return [...summary.entries()]
+    .map(([toolHint, entry]) => ({
+      toolHint,
+      actionCount: entry.actionCount,
+      kinds: [...entry.kinds].sort((a, b) => a.localeCompare(b)),
+      sourceNoteIds: [...entry.sourceNoteIds].sort((a, b) => a.localeCompare(b))
+    }))
+    .sort((a, b) => b.actionCount - a.actionCount || a.toolHint.localeCompare(b.toolHint))
+}
+
+function buildKindSummary(actions: McpHandoffPayload['actions']): McpHandoffPayload['kindSummary'] {
+  const summary = new Map<string, number>()
+
+  for (const action of actions) {
+    summary.set(action.kind, (summary.get(action.kind) ?? 0) + 1)
+  }
+
+  return [...summary.entries()]
+    .map(([kind, actionCount]) => ({ kind, actionCount }))
+    .sort((a, b) => b.actionCount - a.actionCount || a.kind.localeCompare(b.kind))
 }
 
 function isFineTuneCandidate(note: NoteRecord): boolean {

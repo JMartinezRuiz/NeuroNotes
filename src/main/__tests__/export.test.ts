@@ -150,6 +150,18 @@ describe('buildMcpHandoffPayload', () => {
           status: 'done',
           createdAt: now,
           updatedAt: now
+        },
+        {
+          id: 'action-open-unassigned',
+          noteId: sourceNote.id,
+          noteTitle: sourceNote.title,
+          kind: 'mcp',
+          title: 'Preparar automatizacion',
+          detail: 'Accion avanzada pendiente de herramienta concreta.',
+          confidence: 0.61,
+          status: 'open',
+          createdAt: now,
+          updatedAt: now
         }
       ]
     }
@@ -161,32 +173,65 @@ describe('buildMcpHandoffPayload', () => {
       exportedAt: now,
       execution: {
         mode: 'manual-user-approved',
-        requiresUserApproval: true
+        requiresUserApproval: true,
+        sideEffects: 'none-export-only'
       },
       model: DEFAULT_SETTINGS.model,
-      actionCount: 1,
+      actionCount: 2,
       doneActionCount: 1
     })
-    expect(payload.actions).toEqual([
-      expect.objectContaining({
-        id: 'action-open',
-        kind: 'task',
-        status: 'open',
+    expect(payload.toolSummary).toEqual([
+      {
         toolHint: 'task.create',
-        sourceNote: expect.objectContaining({
-          id: sourceNote.id,
-          title: sourceNote.title,
-          category: 'Proyecto',
-          tags: ['qwen', 'notas'],
-          relatedNoteIds: ['note-2'],
-          analysis: expect.objectContaining({
-            provider: 'qwen',
-            model: 'qwen3.5:0.8b',
-            ragNoteIds: ['note-2']
-          })
-        })
-      })
+        actionCount: 1,
+        kinds: ['task'],
+        sourceNoteIds: [sourceNote.id]
+      },
+      {
+        toolHint: 'unassigned',
+        actionCount: 1,
+        kinds: ['mcp'],
+        sourceNoteIds: [sourceNote.id]
+      }
     ])
+    expect(payload.kindSummary).toEqual([
+      {
+        kind: 'mcp',
+        actionCount: 1
+      },
+      {
+        kind: 'task',
+        actionCount: 1
+      }
+    ])
+    expect(payload.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'action-open',
+          kind: 'task',
+          status: 'open',
+          toolHint: 'task.create',
+          sourceNote: expect.objectContaining({
+            id: sourceNote.id,
+            title: sourceNote.title,
+            category: 'Proyecto',
+            tags: ['qwen', 'notas'],
+            relatedNoteIds: ['note-2'],
+            analysis: expect.objectContaining({
+              provider: 'qwen',
+              model: 'qwen3.5:0.8b',
+              ragNoteIds: ['note-2']
+            })
+          })
+        }),
+        expect.objectContaining({
+          id: 'action-open-unassigned',
+          kind: 'mcp',
+          status: 'open',
+          toolHint: null
+        })
+      ])
+    )
 
     expect(payload.actions[0].sourceNote.contentExcerpt).toContain('Crear una app de notas con Qwen local.')
   })
