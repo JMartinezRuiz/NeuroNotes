@@ -1428,6 +1428,24 @@ button:disabled {
   line-height: 1;
 }
 
+.network-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 10px;
+  color: #fff;
+  border-radius: 8px;
+  background: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.network-action-button:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
 .plan-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

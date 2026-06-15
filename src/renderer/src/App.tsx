@@ -42,6 +42,8 @@ import {
   analysisActionLabel,
   analysisActionTitle,
   analysisResultMessage,
+  isolatedAnalysisProgressMessage,
+  isolatedAnalysisResultMessage,
   quickCaptureProgressMessage,
   quickCaptureResultMessage
 } from './analysisMessages'
@@ -964,6 +966,50 @@ export default function App(): JSX.Element {
       const result = await api.analyzePending(engine)
       await refreshNotes(result.lastUpdatedId ?? selectedId ?? undefined)
       setAnalysisQueueMessage(pendingAnalysisResultMessage(engine, result))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function runIsolatedAnalysis(): Promise<void> {
+    if (isolatedNotes.length === 0) {
+      return
+    }
+
+    const engine = pendingAnalysisEngine(health.ok)
+    const total = isolatedNotes.length
+    setBusy('analyzeIsolated')
+    setAnalysisQueueMessage(isolatedAnalysisProgressMessage(engine, total))
+
+    try {
+      if (selectedNote && (editorContent !== selectedNote.content || editorTitle.trim() !== selectedNote.title)) {
+        await saveSelected(true)
+      }
+
+      let qwen = 0
+      let local = 0
+      let failed = 0
+      let lastUpdatedId: string | undefined
+
+      for (const note of isolatedNotes) {
+        try {
+          const analyzed = await api.analyzeNote(note.id, engine)
+          lastUpdatedId = analyzed.id
+
+          if (analyzed.analysisStatus === 'qwen') {
+            qwen += 1
+          } else if (analyzed.analysisStatus === 'fallback') {
+            local += 1
+          } else if (analyzed.analysisStatus === 'error') {
+            failed += 1
+          }
+        } catch {
+          failed += 1
+        }
+      }
+
+      await refreshNotes(lastUpdatedId ?? selectedId ?? undefined)
+      setAnalysisQueueMessage(isolatedAnalysisResultMessage({ failed, local, qwen }))
     } finally {
       setBusy(null)
     }
@@ -2434,6 +2480,20 @@ export default function App(): JSX.Element {
                   <h3>Notas aisladas</h3>
                   <span>{isolatedNotes.length}</span>
                 </div>
+                <button
+                  type="button"
+                  className="network-action-button"
+                  onClick={runIsolatedAnalysis}
+                  disabled={busy !== null || isolatedNotes.length === 0}
+                  title={
+                    pendingEngine === 'qwen'
+                      ? 'Reanalizar notas aisladas con Qwen y RAG local'
+                      : 'Reanalizar notas aisladas con analisis local'
+                  }
+                >
+                  {busy === 'analyzeIsolated' ? <Loader2 className="spin" size={15} /> : <Sparkles size={15} />}
+                  {busy === 'analyzeIsolated' ? 'Reanalizando' : 'Reanalizar aisladas'}
+                </button>
                 <div className="related-list">
                   {isolatedNotes.length > 0 ? (
                     isolatedNotes.slice(0, 6).map((note) => (

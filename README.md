@@ -71,7 +71,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Manual link and unlink controls.
 - Incoming backlinks are visible in the note inspector, so notes that are referenced by other notes do not appear isolated.
 - Graph view for direct links, backlinks, and library connection counts.
-- The network view highlights isolated notes so users can quickly find captures that still need AI/RAG links.
+- The network view highlights isolated notes and can reanalyze them to try to generate AI/RAG links.
 - MCP graph inspection exposes deduplicated note edges, backlinks, and isolated notes for local hosts.
 - Analysis audit metadata: provider, model, elapsed time, timestamp, retrieved RAG note IDs, scores, and excerpts.
 - RAG audit view in the inspector showing the context snippets used during analysis.

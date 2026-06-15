@@ -2,6 +2,12 @@ import { NoteRecord } from './types'
 
 export type AnalysisMessageEngine = 'qwen' | 'local'
 
+export interface IsolatedAnalysisResultSummary {
+  failed: number
+  local: number
+  qwen: number
+}
+
 export function analysisResultMessage(
   note: Pick<NoteRecord, 'analysisStatus'>,
   requestedEngine: AnalysisMessageEngine
@@ -68,4 +74,29 @@ export function quickCaptureResultMessage(
   requestedEngine: AnalysisMessageEngine
 ): string {
   return `Nota creada. ${analysisResultMessage(note, requestedEngine)}`
+}
+
+export function isolatedAnalysisProgressMessage(engine: AnalysisMessageEngine, count: number): string {
+  const isolatedLabel = count === 1 ? '1 nota aislada' : `${count} notas aisladas`
+
+  return engine === 'qwen'
+    ? `Reanalizando ${isolatedLabel} con Qwen...`
+    : `Reanalizando ${isolatedLabel} localmente...`
+}
+
+export function isolatedAnalysisResultMessage(result: IsolatedAnalysisResultSummary): string {
+  const analyzedCount = result.qwen + result.local
+  const analyzedLabel = formatNoteCount(analyzedCount)
+  const analyzedVerb = analyzedCount === 1 ? 'reanalizada' : 'reanalizadas'
+  const detail = [
+    result.qwen > 0 ? `${result.qwen} Qwen` : '',
+    result.local > 0 ? `${result.local} local` : '',
+    result.failed > 0 ? `${result.failed} fallo${result.failed === 1 ? '' : 's'}` : ''
+  ].filter(Boolean)
+
+  return `Notas aisladas: ${analyzedLabel} ${analyzedVerb}${detail.length > 0 ? ` (${detail.join(', ')})` : ''}.`
+}
+
+function formatNoteCount(count: number): string {
+  return count === 1 ? '1 nota' : `${count} notas`
 }

@@ -3,6 +3,8 @@ import {
   analysisActionLabel,
   analysisActionTitle,
   analysisResultMessage,
+  isolatedAnalysisProgressMessage,
+  isolatedAnalysisResultMessage,
   quickCaptureProgressMessage,
   quickCaptureResultMessage
 } from '../analysisMessages'
@@ -42,5 +44,21 @@ describe('analysis action text', () => {
     expect(analysisActionLabel({ analysisStatus: 'idle' }, true)).toBe('Analizar Qwen')
     expect(analysisActionLabel({ analysisStatus: 'idle' }, false)).toBe('Analizar local')
     expect(analysisActionLabel({ analysisStatus: 'fallback' }, false)).toBe('Reanalizar local')
+  })
+})
+
+describe('isolated note analysis messages', () => {
+  it('reports progress with the selected analysis engine', () => {
+    expect(isolatedAnalysisProgressMessage('qwen', 2)).toBe('Reanalizando 2 notas aisladas con Qwen...')
+    expect(isolatedAnalysisProgressMessage('local', 1)).toBe('Reanalizando 1 nota aislada localmente...')
+  })
+
+  it('uses singular and plural result text correctly', () => {
+    expect(isolatedAnalysisResultMessage({ qwen: 0, local: 1, failed: 0 })).toBe(
+      'Notas aisladas: 1 nota reanalizada (1 local).'
+    )
+    expect(isolatedAnalysisResultMessage({ qwen: 2, local: 1, failed: 1 })).toBe(
+      'Notas aisladas: 3 notas reanalizadas (2 Qwen, 1 local, 1 fallo).'
+    )
   })
 })
