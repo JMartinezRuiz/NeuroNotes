@@ -158,6 +158,7 @@ export default function App(): JSX.Element {
   const [editorMessage, setEditorMessage] = useState<string>('')
   const [libraryMessage, setLibraryMessage] = useState<string>('')
   const [diagnosticsMessage, setDiagnosticsMessage] = useState<string>('')
+  const [analysisQueueMessage, setAnalysisQueueMessage] = useState<string>('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('note')
   const [bootstrapped, setBootstrapped] = useState(false)
@@ -283,7 +284,7 @@ export default function App(): JSX.Element {
     }
 
     autoAnalyzeAttemptKey.current = pendingAnalysisKey
-    void runPendingAnalysis()
+    void runPendingAnalysis('auto')
   }, [bootstrapped, busy, health.ok, pendingAnalysisCount, pendingAnalysisKey, settings.autoAnalyze])
 
   useEffect(() => {
@@ -599,12 +600,17 @@ export default function App(): JSX.Element {
     }
   }
 
-  async function runPendingAnalysis(): Promise<void> {
+  async function runPendingAnalysis(mode: 'manual' | 'auto' = 'manual'): Promise<void> {
     if (pendingAnalysisCount === 0) {
       return
     }
 
     setBusy('analyzePending')
+    setAnalysisQueueMessage(
+      mode === 'auto'
+        ? `Qwen listo. Reanalizando ${pendingAnalysisCount} pendientes...`
+        : `Analizando ${pendingAnalysisCount} pendientes...`
+    )
     try {
       if (selectedNote && (editorContent !== selectedNote.content || editorTitle.trim() !== selectedNote.title)) {
         await saveSelected(true)
@@ -612,6 +618,11 @@ export default function App(): JSX.Element {
 
       const result = await api.analyzePending()
       await refreshNotes(result.lastUpdatedId ?? selectedId ?? undefined)
+      setAnalysisQueueMessage(
+        result.failed > 0
+          ? `Qwen proceso ${result.analyzed} de ${result.total}; ${result.failed} fallaron.`
+          : `Qwen actualizo ${result.analyzed} pendientes.`
+      )
     } finally {
       setBusy(null)
     }
@@ -634,6 +645,7 @@ export default function App(): JSX.Element {
 
   async function updateSettings(nextSettings: Partial<AppSettings>): Promise<void> {
     setDiagnosticsMessage('')
+    setAnalysisQueueMessage('')
     const updated = await api.updateSettings(nextSettings)
     setSettings(updated)
   }
@@ -784,11 +796,17 @@ export default function App(): JSX.Element {
             </button>
           </div>
           <div className="topbar-actions">
+            {analysisQueueMessage && (
+              <div className="queue-pill" data-active={busy === 'analyzePending'}>
+                {busy === 'analyzePending' ? <Loader2 className="spin" size={14} /> : <CheckCircle2 size={14} />}
+                <span>{analysisQueueMessage}</span>
+              </div>
+            )}
             {pendingAnalysisCount > 0 && (
               <button
                 type="button"
                 className="batch-button"
-                onClick={runPendingAnalysis}
+                onClick={() => runPendingAnalysis('manual')}
                 disabled={!health.ok || busy === 'analyzePending'}
                 title={health.ok ? 'Analizar pendientes con Qwen' : 'Qwen no esta listo'}
               >
