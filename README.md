@@ -31,6 +31,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.
 - Bounded Ollama health and Qwen generation requests, so stalled local AI calls fall back instead of blocking notes.
 - Local fallback analyzer when Ollama/Qwen is unavailable.
+- Single-note analysis uses the local analyzer immediately when Qwen is not ready, and Qwen can upgrade those notes later.
 - Local fallback analyzer normalizes Spanish accents for category, tag, and action heuristics.
 - Manual pending-note analysis can use the local fallback before Qwen is ready without contacting Ollama; when Qwen becomes available, fallback notes can be upgraded through the Qwen pending flow.
 - RAG context generation from locally related notes before Qwen analysis, with TF-IDF-style scoring, phrase/tag/title signals, stored excerpts, and scores for auditability.

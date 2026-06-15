@@ -378,12 +378,12 @@ function registerIpcHandlers(): void {
     })
   })
 
-  ipcMain.handle('notes:analyze', async (_, id: string) => {
-    return analyzeAndPersistNote(id)
+  ipcMain.handle('notes:analyze', async (_, id: string, requestedMode: unknown) => {
+    return analyzeAndPersistNote(id, normalizeAnalysisMode(requestedMode))
   })
 
   ipcMain.handle('notes:analyzePending', async (_, requestedMode: unknown) => {
-    const mode = normalizeAnalyzePendingMode(requestedMode)
+    const mode = normalizeAnalysisMode(requestedMode)
     const initialDatabase = await readDatabase()
     const pendingIds = initialDatabase.notes.filter((note) => isPendingAnalysis(note, mode)).map((note) => note.id)
     const result: AnalyzePendingResult = {
@@ -701,7 +701,7 @@ function isPendingAnalysis(note: NoteRecord, mode: AnalyzePendingMode): boolean 
   return note.analysisStatus !== 'qwen'
 }
 
-function normalizeAnalyzePendingMode(value: unknown): AnalyzePendingMode {
+function normalizeAnalysisMode(value: unknown): AnalysisMode {
   return value === 'local' ? 'local' : 'qwen'
 }
 

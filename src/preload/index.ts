@@ -5,6 +5,7 @@ import {
   AiDiagnosticsResult,
   AiHealth,
   AiRuntimeStartResult,
+  AnalysisMode,
   AnalyzePendingMode,
   AnalyzePendingResult,
   AppSettings,
@@ -29,7 +30,7 @@ const api = {
     ipcRenderer.invoke('notes:addManualLink', sourceId, targetId),
   removeLink: (sourceId: string, targetId: string): Promise<NoteRecord> =>
     ipcRenderer.invoke('notes:removeLink', sourceId, targetId),
-  analyzeNote: (id: string): Promise<NoteRecord> => ipcRenderer.invoke('notes:analyze', id),
+  analyzeNote: (id: string, mode: AnalysisMode = 'qwen'): Promise<NoteRecord> => ipcRenderer.invoke('notes:analyze', id, mode),
   analyzePending: (mode: AnalyzePendingMode): Promise<AnalyzePendingResult> =>
     ipcRenderer.invoke('notes:analyzePending', mode),
   listActions: (): Promise<ActionItem[]> => ipcRenderer.invoke('actions:list'),

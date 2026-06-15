@@ -737,8 +737,14 @@ export default function App(): JSX.Element {
       ) {
         await saveSelected(true)
       }
-      const analyzed = await api.analyzeNote(id)
+      const engine = pendingAnalysisEngine(health.ok)
+      const analyzed = await api.analyzeNote(id, engine)
       await refreshNotes(analyzed.id)
+      setEditorMessage(
+        engine === 'local'
+          ? 'Analisis local listo. Qwen puede actualizar esta nota cuando el modelo este disponible.'
+          : 'Analisis Qwen listo.'
+      )
     } finally {
       setBusy(null)
     }

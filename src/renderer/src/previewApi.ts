@@ -278,7 +278,7 @@ export function createPreviewApi(): Api {
       target.updatedAt = source.updatedAt
       return source
     },
-    analyzeNote: async (id) => {
+    analyzeNote: async (id, mode = 'qwen') => {
       const note = notes.find((item) => item.id === id)
 
       if (!note) {
@@ -306,13 +306,13 @@ export function createPreviewApi(): Api {
           confidence: 0.68
         }
       ]
-      note.analysisStatus = 'fallback'
-      note.analysisError = 'Vista previa: Qwen solo corre dentro de Electron/Ollama.'
+      note.analysisStatus = mode === 'qwen' ? 'qwen' : 'fallback'
+      note.analysisError = mode === 'qwen' ? undefined : 'Vista previa: Qwen solo corre dentro de Electron/Ollama.'
       note.analysisRun = {
-        provider: 'local',
+        provider: mode === 'qwen' ? 'qwen' : 'local',
         model: settings.model,
         analyzedAt: new Date().toISOString(),
-        durationMs: 12,
+        durationMs: mode === 'qwen' ? 860 : 12,
         ragNoteIds: note.related.map((related) => related.noteId),
         ragContext: note.related.map((related) => {
           const candidate = notes.find((item) => item.id === related.noteId)
