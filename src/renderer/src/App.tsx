@@ -22,6 +22,11 @@ import {
 } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AnalysisStatusFilter,
+  noteMatchesAnalysisStatusFilter,
+  summarizeAnalysisStatusFilters
+} from './analysisFilters'
+import {
   buildPendingAnalysisKey,
   isPendingForAnalysis,
   pendingAnalysisButtonTitle,
@@ -205,6 +210,7 @@ export default function App(): JSX.Element {
   const [manualLinkTargetId, setManualLinkTargetId] = useState('')
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<string>('Todas')
+  const [activeAnalysisFilter, setActiveAnalysisFilter] = useState<AnalysisStatusFilter>('all')
   const [settings, setSettings] = useState<AppSettings>(emptySettings)
   const [health, setHealth] = useState<AiHealth>(emptyHealth)
   const [busy, setBusy] = useState<string | null>(null)
@@ -313,6 +319,7 @@ export default function App(): JSX.Element {
     () => Array.from(new Set([...NOTE_CATEGORIES, ...categoryCounts.slice(1).map((category) => category.name)])),
     [categoryCounts]
   )
+  const analysisStatusFilterOptions = useMemo(() => summarizeAnalysisStatusFilters(notes), [notes])
   const linkableNotes = useMemo(() => {
     if (!selectedNote) {
       return []
@@ -331,9 +338,12 @@ export default function App(): JSX.Element {
   const filteredNotes = useMemo(() => {
     const categoryFilteredNotes =
       activeCategory === 'Todas' ? notes : notes.filter((note) => note.category === activeCategory)
+    const analysisFilteredNotes = categoryFilteredNotes.filter((note) =>
+      noteMatchesAnalysisStatusFilter(note, activeAnalysisFilter)
+    )
 
-    return categoryFilteredNotes.filter((note) => noteMatchesSearch(note, search))
-  }, [activeCategory, notes, search])
+    return analysisFilteredNotes.filter((note) => noteMatchesSearch(note, search))
+  }, [activeAnalysisFilter, activeCategory, notes, search])
 
   useEffect(() => {
     return api.onCommand((command) => {
@@ -1154,6 +1164,23 @@ export default function App(): JSX.Element {
             >
               <span>{category.name}</span>
               <strong>{category.count}</strong>
+            </button>
+          ))}
+        </div>
+
+        <div className="analysis-filter" aria-label="Estado IA">
+          {analysisStatusFilterOptions.map((option) => (
+            <button
+              key={option.filter}
+              type="button"
+              className={option.filter === activeAnalysisFilter ? 'active' : ''}
+              data-status={option.filter}
+              aria-pressed={option.filter === activeAnalysisFilter}
+              onClick={() => setActiveAnalysisFilter(option.filter)}
+              title={`Filtrar estado IA: ${option.label}`}
+            >
+              <span>{option.label}</span>
+              <strong>{option.count}</strong>
             </button>
           ))}
         </div>
