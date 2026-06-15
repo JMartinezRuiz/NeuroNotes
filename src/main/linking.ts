@@ -1,6 +1,8 @@
 import { NoteRecord, RagContextItem, RelatedNote } from './types'
 
 const RECIPROCAL_REASON_PREFIX = 'Enlace reciproco:'
+const MANUAL_LINK_REASON = 'Enlace manual.'
+const MANUAL_RECIPROCAL_REASON = 'Enlace reciproco: Enlace manual.'
 
 const STOPWORDS = new Set([
   'a',
@@ -47,6 +49,9 @@ export interface RagContextOptions {
   maxNotes?: number
   excerptLength?: number
 }
+
+type RagSourceNote = Pick<NoteRecord, 'id' | 'content' | 'tags' | 'category'> &
+  Partial<Pick<NoteRecord, 'title' | 'summary' | 'related'>>
 
 function tokens(text: string): string[] {
   return text
@@ -98,7 +103,7 @@ function cosine(a: Map<string, number>, b: Map<string, number>, documentFrequenc
 }
 
 export function rankRelatedNotes(
-  note: Pick<NoteRecord, 'id' | 'content' | 'tags' | 'category'> & Partial<Pick<NoteRecord, 'title' | 'summary'>>,
+  note: RagSourceNote,
   notes: NoteRecord[]
 ): RelatedNote[] {
   const candidates = notes.filter((candidate) => candidate.id !== note.id)
@@ -144,7 +149,7 @@ export function rankRelatedNotes(
 }
 
 export function buildRagContext(
-  note: Pick<NoteRecord, 'id' | 'content' | 'tags' | 'category'> & Partial<Pick<NoteRecord, 'title' | 'summary'>>,
+  note: RagSourceNote,
   notes: NoteRecord[],
   options: RagContextOptions = {}
 ): string {
@@ -152,7 +157,7 @@ export function buildRagContext(
 }
 
 export function buildRagContextBundle(
-  note: Pick<NoteRecord, 'id' | 'content' | 'tags' | 'category'> & Partial<Pick<NoteRecord, 'title' | 'summary'>>,
+  note: RagSourceNote,
   notes: NoteRecord[],
   options: RagContextOptions = {}
 ): {
@@ -162,7 +167,10 @@ export function buildRagContextBundle(
   items: RagContextItem[]
 } {
   const resolvedOptions = normalizeRagContextOptions(options)
-  const related = rankRelatedNotes(note, notes).slice(0, resolvedOptions.maxNotes)
+  const related = mergeManualAndRankedRelated(note, notes, rankRelatedNotes(note, notes)).slice(
+    0,
+    resolvedOptions.maxNotes
+  )
 
   if (related.length === 0) {
     return {
@@ -212,6 +220,50 @@ function normalizeRagContextOptions(options: RagContextOptions): Required<RagCon
     maxNotes: clampInteger(options.maxNotes, 0, MAX_RELATED_NOTES, DEFAULT_RAG_MAX_NOTES),
     excerptLength: clampInteger(options.excerptLength, 160, 1200, DEFAULT_RAG_EXCERPT_LENGTH)
   }
+}
+
+function mergeManualAndRankedRelated(note: RagSourceNote, notes: NoteRecord[], ranked: RelatedNote[]): RelatedNote[] {
+  const byId = new Map<string, RelatedNote>()
+
+  for (const link of note.related ?? []) {
+    if (!isManualContextLink(link)) {
+      continue
+    }
+
+    const target = notes.find((candidate) => candidate.id === link.noteId && candidate.id !== note.id)
+
+    if (!target) {
+      continue
+    }
+
+    byId.set(target.id, {
+      noteId: target.id,
+      title: target.title,
+      score: Math.max(0, Math.min(1, Number.isFinite(link.score) ? link.score : 0.72)),
+      reason: link.reason
+    })
+  }
+
+  for (const link of ranked) {
+    const existing = byId.get(link.noteId)
+
+    if (existing) {
+      byId.set(link.noteId, {
+        ...existing,
+        title: link.title || existing.title,
+        score: Math.max(existing.score, link.score)
+      })
+      continue
+    }
+
+    byId.set(link.noteId, link)
+  }
+
+  return [...byId.values()]
+}
+
+function isManualContextLink(link: RelatedNote): boolean {
+  return link.reason === MANUAL_LINK_REASON || link.reason === MANUAL_RECIPROCAL_REASON
 }
 
 function clampInteger(value: unknown, min: number, max: number, fallback: number): number {

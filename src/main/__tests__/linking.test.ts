@@ -162,6 +162,50 @@ describe('buildRagContext', () => {
     expect(bundle.items[0].excerpt.length).toBeLessThanOrEqual(180)
   })
 
+  it('prioritizes manual links as RAG context before lexical matches', () => {
+    const source = note({
+      id: 'source',
+      category: 'Proyecto',
+      tags: ['qwen'],
+      content: 'Qwen necesita contexto RAG local para resumir notas relacionadas.',
+      related: [
+        {
+          noteId: 'manual',
+          title: 'Titulo anterior',
+          score: 0.72,
+          reason: 'Enlace manual.'
+        }
+      ]
+    })
+    const manual = note({
+      id: 'manual',
+      title: 'Decision curada',
+      category: 'Ideas',
+      tags: ['arquitectura'],
+      content: 'Esta nota fue enlazada manualmente porque contiene una decision importante del usuario.'
+    })
+    const lexical = note({
+      id: 'lexical',
+      title: 'Qwen RAG local',
+      category: 'Proyecto',
+      tags: ['qwen'],
+      content: 'Qwen con RAG local resume notas relacionadas y genera enlaces automaticos.'
+    })
+
+    const bundle = buildRagContextBundle(source, [source, lexical, manual], {
+      maxNotes: 1
+    })
+
+    expect(bundle.noteIds).toEqual(['manual'])
+    expect(bundle.items[0]).toMatchObject({
+      noteId: 'manual',
+      title: 'Decision curada',
+      reason: 'Enlace manual.'
+    })
+    expect(bundle.text).toContain('ID: manual')
+    expect(bundle.text).not.toContain('ID: lexical')
+  })
+
   it('can disable RAG context while keeping analysis local', () => {
     const source = note({
       id: 'source',

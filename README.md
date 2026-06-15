@@ -37,7 +37,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Local fallback analyzer normalizes Spanish accents for category, tag, and action heuristics.
 - Manual pending-note analysis can use the local fallback before Qwen is ready without contacting Ollama; when Qwen becomes available, fallback notes can be upgraded through the Qwen pending flow.
 - Pending analysis results report how many notes finished with Qwen, local fallback, failures, or stale skipped updates.
-- RAG context generation from locally related notes before Qwen analysis, with TF-IDF-style scoring, phrase/tag/title signals, stored excerpts, and scores for auditability.
+- RAG context generation from locally related notes before Qwen analysis, prioritizing user-curated manual links before TF-IDF-style lexical matches, with stored excerpts and scores for auditability.
 - Automatic summaries, categories, tags, and related-note suggestions.
 - Editing note content clears stale AI summaries, suggested actions, and automatic links while preserving manual links.
 - Late AI results are ignored if the note changed while analysis was running, preventing stale Qwen/local output from overwriting user edits.
@@ -59,8 +59,8 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 The analysis flow is:
 
 1. A note is created or selected for analysis.
-2. Neuronotes ranks nearby notes locally using TF-IDF-style lexical similarity, phrase overlap, tag overlap, title matches, and category signals.
-3. The strongest matches are serialized as RAG context with score, reason, tags, and excerpt, bounded by the local RAG settings.
+2. Neuronotes ranks nearby notes locally using manual links first, then TF-IDF-style lexical similarity, phrase overlap, tag overlap, title matches, and category signals.
+3. The strongest manual and ranked matches are serialized as RAG context with score, reason, tags, and excerpt, bounded by the local RAG settings.
 4. Qwen 0.8B is called through Ollama with a strict JSON prompt.
 5. The response is sanitized and merged with local related-note ranking.
 6. Suggested action intents are stored locally without executing external tools.
