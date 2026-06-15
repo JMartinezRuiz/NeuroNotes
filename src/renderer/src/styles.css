@@ -2143,6 +2143,14 @@ button:disabled {
   border-color: #c8bdac;
 }
 
+.related-row-incoming {
+  background: #f3f7f1;
+}
+
+.related-row-incoming svg {
+  color: var(--accent);
+}
+
 .related-row span {
   display: grid;
   gap: 3px;

@@ -343,6 +343,10 @@ export default function App(): JSX.Element {
     () => (selectedNote ? graphConnections(selectedNote, notes) : []),
     [notes, selectedNote]
   )
+  const incomingConnections = useMemo(
+    () => selectedConnections.filter((connection) => connection.direction === 'backlink'),
+    [selectedConnections]
+  )
   const analysisContextNotes = useMemo(() => {
     if (!selectedNote?.analysisRun) {
       return []
@@ -2278,6 +2282,31 @@ export default function App(): JSX.Element {
                   )}
                 </div>
               </section>
+
+              {incomingConnections.length > 0 && (
+                <section>
+                  <div className="section-title">
+                    <h3>Referencias entrantes</h3>
+                    <span>{incomingConnections.length}</span>
+                  </div>
+                  <div className="related-list">
+                    {incomingConnections.map((connection) => (
+                      <button
+                        type="button"
+                        key={connection.note.id}
+                        onClick={() => setSelectedId(connection.note.id)}
+                        className="related-row related-row-incoming"
+                      >
+                        <Network size={15} />
+                        <span>
+                          <strong>{connection.note.title}</strong>
+                          <small>{connection.reason}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               {selectedNote.analysisError && (
                 <section className="error-box">

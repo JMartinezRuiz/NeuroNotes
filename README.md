@@ -69,6 +69,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Fine-tuning readiness summary in settings, showing reviewed JSONL examples and analyzed notes still awaiting approval.
 - Reciprocal note graph synchronization, including review invalidation when automatic relationships change.
 - Manual link and unlink controls.
+- Incoming backlinks are visible in the note inspector, so notes that are referenced by other notes do not appear isolated.
 - Graph view for direct links, backlinks, and library connection counts.
 - Analysis audit metadata: provider, model, elapsed time, timestamp, retrieved RAG note IDs, scores, and excerpts.
 - RAG audit view in the inspector showing the context snippets used during analysis.
