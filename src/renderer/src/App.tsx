@@ -1362,7 +1362,7 @@ export default function App(): JSX.Element {
                   className="secondary"
                   onClick={copyAiSetupCommand}
                   disabled={busy === 'copyAiSetup'}
-                  title="Copiar comandos PowerShell de setup"
+                  title="Copiar comandos PowerShell de instalacion, arranque y prueba"
                 >
                   {busy === 'copyAiSetup' ? <Loader2 className="spin" size={16} /> : <Copy size={16} />}
                   Copiar setup

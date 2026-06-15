@@ -32,7 +32,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
 - Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.
 - Local AI setup checklist in settings for Ollama, model availability, and fallback/Qwen analysis mode.
-- Settings can copy PowerShell setup commands for installing Ollama and pulling the configured Qwen model on Windows.
+- Settings can copy PowerShell setup commands for installing Ollama, starting the local runtime, pulling the configured Qwen model, and running a JSON probe on Windows.
 - Configurable RAG context limits for Qwen: number of retrieved notes and excerpt length.
 - RAG budget indicator in settings to keep context compact enough for Qwen 0.8B.
 - Bounded Ollama health and Qwen generation requests, so stalled local AI calls fall back instead of blocking notes.
@@ -183,7 +183,7 @@ Windows quick setup for the local Qwen runtime:
 npm run setup:qwen:win
 ```
 
-If Ollama is missing, install Ollama with its official Windows installer script, start it, pull the default model, and verify Qwen:
+If Ollama is missing, install Ollama with its official Windows installer script, start it, pull the default model, and verify Qwen with a JSON probe:
 
 ```powershell
 npm run setup:qwen:win:install
@@ -198,8 +198,14 @@ npm run setup:qwen:win:pull
 Manual alternative:
 
 ```powershell
-irm https://ollama.com/install.ps1 | iex
+if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
+  irm https://ollama.com/install.ps1 | iex
+}
+$ollama = (Get-Command ollama).Source
+$env:OLLAMA_HOST = '127.0.0.1:11434'
+Start-Process -FilePath $ollama -ArgumentList 'serve' -WindowStyle Hidden
 ollama pull qwen3.5:0.8b
+Invoke-RestMethod -Uri http://127.0.0.1:11434/api/tags
 ```
 
 Verify the local Qwen runtime from the repo:
