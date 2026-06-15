@@ -59,11 +59,12 @@ describe('neuronotes MCP server', () => {
       'neuronotes_search_notes',
       'neuronotes_get_note',
       'neuronotes_list_open_actions',
-      'neuronotes_library_summary'
+      'neuronotes_library_summary',
+      'neuronotes_finetune_readiness'
     ])
   })
 
-  it('exposes library, actions, and notes as MCP resources', async () => {
+  it('exposes library, actions, fine-tuning readiness, and notes as MCP resources', async () => {
     const listResponse = await handleMcpMessage(
       {
         jsonrpc: '2.0',
@@ -83,6 +84,10 @@ describe('neuronotes MCP server', () => {
         expect.objectContaining({
           uri: 'neuronotes://actions/open',
           title: 'Open Neuronotes Actions'
+        }),
+        expect.objectContaining({
+          uri: 'neuronotes://finetune/readiness',
+          title: 'Fine-Tuning Readiness'
         }),
         expect.objectContaining({
           uri: 'neuronotes://notes/note-health',
@@ -114,6 +119,27 @@ describe('neuronotes MCP server', () => {
           }
         ]
       }
+    })
+
+    const fineTuneResponse = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 'resources-3',
+        method: 'resources/read',
+        params: {
+          uri: 'neuronotes://finetune/readiness'
+        }
+      },
+      { dbPath }
+    )
+    const fineTunePayload = JSON.parse(fineTuneResponse.result.contents[0].text)
+
+    expect(fineTunePayload).toMatchObject({
+      schema: 'neuronotes.mcp.finetune-readiness.v1',
+      targetModel: 'qwen3.5:0.8b',
+      reviewedExampleCount: 0,
+      pendingReviewCount: 2,
+      status: 'needs-review'
     })
   })
 
@@ -294,6 +320,51 @@ describe('neuronotes MCP server', () => {
     expect(result.reviewedFineTuneCount).toBe(0)
   })
 
+  it('summarizes fine-tuning readiness for MCP hosts', async () => {
+    const reviewedDatabase = sampleDatabase()
+    reviewedDatabase.notes[0].trainingReviewedAt = '2026-06-15T00:03:00.000Z'
+    await writeFile(dbPath, `${JSON.stringify(reviewedDatabase, null, 2)}\n`, 'utf8')
+
+    const result = await callTool('neuronotes_finetune_readiness', {}, { dbPath })
+
+    expect(result).toMatchObject({
+      schema: 'neuronotes.mcp.finetune-readiness.v1',
+      targetModel: 'qwen3.5:0.8b',
+      reviewedExampleCount: 1,
+      pendingReviewCount: 1,
+      reviewableCount: 2,
+      reviewedQwenCount: 1,
+      reviewedLocalCount: 0,
+      pendingQwenCount: 0,
+      pendingLocalCount: 1,
+      status: 'ready',
+      reviewedExamples: [
+        expect.objectContaining({
+          id: 'note-health',
+          analysisStatus: 'qwen',
+          reviewedAt: '2026-06-15T00:03:00.000Z',
+          ragNoteIds: ['note-project']
+        })
+      ],
+      pendingReview: [
+        expect.objectContaining({
+          id: 'note-project',
+          analysisStatus: 'fallback'
+        })
+      ]
+    })
+
+    const summary = await callTool('neuronotes_library_summary', {}, { dbPath })
+
+    expect(summary.fineTune).toMatchObject({
+      schema: 'neuronotes.mcp.finetune-readiness.v1',
+      reviewedExampleCount: 1,
+      pendingReviewCount: 1,
+      status: 'ready'
+    })
+    expect(summary.fineTune.reviewedExamples).toBeUndefined()
+  })
+
   it('lists open action intents without returning completed actions', async () => {
     const result = await callTool(
       'neuronotes_list_open_actions',
@@ -389,6 +460,11 @@ describe('neuronotes MCP server', () => {
       actionCount: 2,
       openActionCount: 1,
       mcpApprovedActionCount: 1,
+      fineTune: expect.objectContaining({
+        reviewedExampleCount: 0,
+        pendingReviewCount: 2,
+        status: 'needs-review'
+      }),
       qwenAnalyzedCount: 1,
       fallbackAnalyzedCount: 1,
       execution: {

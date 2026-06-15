@@ -14,7 +14,8 @@ const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 25
 const RESOURCE_URIS = {
   summary: 'neuronotes://library/summary',
-  openActions: 'neuronotes://actions/open'
+  openActions: 'neuronotes://actions/open',
+  fineTuneReadiness: 'neuronotes://finetune/readiness'
 }
 
 const TOOLS = [
@@ -107,7 +108,19 @@ const TOOLS = [
   },
   {
     name: 'neuronotes_library_summary',
-    description: 'Summarize local Neuronotes counts, AI settings, categories, open actions, and MCP readiness.',
+    description: 'Summarize local Neuronotes counts, AI settings, categories, fine-tuning readiness, open actions, and MCP readiness.',
+    annotations: {
+      readOnlyHint: true
+    },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {}
+    }
+  },
+  {
+    name: 'neuronotes_finetune_readiness',
+    description: 'Summarize reviewed local Qwen fine-tuning examples and analyzed notes still awaiting approval.',
     annotations: {
       readOnlyHint: true
     },
@@ -238,6 +251,10 @@ export async function callTool(name, args = {}, context = {}) {
     return librarySummary(database, context.dbPath)
   }
 
+  if (name === 'neuronotes_finetune_readiness') {
+    return fineTuneReadiness(database)
+  }
+
   throw rpcError(-32602, `Unknown tool: ${name}`)
 }
 
@@ -361,6 +378,17 @@ function listResources(database) {
           priority: 0.85
         }
       },
+      {
+        uri: RESOURCE_URIS.fineTuneReadiness,
+        name: 'fine-tune-readiness',
+        title: 'Fine-Tuning Readiness',
+        description: 'Reviewed JSONL examples and analyzed notes still awaiting training approval.',
+        mimeType: 'application/json',
+        annotations: {
+          audience: ['assistant'],
+          priority: 0.82
+        }
+      },
       ...database.notes
         .slice()
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -388,6 +416,10 @@ function readResource(uri, database, dbPath) {
 
   if (uri === RESOURCE_URIS.openActions) {
     return jsonResource(uri, listOpenActions(database, { limit: MAX_LIMIT }))
+  }
+
+  if (uri === RESOURCE_URIS.fineTuneReadiness) {
+    return jsonResource(uri, fineTuneReadiness(database))
   }
 
   const noteId = parseNoteResourceUri(uri)
@@ -666,6 +698,7 @@ function librarySummary(database, dbPath) {
     openActionCount: actionCounts.open ?? 0,
     mcpApprovedActionCount: approvedActionCount,
     reviewedFineTuneCount: database.notes.filter((note) => Boolean(note.trainingReviewedAt)).length,
+    fineTune: fineTuneReadiness(database, { includeNotes: false }),
     qwenAnalyzedCount: statusCounts.qwen ?? 0,
     fallbackAnalyzedCount: statusCounts.fallback ?? 0,
     categories: categoryCounts,
@@ -677,6 +710,55 @@ function librarySummary(database, dbPath) {
       canExecuteExternalTools: false,
       requiresUserApprovalForFollowUp: true
     }
+  }
+}
+
+function fineTuneReadiness(database, options = {}) {
+  const includeNotes = options.includeNotes !== false
+  const reviewableNotes = database.notes.filter(isTrainingReviewable)
+  const reviewedNotes = reviewableNotes.filter((note) => Boolean(note.trainingReviewedAt))
+  const pendingReviewNotes = reviewableNotes.filter((note) => !note.trainingReviewedAt)
+  const reviewedQwenNotes = reviewedNotes.filter((note) => note.analysisStatus === 'qwen')
+  const reviewedLocalNotes = reviewedNotes.filter((note) => note.analysisStatus === 'fallback')
+  const pendingQwenNotes = pendingReviewNotes.filter((note) => note.analysisStatus === 'qwen')
+  const pendingLocalNotes = pendingReviewNotes.filter((note) => note.analysisStatus === 'fallback')
+
+  const payload = {
+    schema: 'neuronotes.mcp.finetune-readiness.v1',
+    targetModel: database.settings.model,
+    reviewedExampleCount: reviewedNotes.length,
+    pendingReviewCount: pendingReviewNotes.length,
+    reviewableCount: reviewableNotes.length,
+    reviewedQwenCount: reviewedQwenNotes.length,
+    reviewedLocalCount: reviewedLocalNotes.length,
+    pendingQwenCount: pendingQwenNotes.length,
+    pendingLocalCount: pendingLocalNotes.length,
+    status: reviewedNotes.length > 0 ? 'ready' : pendingReviewNotes.length > 0 ? 'needs-review' : 'empty'
+  }
+
+  if (includeNotes) {
+    payload.reviewedExamples = reviewedNotes.slice(0, MAX_LIMIT).map(fineTuneNoteSummary)
+    payload.pendingReview = pendingReviewNotes.slice(0, MAX_LIMIT).map(fineTuneNoteSummary)
+  }
+
+  return payload
+}
+
+function fineTuneNoteSummary(note) {
+  return {
+    id: note.id,
+    title: note.title,
+    category: note.category,
+    tags: note.tags,
+    analysisStatus: note.analysisStatus,
+    analysisProvider: note.analysisRun?.provider ?? null,
+    model: note.analysisRun?.model ?? null,
+    analyzedAt: note.analysisRun?.analyzedAt ?? null,
+    reviewedAt: note.trainingReviewedAt ?? null,
+    ragNoteIds: note.analysisRun?.ragNoteIds ?? [],
+    relatedCount: note.related.length,
+    suggestedActionCount: note.suggestedActions.length,
+    excerpt: excerpt(note.content, 220)
   }
 }
 
