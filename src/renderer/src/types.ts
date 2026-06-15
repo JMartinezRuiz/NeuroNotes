@@ -90,6 +90,8 @@ export interface AppSettings {
   model: string
   ollamaUrl: string
   autoAnalyze: boolean
+  ragMaxNotes: number
+  ragExcerptLength: number
 }
 
 export type AiHealthStatus = 'ready' | 'ollama-missing' | 'model-missing' | 'error'

@@ -39,4 +39,21 @@ describe('createPreviewApi', () => {
     const removed = await api.setTrainingReview(analyzed.id, false)
     expect(removed.trainingReviewedAt).toBeUndefined()
   })
+
+  it('applies RAG context settings in preview analysis', async () => {
+    const api = createPreviewApi()
+    const settings = await api.updateSettings({
+      ragMaxNotes: 0,
+      ragExcerptLength: 2000
+    })
+
+    expect(settings).toMatchObject({
+      ragMaxNotes: 0,
+      ragExcerptLength: 1200
+    })
+
+    const analyzed = await api.analyzeNote('preview-roadmap', 'qwen')
+    expect(analyzed.analysisRun?.ragNoteIds).toEqual([])
+    expect(analyzed.analysisRun?.ragContext).toEqual([])
+  })
 })

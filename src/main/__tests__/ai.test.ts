@@ -5,7 +5,9 @@ import { AppSettings, NoteRecord } from '../types'
 const settings: AppSettings = {
   model: 'qwen3.5:0.8b',
   ollamaUrl: 'http://127.0.0.1:11434',
-  autoAnalyze: true
+  autoAnalyze: true,
+  ragMaxNotes: 5,
+  ragExcerptLength: 550
 }
 
 function note(overrides: Partial<NoteRecord> & Pick<NoteRecord, 'id' | 'content'>): NoteRecord {

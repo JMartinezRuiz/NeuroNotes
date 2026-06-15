@@ -259,7 +259,10 @@ export async function analyzeNote(
 ): Promise<AnalysisResult> {
   const startedAt = Date.now()
   const localRelated = rankRelatedNotes(note, allNotes)
-  const ragContext = buildRagContextBundle(note, allNotes)
+  const ragContext = buildRagContextBundle(note, allNotes, {
+    maxNotes: settings.ragMaxNotes,
+    excerptLength: settings.ragExcerptLength
+  })
 
   if (mode === 'local') {
     const fallback = fallbackAnalysis(note, localRelated)

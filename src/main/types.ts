@@ -76,6 +76,8 @@ export interface AppSettings {
   model: string
   ollamaUrl: string
   autoAnalyze: boolean
+  ragMaxNotes: number
+  ragExcerptLength: number
 }
 
 export type AiHealthStatus = 'ready' | 'ollama-missing' | 'model-missing' | 'error'
@@ -206,7 +208,9 @@ export interface AnalysisResult {
 export const DEFAULT_SETTINGS: AppSettings = {
   model: 'qwen3.5:0.8b',
   ollamaUrl: 'http://127.0.0.1:11434',
-  autoAnalyze: true
+  autoAnalyze: true,
+  ragMaxNotes: 5,
+  ragExcerptLength: 550
 }
 
 export const NOTE_CATEGORIES = [

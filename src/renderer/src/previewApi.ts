@@ -6,7 +6,9 @@ type Api = NeuronotesApi
 const settings: AppSettings = {
   model: 'qwen3.5:0.8b',
   ollamaUrl: 'http://127.0.0.1:11434',
-  autoAnalyze: true
+  autoAnalyze: true,
+  ragMaxNotes: 5,
+  ragExcerptLength: 550
 }
 
 let notes: NoteRecord[] = [
@@ -154,6 +156,8 @@ const isFineTuneReviewable = (note: NoteRecord): boolean => {
 }
 const fineTuneExampleCount = (): number =>
   notes.filter((note) => Boolean(note.trainingReviewedAt) && isFineTuneReviewable(note)).length
+const clampNumber = (value: unknown, min: number, max: number): number =>
+  Number.isFinite(value) ? Math.max(min, Math.min(max, Math.round(Number(value)))) : min
 
 const previewHealth = (): AiHealth => ({
   ok: false,
@@ -351,8 +355,8 @@ export function createPreviewApi(): Api {
         model: settings.model,
         analyzedAt: new Date().toISOString(),
         durationMs: mode === 'qwen' ? 860 : 12,
-        ragNoteIds: note.related.map((related) => related.noteId),
-        ragContext: note.related.map((related) => {
+        ragNoteIds: note.related.slice(0, settings.ragMaxNotes).map((related) => related.noteId),
+        ragContext: note.related.slice(0, settings.ragMaxNotes).map((related) => {
           const candidate = notes.find((item) => item.id === related.noteId)
 
           return {
@@ -362,7 +366,7 @@ export function createPreviewApi(): Api {
             tags: candidate?.tags ?? [],
             score: related.score,
             reason: related.reason,
-            excerpt: candidate?.content.replace(/\s+/g, ' ').slice(0, 180) ?? ''
+            excerpt: candidate?.content.replace(/\s+/g, ' ').slice(0, settings.ragExcerptLength) ?? ''
           }
         })
       }
@@ -396,10 +400,13 @@ export function createPreviewApi(): Api {
           model: settings.model,
           analyzedAt: new Date().toISOString(),
           durationMs: mode === 'qwen' ? 860 : 12,
-          ragNoteIds: notes.filter((candidate) => candidate.id !== note.id).slice(0, 3).map((candidate) => candidate.id),
+          ragNoteIds: notes
+            .filter((candidate) => candidate.id !== note.id)
+            .slice(0, settings.ragMaxNotes)
+            .map((candidate) => candidate.id),
           ragContext: notes
             .filter((candidate) => candidate.id !== note.id)
-            .slice(0, 3)
+            .slice(0, settings.ragMaxNotes)
             .map((candidate) => ({
               noteId: candidate.id,
               title: candidate.title,
@@ -407,7 +414,7 @@ export function createPreviewApi(): Api {
               tags: candidate.tags,
               score: 0.66,
               reason: 'Contexto simulado para vista previa.',
-              excerpt: candidate.content.replace(/\s+/g, ' ').slice(0, 180)
+              excerpt: candidate.content.replace(/\s+/g, ' ').slice(0, settings.ragExcerptLength)
             }))
         }
         note.trainingReviewedAt = undefined
@@ -533,6 +540,8 @@ export function createPreviewApi(): Api {
     getSettings: async () => ({ ...settings }),
     updateSettings: async (updates) => {
       Object.assign(settings, updates)
+      settings.ragMaxNotes = clampNumber(settings.ragMaxNotes, 0, 6)
+      settings.ragExcerptLength = clampNumber(settings.ragExcerptLength, 160, 1200)
       return { ...settings }
     },
     checkAiHealth: async () => previewHealth(),

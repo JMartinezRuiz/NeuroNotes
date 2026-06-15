@@ -51,7 +51,9 @@ type WorkspaceView = 'note' | 'network'
 const emptySettings: AppSettings = {
   model: 'qwen3.5:0.8b',
   ollamaUrl: 'http://127.0.0.1:11434',
-  autoAnalyze: true
+  autoAnalyze: true,
+  ragMaxNotes: 5,
+  ragExcerptLength: 550
 }
 
 const emptyHealth: AiHealth = {
@@ -880,7 +882,9 @@ export default function App(): JSX.Element {
   async function restoreDefaultQwenSettings(): Promise<void> {
     await updateSettings({
       model: emptySettings.model,
-      ollamaUrl: emptySettings.ollamaUrl
+      ollamaUrl: emptySettings.ollamaUrl,
+      ragMaxNotes: emptySettings.ragMaxNotes,
+      ragExcerptLength: emptySettings.ragExcerptLength
     })
   }
 
@@ -1102,10 +1106,34 @@ export default function App(): JSX.Element {
               />
               Analizar al crear
             </label>
+            <label>
+              Notas RAG
+              <input
+                min={0}
+                max={6}
+                type="number"
+                value={settings.ragMaxNotes}
+                onChange={(event) => updateSettings({ ragMaxNotes: Number(event.target.value) })}
+              />
+            </label>
+            <label>
+              Extracto RAG
+              <input
+                min={160}
+                max={1200}
+                step={10}
+                type="number"
+                value={settings.ragExcerptLength}
+                onChange={(event) => updateSettings({ ragExcerptLength: Number(event.target.value) })}
+              />
+            </label>
             <div className="model-card">
               <div>
                 <span>Motor local</span>
                 <strong>{settings.model}</strong>
+                <small>
+                  RAG: {settings.ragMaxNotes} notas, {settings.ragExcerptLength} caracteres por extracto
+                </small>
                 <small>
                   {diagnosticsMessage ||
                   (health.ok
@@ -1147,7 +1175,9 @@ export default function App(): JSX.Element {
                   onClick={restoreDefaultQwenSettings}
                   disabled={
                     settings.model === emptySettings.model &&
-                    settings.ollamaUrl === emptySettings.ollamaUrl
+                    settings.ollamaUrl === emptySettings.ollamaUrl &&
+                    settings.ragMaxNotes === emptySettings.ragMaxNotes &&
+                    settings.ragExcerptLength === emptySettings.ragExcerptLength
                   }
                   title="Usar Qwen 0.8B"
                 >

@@ -144,7 +144,9 @@ describe('normalizeDatabase', () => {
       settings: {
         model: '',
         ollamaUrl: 'http://127.0.0.1:11434/',
-        autoAnalyze: false
+        autoAnalyze: false,
+        ragMaxNotes: 99,
+        ragExcerptLength: 20
       },
       actions: [
         {
@@ -172,7 +174,9 @@ describe('normalizeDatabase', () => {
     expect(normalized.settings).toEqual({
       model: DEFAULT_SETTINGS.model,
       ollamaUrl: 'http://127.0.0.1:11434',
-      autoAnalyze: false
+      autoAnalyze: false,
+      ragMaxNotes: 6,
+      ragExcerptLength: 160
     })
     expect(normalized.notes).toHaveLength(1)
     expect(normalized.notes[0]).toMatchObject({

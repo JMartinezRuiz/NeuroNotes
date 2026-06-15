@@ -40,6 +40,13 @@ const STOPWORDS = new Set([
 
 const MAX_RELATED_NOTES = 6
 const MIN_RELATED_SCORE = 0.08
+const DEFAULT_RAG_MAX_NOTES = 5
+const DEFAULT_RAG_EXCERPT_LENGTH = 550
+
+export interface RagContextOptions {
+  maxNotes?: number
+  excerptLength?: number
+}
 
 function tokens(text: string): string[] {
   return text
@@ -138,21 +145,24 @@ export function rankRelatedNotes(
 
 export function buildRagContext(
   note: Pick<NoteRecord, 'id' | 'content' | 'tags' | 'category'> & Partial<Pick<NoteRecord, 'title' | 'summary'>>,
-  notes: NoteRecord[]
+  notes: NoteRecord[],
+  options: RagContextOptions = {}
 ): string {
-  return buildRagContextBundle(note, notes).text
+  return buildRagContextBundle(note, notes, options).text
 }
 
 export function buildRagContextBundle(
   note: Pick<NoteRecord, 'id' | 'content' | 'tags' | 'category'> & Partial<Pick<NoteRecord, 'title' | 'summary'>>,
-  notes: NoteRecord[]
+  notes: NoteRecord[],
+  options: RagContextOptions = {}
 ): {
   text: string
   related: RelatedNote[]
   noteIds: string[]
   items: RagContextItem[]
 } {
-  const related = rankRelatedNotes(note, notes).slice(0, 5)
+  const resolvedOptions = normalizeRagContextOptions(options)
+  const related = rankRelatedNotes(note, notes).slice(0, resolvedOptions.maxNotes)
 
   if (related.length === 0) {
     return {
@@ -178,7 +188,7 @@ export function buildRagContextBundle(
         tags: candidate.tags,
         score: item.score,
         reason: item.reason,
-        excerpt: candidate.content.replace(/\s+/g, ' ').trim().slice(0, 550)
+        excerpt: candidate.content.replace(/\s+/g, ' ').trim().slice(0, resolvedOptions.excerptLength)
       }
     })
     .filter((item): item is RagContextItem => Boolean(item))
@@ -195,6 +205,21 @@ export function buildRagContextBundle(
     noteIds: items.map((item) => item.noteId),
     items
   }
+}
+
+function normalizeRagContextOptions(options: RagContextOptions): Required<RagContextOptions> {
+  return {
+    maxNotes: clampInteger(options.maxNotes, 0, MAX_RELATED_NOTES, DEFAULT_RAG_MAX_NOTES),
+    excerptLength: clampInteger(options.excerptLength, 160, 1200, DEFAULT_RAG_EXCERPT_LENGTH)
+  }
+}
+
+function clampInteger(value: unknown, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) {
+    return fallback
+  }
+
+  return Math.max(min, Math.min(max, Math.round(Number(value))))
 }
 
 function noteVector(note: Pick<NoteRecord, 'content' | 'tags' | 'category'> & Partial<Pick<NoteRecord, 'title' | 'summary'>>): Map<string, number> {

@@ -129,6 +129,61 @@ describe('buildRagContext', () => {
     })
     expect(bundle.items[0].excerpt).toContain('El contexto recuperado')
   })
+
+  it('limits RAG context size with explicit options', () => {
+    const source = note({
+      id: 'source',
+      category: 'Proyecto',
+      tags: ['qwen'],
+      content: 'Qwen necesita contexto RAG local para resumir notas relacionadas.'
+    })
+    const first = note({
+      id: 'first',
+      title: 'RAG local uno',
+      category: 'Proyecto',
+      tags: ['qwen'],
+      content: 'Qwen usa contexto RAG local con extractos largos de notas relacionadas para resumir mejor.'
+    })
+    const second = note({
+      id: 'second',
+      title: 'RAG local dos',
+      category: 'Proyecto',
+      tags: ['qwen'],
+      content: 'Otra nota relacionada con Qwen, contexto RAG local y resumen automatico.'
+    })
+
+    const bundle = buildRagContextBundle(source, [source, first, second], {
+      maxNotes: 1,
+      excerptLength: 180
+    })
+
+    expect(bundle.items).toHaveLength(1)
+    expect(bundle.noteIds).toHaveLength(1)
+    expect(bundle.items[0].excerpt.length).toBeLessThanOrEqual(180)
+  })
+
+  it('can disable RAG context while keeping analysis local', () => {
+    const source = note({
+      id: 'source',
+      category: 'Proyecto',
+      tags: ['qwen'],
+      content: 'Qwen con RAG local.'
+    })
+    const candidate = note({
+      id: 'candidate',
+      category: 'Proyecto',
+      tags: ['qwen'],
+      content: 'Nota candidata sobre Qwen y RAG local.'
+    })
+
+    const bundle = buildRagContextBundle(source, [source, candidate], {
+      maxNotes: 0
+    })
+
+    expect(bundle.items).toEqual([])
+    expect(bundle.noteIds).toEqual([])
+    expect(bundle.text).toBe('No hay notas relacionadas todavia.')
+  })
 })
 
 describe('synchronizeRelatedGraph', () => {

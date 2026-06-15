@@ -29,6 +29,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Automatic and manual note analysis.
 - Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
 - Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.
+- Configurable RAG context limits for Qwen: number of retrieved notes and excerpt length.
 - Bounded Ollama health and Qwen generation requests, so stalled local AI calls fall back instead of blocking notes.
 - Local fallback analyzer when Ollama/Qwen is unavailable.
 - Single-note analysis uses the local analyzer immediately when Qwen is not ready, and Qwen can upgrade those notes later.
@@ -57,7 +58,7 @@ The analysis flow is:
 
 1. A note is created or selected for analysis.
 2. Neuronotes ranks nearby notes locally using TF-IDF-style lexical similarity, phrase overlap, tag overlap, title matches, and category signals.
-3. The strongest matches are serialized as RAG context with score, reason, tags, and excerpt.
+3. The strongest matches are serialized as RAG context with score, reason, tags, and excerpt, bounded by the local RAG settings.
 4. Qwen 0.8B is called through Ollama with a strict JSON prompt.
 5. The response is sanitized and merged with local related-note ranking.
 6. Suggested action intents are stored locally without executing external tools.
@@ -180,3 +181,4 @@ npm run verify:win-dist
 - The development build is currently unsigned.
 - For public Windows distribution, add a signing certificate and remove `signExecutable: false` from the Electron Builder config.
 - Real Qwen inference requires Ollama installed locally and the `qwen3.5:0.8b` model pulled. Use `npm run verify:qwen` to prove the local runtime can generate a valid Neuronotes analysis.
+- RAG defaults are tuned conservatively for Qwen 0.8B: 5 context notes and 550 characters per excerpt. The settings panel can reduce or expand those limits locally.

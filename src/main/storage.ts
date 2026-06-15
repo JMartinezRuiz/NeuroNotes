@@ -188,8 +188,18 @@ function normalizeSettings(settings: unknown): DatabaseFile['settings'] {
       typeof source.ollamaUrl === 'string' && source.ollamaUrl.trim()
         ? source.ollamaUrl.trim().replace(/\/$/, '')
         : DEFAULT_SETTINGS.ollamaUrl,
-    autoAnalyze: typeof source.autoAnalyze === 'boolean' ? source.autoAnalyze : DEFAULT_SETTINGS.autoAnalyze
+    autoAnalyze: typeof source.autoAnalyze === 'boolean' ? source.autoAnalyze : DEFAULT_SETTINGS.autoAnalyze,
+    ragMaxNotes: clampInteger(source.ragMaxNotes, 0, 6, DEFAULT_SETTINGS.ragMaxNotes),
+    ragExcerptLength: clampInteger(source.ragExcerptLength, 160, 1200, DEFAULT_SETTINGS.ragExcerptLength)
   }
+}
+
+function clampInteger(value: unknown, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) {
+    return fallback
+  }
+
+  return Math.max(min, Math.min(max, Math.round(Number(value))))
 }
 
 function normalizeNote(value: unknown): NoteRecord | undefined {

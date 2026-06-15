@@ -505,7 +505,14 @@ function registerIpcHandlers(): void {
         ...database.settings,
         ...settings,
         model: settings.model?.trim() || database.settings.model,
-        ollamaUrl: settings.ollamaUrl?.trim().replace(/\/$/, '') || database.settings.ollamaUrl
+        ollamaUrl: settings.ollamaUrl?.trim().replace(/\/$/, '') || database.settings.ollamaUrl,
+        ragMaxNotes: normalizeIntegerSetting(settings.ragMaxNotes, 0, 6, database.settings.ragMaxNotes),
+        ragExcerptLength: normalizeIntegerSetting(
+          settings.ragExcerptLength,
+          160,
+          1200,
+          database.settings.ragExcerptLength
+        )
       }
       return database.settings
     })
@@ -773,6 +780,14 @@ function isFineTuneReviewable(note: NoteRecord): boolean {
 
 function normalizeAnalysisMode(value: unknown): AnalysisMode {
   return value === 'local' ? 'local' : 'qwen'
+}
+
+function normalizeIntegerSetting(value: unknown, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) {
+    return fallback
+  }
+
+  return Math.max(min, Math.min(max, Math.round(Number(value))))
 }
 
 function formatActionCount(count: number): string {
