@@ -69,8 +69,9 @@ export function normalizeDatabase(raw: Partial<DatabaseFile> | null | undefined)
   const source = raw && typeof raw === 'object' ? raw : {}
   const notes = Array.isArray(source.notes) ? source.notes.map(normalizeNote).filter(isNoteRecord) : []
   const noteIds = new Set(notes.map((note) => note.id))
-  const normalizedNotes = notes.map((note) => normalizeNoteReferences(note, noteIds))
-  const notesById = new Map(normalizedNotes.map((note) => [note.id, note]))
+  const notesById = new Map(notes.map((note) => [note.id, note]))
+  const normalizedNotes = notes.map((note) => normalizeNoteReferences(note, notesById, noteIds))
+  const normalizedNotesById = new Map(normalizedNotes.map((note) => [note.id, note]))
 
   return {
     version: 1,
@@ -80,7 +81,7 @@ export function normalizeDatabase(raw: Partial<DatabaseFile> | null | undefined)
           .map(normalizeActionItem)
           .filter(isActionItem)
           .filter((action) => noteIds.has(action.noteId))
-          .map((action) => normalizeActionReferences(action, notesById))
+          .map((action) => normalizeActionReferences(action, normalizedNotesById))
       : [],
     settings: normalizeSettings(source.settings)
   }
@@ -99,17 +100,25 @@ function normalizeActionReferences(action: ActionItem, notesById: Map<string, No
   }
 }
 
-function normalizeNoteReferences(note: NoteRecord, noteIds: Set<string>): NoteRecord {
+function normalizeNoteReferences(
+  note: NoteRecord,
+  notesById: Map<string, NoteRecord>,
+  noteIds: Set<string>
+): NoteRecord {
   let changed = false
-  const related = note.related.filter((related) => {
-    const keep = related.noteId !== note.id && noteIds.has(related.noteId)
+  const related: RelatedNote[] = []
 
-    if (!keep) {
+  for (const link of note.related) {
+    const target = notesById.get(link.noteId)
+
+    if (!target || target.id === note.id) {
       changed = true
+      continue
     }
 
-    return keep
-  })
+    related.push(link.title === target.title ? link : { ...link, title: target.title })
+  }
+
   const analysisRunResult = normalizeAnalysisRunReferences(note.analysisRun, note.id, noteIds)
   changed = changed || analysisRunResult.changed
 

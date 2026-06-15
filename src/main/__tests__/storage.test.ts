@@ -316,7 +316,7 @@ describe('normalizeDatabase', () => {
       related: [
         {
           noteId: 'keep',
-          title: 'Referencia valida',
+          title: 'Referencia valida.',
           score: 0.7,
           reason: 'Relacion vigente.'
         }
@@ -331,6 +331,46 @@ describe('normalizeDatabase', () => {
         ]
       },
       trainingReviewedAt: undefined
+    })
+  })
+
+  it('syncs related note titles without invalidating reviewed examples', () => {
+    const normalized = normalizeDatabase({
+      notes: [
+        {
+          id: 'source',
+          content: 'Nota revisada con enlace valido.',
+          summary: 'Resumen aprobado.',
+          related: [
+            {
+              noteId: 'target',
+              title: 'Titulo anterior',
+              score: 0.7,
+              reason: 'Relacion vigente.'
+            }
+          ],
+          analysisStatus: 'qwen',
+          trainingReviewedAt: '2026-06-15T00:02:00.000Z'
+        },
+        {
+          id: 'target',
+          title: 'Titulo actual',
+          content: 'Nota destino.'
+        }
+      ]
+    } as unknown as Partial<DatabaseFile>)
+
+    expect(normalized.notes[0]).toMatchObject({
+      id: 'source',
+      related: [
+        {
+          noteId: 'target',
+          title: 'Titulo actual',
+          score: 0.7,
+          reason: 'Relacion vigente.'
+        }
+      ],
+      trainingReviewedAt: '2026-06-15T00:02:00.000Z'
     })
   })
 

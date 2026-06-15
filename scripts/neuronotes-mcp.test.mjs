@@ -341,6 +341,29 @@ describe('neuronotes MCP server', () => {
     })
   })
 
+  it('normalizes related note titles from linked notes', async () => {
+    const staleDatabase = sampleDatabase()
+    staleDatabase.notes[0].related[0].title = 'Titulo anterior'
+    staleDatabase.notes[0].trainingReviewedAt = '2026-06-15T00:03:00.000Z'
+    await writeFile(dbPath, `${JSON.stringify(staleDatabase, null, 2)}\n`, 'utf8')
+
+    const result = await callTool(
+      'neuronotes_get_note',
+      {
+        noteId: 'note-health'
+      },
+      { dbPath }
+    )
+    const database = await readNeuronotesDatabase(dbPath)
+    const note = database.notes.find((item) => item.id === 'note-health')
+
+    expect(result.note.related[0]).toMatchObject({
+      noteId: 'note-project',
+      title: 'Roadmap Neuronotes'
+    })
+    expect(note.trainingReviewedAt).toBe('2026-06-15T00:03:00.000Z')
+  })
+
   it('summarizes library state and keeps MCP execution read-only', async () => {
     const result = await callTool('neuronotes_library_summary', {}, { dbPath })
 

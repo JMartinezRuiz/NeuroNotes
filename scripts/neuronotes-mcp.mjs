@@ -716,13 +716,14 @@ function normalizeDatabase(raw) {
   const source = isObject(raw) ? raw : {}
   const notes = Array.isArray(source.notes) ? source.notes.map(normalizeNote).filter(Boolean) : []
   const noteIds = new Set(notes.map((note) => note.id))
-  const normalizedNotes = notes.map((note) => normalizeNoteReferences(note, noteIds))
-  const notesById = new Map(normalizedNotes.map((note) => [note.id, note]))
+  const notesById = new Map(notes.map((note) => [note.id, note]))
+  const normalizedNotes = notes.map((note) => normalizeNoteReferences(note, notesById, noteIds))
+  const normalizedNotesById = new Map(normalizedNotes.map((note) => [note.id, note]))
   const actions = Array.isArray(source.actions)
     ? source.actions
         .map(normalizeAction)
         .filter((action) => action && noteIds.has(action.noteId))
-        .map((action) => normalizeActionReferences(action, notesById))
+        .map((action) => normalizeActionReferences(action, normalizedNotesById))
     : []
 
   return {
@@ -746,17 +747,21 @@ function normalizeActionReferences(action, notesById) {
   }
 }
 
-function normalizeNoteReferences(note, noteIds) {
+function normalizeNoteReferences(note, notesById, noteIds) {
   let changed = false
-  const related = note.related.filter((related) => {
-    const keep = related.noteId !== note.id && noteIds.has(related.noteId)
+  const related = []
 
-    if (!keep) {
+  for (const link of note.related) {
+    const target = notesById.get(link.noteId)
+
+    if (!target || target.id === note.id) {
       changed = true
+      continue
     }
 
-    return keep
-  })
+    related.push(link.title === target.title ? link : { ...link, title: target.title })
+  }
+
   const analysisRunResult = normalizeAnalysisRunReferences(note.analysisRun, note.id, noteIds)
   changed = changed || analysisRunResult.changed
 
