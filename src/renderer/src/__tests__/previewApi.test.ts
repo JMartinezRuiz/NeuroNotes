@@ -33,6 +33,7 @@ describe('createPreviewApi', () => {
     expect(result.command).toContain("$endpoint = 'http://127.0.0.1:11434'")
     expect(result.command).toContain("Start-Process -FilePath $ollama -ArgumentList 'serve' -WindowStyle Hidden")
     expect(result.command).toContain('& $ollama pull $model')
+    expect(result.command).toContain('think = $false')
     expect(result.command).toContain('Invoke-RestMethod -Uri $generateUrl')
   })
 

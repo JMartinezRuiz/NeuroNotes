@@ -337,6 +337,7 @@ async function analyzeWithQwen(
       body: JSON.stringify({
         model: settings.model,
         stream: false,
+        think: false,
         format: 'json',
         options: {
           temperature: 0.2,
@@ -392,6 +393,7 @@ Devuelve exclusivamente JSON valido con esta forma:
 Categorias permitidas: ${NOTE_CATEGORIES.join(', ')}.
 No inventes IDs. Si no hay relacion clara, usa related: [].
 No ejecutes herramientas ni asumas permisos. Las suggestedActions son solo intenciones locales para una futura capa MCP.
+No incluyas razonamiento, texto fuera del JSON ni bloques <think>.
 
 Fecha de referencia:
 ${note.createdAt.slice(0, 10)}

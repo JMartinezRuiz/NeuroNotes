@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildGeneratePayload,
   classifyOllamaConnectionFailure,
   parseArgs,
   parseJson,
@@ -90,5 +91,19 @@ describe('verify-qwen script options', () => {
       category: 'Proyecto',
       tags: ['qwen', 'rag']
     })
+  })
+
+  it('builds a non-thinking JSON probe request for Qwen 3.5', () => {
+    expect(buildGeneratePayload('qwen3.5:0.8b')).toMatchObject({
+      model: 'qwen3.5:0.8b',
+      stream: false,
+      think: false,
+      format: 'json',
+      options: {
+        temperature: 0.2,
+        num_predict: 320
+      }
+    })
+    expect(buildGeneratePayload('qwen3.5:0.8b').prompt).toContain('No incluyas razonamiento')
   })
 })

@@ -168,16 +168,7 @@ async function generateProbe(endpoint, model, timeoutMs) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        model,
-        stream: false,
-        format: 'json',
-        options: {
-          temperature: 0.2,
-          num_predict: 320
-        },
-        prompt: buildProbePrompt()
-      })
+      body: JSON.stringify(buildGeneratePayload(model))
     },
     timeoutMs
   )
@@ -196,8 +187,23 @@ async function generateProbe(endpoint, model, timeoutMs) {
   }
 }
 
+function buildGeneratePayload(model) {
+  return {
+    model,
+    stream: false,
+    think: false,
+    format: 'json',
+    options: {
+      temperature: 0.2,
+      num_predict: 320
+    },
+    prompt: buildProbePrompt()
+  }
+}
+
 function buildProbePrompt() {
   return `Eres el motor local de Neuronotes. Devuelve solo JSON valido.
+No incluyas razonamiento, texto fuera del JSON ni bloques <think>.
 
 Analiza esta nota:
 Proyecto Neuronotes: usar Qwen 0.8B con RAG local para resumir, categorizar y enlazar notas rapidas.
@@ -655,6 +661,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
 }
 
 export {
+  buildGeneratePayload,
   buildProbePrompt,
   parseArgs,
   parseJson,

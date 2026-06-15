@@ -245,6 +245,7 @@ describe('analyzeNote', () => {
     const body = JSON.parse(String(request.body)) as {
       format: string
       model: string
+      think: boolean
       prompt: string
       stream: boolean
     }
@@ -252,6 +253,7 @@ describe('analyzeNote', () => {
     expect(body).toMatchObject({
       model: 'qwen3.5:0.8b',
       stream: false,
+      think: false,
       format: 'json'
     })
     expect(body.prompt).toContain('Contexto recuperado:')
@@ -262,6 +264,7 @@ describe('analyzeNote', () => {
     expect(body.prompt).toContain('No inventes IDs')
     expect(body.prompt).toContain('suggestedActions')
     expect(body.prompt).toContain('futura capa MCP')
+    expect(body.prompt).toContain('No incluyas razonamiento')
     expect(body.prompt).toContain('Fecha de referencia:\n2026-06-15')
     expect(body.prompt).toContain('Metadatos actuales:')
     expect(body.prompt).toContain('Titulo: Nota fuente Qwen')

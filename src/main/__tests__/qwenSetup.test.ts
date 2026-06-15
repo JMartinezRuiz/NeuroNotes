@@ -17,6 +17,8 @@ describe('buildQwenWindowsSetupCommand', () => {
     expect(command).toContain("Start-Process -FilePath $ollama -ArgumentList 'serve' -WindowStyle Hidden")
     expect(command).toContain('Invoke-RestMethod -Uri $tagsUrl')
     expect(command).toContain('& $ollama pull $model')
+    expect(command).toContain('think = $false')
+    expect(command).toContain('sin razonamiento ni bloques <think>')
     expect(command).toContain('Invoke-RestMethod -Uri $generateUrl')
   })
 

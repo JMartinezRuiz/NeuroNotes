@@ -43,6 +43,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Configurable RAG context limits for Qwen: number of retrieved notes and excerpt length.
 - RAG budget indicator in settings to keep context compact enough for Qwen 0.8B.
 - Bounded Ollama health and Qwen generation requests, so stalled local AI calls fall back instead of blocking notes.
+- Qwen generation requests explicitly disable visible thinking output for a cleaner JSON/RAG contract.
 - Qwen JSON responses are sanitized and lightly repaired for common model output issues such as Markdown fences and trailing commas.
 - MCP library summary includes the latest matching Qwen JSON/RAG diagnostic result so external hosts can see whether local AI was actually verified.
 - Qwen prompts include the note reference date and current title/category/tags, improving time-sensitive actions and metadata-aware categorization.

@@ -39,7 +39,7 @@ export function buildQwenWindowsSetupCommand(settings: QwenSetupSettings): strin
     '}',
     'Invoke-RestMethod -Uri $tagsUrl -TimeoutSec 5 | Out-Null',
     '& $ollama pull $model',
-    "$body = @{ model = $model; stream = $false; format = 'json'; prompt = 'Devuelve solo JSON valido para Neuronotes: {\"ok\": true}' } | ConvertTo-Json -Depth 5",
+    "$body = @{ model = $model; stream = $false; think = $false; format = 'json'; prompt = 'Devuelve solo JSON valido para Neuronotes, sin razonamiento ni bloques <think>: {\"ok\": true}' } | ConvertTo-Json -Depth 5",
     "Invoke-RestMethod -Uri $generateUrl -Method Post -ContentType 'application/json' -Body $body | ConvertTo-Json -Depth 5"
   ].join('\n')
 }
