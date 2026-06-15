@@ -56,7 +56,12 @@ import {
 } from './fineTuneReadiness'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges } from './graph'
-import { mcpActionReadiness, summarizeMcpActionReadiness } from './mcpActionReadiness'
+import {
+  McpActionReadinessFilter,
+  actionMatchesMcpReadinessFilter,
+  mcpActionReadiness,
+  summarizeMcpActionReadiness
+} from './mcpActionReadiness'
 import { normalizeSearchText, noteMatchesSearch } from './search'
 import { commandFromKeyboardShortcut } from './shortcuts'
 import { summarizeRagBudget } from './ragBudget'
@@ -241,6 +246,7 @@ export default function App(): JSX.Element {
   const [activeCategory, setActiveCategory] = useState<string>('Todas')
   const [activeAnalysisFilter, setActiveAnalysisFilter] = useState<AnalysisStatusFilter>('all')
   const [activeFineTuneFilter, setActiveFineTuneFilter] = useState<FineTuneReviewFilter>('all')
+  const [activeMcpReadinessFilter, setActiveMcpReadinessFilter] = useState<McpActionReadinessFilter>('all')
   const [settings, setSettings] = useState<AppSettings>(emptySettings)
   const [health, setHealth] = useState<AiHealth>(emptyHealth)
   const [busy, setBusy] = useState<string | null>(null)
@@ -278,6 +284,49 @@ export default function App(): JSX.Element {
   const openActionCount = openActions.length
   const doneActionCount = doneActions.length
   const mcpReadinessSummary = useMemo(() => summarizeMcpActionReadiness(actions), [actions])
+  const filteredOpenActions = useMemo(
+    () => openActions.filter((action) => actionMatchesMcpReadinessFilter(action, activeMcpReadinessFilter)),
+    [activeMcpReadinessFilter, openActions]
+  )
+  const filteredDoneActions = useMemo(
+    () => doneActions.filter((action) => actionMatchesMcpReadinessFilter(action, activeMcpReadinessFilter)),
+    [activeMcpReadinessFilter, doneActions]
+  )
+  const mcpReadinessFilters = useMemo(
+    (): Array<{ id: McpActionReadinessFilter; label: string; count: number; title: string }> => [
+      {
+        id: 'all',
+        label: 'Todas',
+        count: mcpReadinessSummary.total,
+        title: 'Ver todas las acciones guardadas'
+      },
+      {
+        id: 'ready',
+        label: 'Listas',
+        count: mcpReadinessSummary.ready,
+        title: 'Ver acciones listas para handoff MCP'
+      },
+      {
+        id: 'needs-approval',
+        label: 'Por aprobar',
+        count: mcpReadinessSummary.needsApproval,
+        title: 'Ver acciones que necesitan aprobacion manual'
+      },
+      {
+        id: 'needs-tool',
+        label: 'Sin tool',
+        count: mcpReadinessSummary.needsTool,
+        title: 'Ver acciones que necesitan toolHint MCP'
+      },
+      {
+        id: 'done',
+        label: 'Hechas',
+        count: mcpReadinessSummary.done,
+        title: 'Ver acciones completadas fuera del handoff'
+      }
+    ],
+    [mcpReadinessSummary]
+  )
   const actionNotesById = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes])
   const savedSuggestedActionKeys = useMemo(
     () => new Set(selectedActionItems.map((action) => actionIdentity(action))),
@@ -1683,13 +1732,15 @@ export default function App(): JSX.Element {
                 <section>
                   <div className="section-title">
                     <h3>Por hacer</h3>
-                    <span>{openActions.length}</span>
+                    <span>{filteredOpenActions.length}</span>
                   </div>
                   <div className="plan-action-list">
-                    {openActions.length > 0 ? (
-                      openActions.map(renderPlanAction)
+                    {filteredOpenActions.length > 0 ? (
+                      filteredOpenActions.map(renderPlanAction)
                     ) : (
-                      <p className="muted">Sin acciones abiertas.</p>
+                      <p className="muted">
+                        {activeMcpReadinessFilter === 'all' ? 'Sin acciones abiertas.' : 'Sin acciones abiertas en este filtro.'}
+                      </p>
                     )}
                   </div>
                 </section>
@@ -1697,13 +1748,15 @@ export default function App(): JSX.Element {
                 <section>
                   <div className="section-title">
                     <h3>Hechas</h3>
-                    <span>{doneActions.length}</span>
+                    <span>{filteredDoneActions.length}</span>
                   </div>
                   <div className="plan-action-list">
-                    {doneActions.length > 0 ? (
-                      doneActions.map(renderPlanAction)
+                    {filteredDoneActions.length > 0 ? (
+                      filteredDoneActions.map(renderPlanAction)
                     ) : (
-                      <p className="muted">Sin acciones completadas.</p>
+                      <p className="muted">
+                        {activeMcpReadinessFilter === 'all' ? 'Sin acciones completadas.' : 'Sin acciones completadas en este filtro.'}
+                      </p>
                     )}
                   </div>
                 </section>
@@ -1716,19 +1769,21 @@ export default function App(): JSX.Element {
                 <p className="summary-text">
                   Las acciones abiertas se exportan con nota fuente, contexto RAG, aprobacion MCP y un borrador de tool-call para revision externa.
                 </p>
-                <div className="mcp-readiness-summary">
-                  <span data-state="ready">
-                    <strong>{mcpReadinessSummary.ready}</strong>
-                    Listas
-                  </span>
-                  <span data-state="needs-approval">
-                    <strong>{mcpReadinessSummary.needsApproval}</strong>
-                    Por aprobar
-                  </span>
-                  <span data-state="needs-tool">
-                    <strong>{mcpReadinessSummary.needsTool}</strong>
-                    Sin tool
-                  </span>
+                <div className="mcp-readiness-filters" role="group" aria-label="Filtrar acciones por estado MCP">
+                  {mcpReadinessFilters.map((filter) => (
+                    <button
+                      type="button"
+                      key={filter.id}
+                      data-state={filter.id}
+                      data-active={activeMcpReadinessFilter === filter.id}
+                      aria-pressed={activeMcpReadinessFilter === filter.id}
+                      onClick={() => setActiveMcpReadinessFilter(filter.id)}
+                      title={filter.title}
+                    >
+                      <strong>{filter.count}</strong>
+                      {filter.label}
+                    </button>
+                  ))}
                 </div>
                 <button
                   type="button"

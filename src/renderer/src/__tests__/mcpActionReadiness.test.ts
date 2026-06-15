@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { mcpActionReadiness, summarizeMcpActionReadiness } from '../mcpActionReadiness'
+import {
+  actionMatchesMcpReadinessFilter,
+  mcpActionReadiness,
+  summarizeMcpActionReadiness
+} from '../mcpActionReadiness'
 import { ActionItem } from '../types'
 
 function action(overrides: Partial<ActionItem> = {}): ActionItem {
@@ -94,5 +98,26 @@ describe('summarizeMcpActionReadiness', () => {
       needsTool: 1,
       done: 1
     })
+  })
+})
+
+describe('actionMatchesMcpReadinessFilter', () => {
+  it('matches every action when the filter is all', () => {
+    expect(actionMatchesMcpReadinessFilter(action({ toolHint: undefined }), 'all')).toBe(true)
+    expect(actionMatchesMcpReadinessFilter(action({ status: 'done' }), 'all')).toBe(true)
+  })
+
+  it('matches actions by their current MCP readiness state', () => {
+    const ready = action({ mcpApprovedAt: '2026-06-15T00:01:00.000Z' })
+    const needsApproval = action()
+    const needsTool = action({ toolHint: undefined })
+    const done = action({ status: 'done', mcpApprovedAt: '2026-06-15T00:01:00.000Z' })
+
+    expect(actionMatchesMcpReadinessFilter(ready, 'ready')).toBe(true)
+    expect(actionMatchesMcpReadinessFilter(ready, 'needs-approval')).toBe(false)
+    expect(actionMatchesMcpReadinessFilter(needsApproval, 'needs-approval')).toBe(true)
+    expect(actionMatchesMcpReadinessFilter(needsTool, 'needs-tool')).toBe(true)
+    expect(actionMatchesMcpReadinessFilter(done, 'done')).toBe(true)
+    expect(actionMatchesMcpReadinessFilter(done, 'ready')).toBe(false)
   })
 })

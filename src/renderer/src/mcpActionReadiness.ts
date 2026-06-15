@@ -1,6 +1,7 @@
 import { ActionItem } from './types'
 
 export type McpActionReadinessState = 'ready' | 'needs-approval' | 'needs-tool' | 'done'
+export type McpActionReadinessFilter = 'all' | McpActionReadinessState
 
 export interface McpActionReadiness {
   state: McpActionReadinessState
@@ -92,4 +93,15 @@ export function summarizeMcpActionReadiness(actions: McpActionInput[]): McpActio
   }
 
   return summary
+}
+
+export function actionMatchesMcpReadinessFilter(
+  action: McpActionInput,
+  filter: McpActionReadinessFilter
+): boolean {
+  if (filter === 'all') {
+    return true
+  }
+
+  return mcpActionReadiness(action).state === filter
 }
