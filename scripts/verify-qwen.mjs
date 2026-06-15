@@ -223,7 +223,10 @@ Forma exacta:
 }
 
 function parseJson(text) {
-  const clean = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+  const clean = text
+    .replace(/<think>[\s\S]*?<\/think>/g, '')
+    .replace(/```(?:json)?/gi, '')
+    .trim()
   const start = clean.indexOf('{')
   const end = clean.lastIndexOf('}')
 
@@ -231,7 +234,17 @@ function parseJson(text) {
     throw new Error('The model did not return a JSON object')
   }
 
-  return JSON.parse(clean.slice(start, end + 1))
+  const candidate = clean.slice(start, end + 1)
+
+  try {
+    return JSON.parse(candidate)
+  } catch {
+    return JSON.parse(repairJsonCandidate(candidate))
+  }
+}
+
+function repairJsonCandidate(value) {
+  return value.replace(/,\s*([}\]])/g, '$1')
 }
 
 function validateProbeAnalysis(payload) {

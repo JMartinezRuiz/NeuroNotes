@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseArgs, recoveryNextSteps, recoverySetupCommands, resolveOllamaHostEnv } from './verify-qwen.mjs'
+import { parseArgs, parseJson, recoveryNextSteps, recoverySetupCommands, resolveOllamaHostEnv } from './verify-qwen.mjs'
 
 describe('verify-qwen script options', () => {
   it('parses start and pull options with sane defaults', () => {
@@ -54,5 +54,24 @@ describe('verify-qwen script options', () => {
       'ollama pull qwen3.5:0.8b',
       'npm run verify:qwen:start:json'
     ])
+  })
+
+  it('parses fenced Qwen JSON with thinking output and trailing commas', () => {
+    expect(
+      parseJson(`<think>razonamiento interno</think>
+\`\`\`json
+{
+  "title": "Setup Qwen",
+  "summary": "Verifica Qwen 0.8B local.",
+  "category": "Proyecto",
+  "tags": ["qwen", "rag",],
+}
+\`\`\``)
+    ).toMatchObject({
+      title: 'Setup Qwen',
+      summary: 'Verifica Qwen 0.8B local.',
+      category: 'Proyecto',
+      tags: ['qwen', 'rag']
+    })
   })
 })
