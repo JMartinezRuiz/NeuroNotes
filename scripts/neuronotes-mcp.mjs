@@ -716,16 +716,79 @@ function normalizeDatabase(raw) {
   const source = isObject(raw) ? raw : {}
   const notes = Array.isArray(source.notes) ? source.notes.map(normalizeNote).filter(Boolean) : []
   const noteIds = new Set(notes.map((note) => note.id))
+  const normalizedNotes = notes.map((note) => normalizeNoteReferences(note, noteIds))
   const actions = Array.isArray(source.actions)
     ? source.actions.map(normalizeAction).filter((action) => action && noteIds.has(action.noteId))
     : []
 
   return {
     version: 1,
-    notes,
+    notes: normalizedNotes,
     actions,
     settings: normalizeSettings(source.settings)
   }
+}
+
+function normalizeNoteReferences(note, noteIds) {
+  let changed = false
+  const related = note.related.filter((related) => {
+    const keep = related.noteId !== note.id && noteIds.has(related.noteId)
+
+    if (!keep) {
+      changed = true
+    }
+
+    return keep
+  })
+  const analysisRunResult = normalizeAnalysisRunReferences(note.analysisRun, note.id, noteIds)
+  changed = changed || analysisRunResult.changed
+
+  return {
+    ...note,
+    related,
+    analysisRun: analysisRunResult.analysisRun,
+    trainingReviewedAt: changed ? undefined : note.trainingReviewedAt
+  }
+}
+
+function normalizeAnalysisRunReferences(analysisRun, sourceNoteId, noteIds) {
+  if (!analysisRun) {
+    return {
+      analysisRun: undefined,
+      changed: false
+    }
+  }
+
+  const ragNoteIds = uniqueValidReferenceIds(analysisRun.ragNoteIds, sourceNoteId, noteIds)
+  const ragContext = (analysisRun.ragContext ?? []).filter(
+    (item) => item.noteId !== sourceNoteId && noteIds.has(item.noteId)
+  )
+  const changed =
+    ragNoteIds.length !== analysisRun.ragNoteIds.length ||
+    ragContext.length !== (analysisRun.ragContext ?? []).length
+
+  return {
+    analysisRun: {
+      ...analysisRun,
+      ragNoteIds,
+      ragContext
+    },
+    changed
+  }
+}
+
+function uniqueValidReferenceIds(values, sourceNoteId, noteIds) {
+  const unique = new Set()
+
+  for (const value of values) {
+    if (value === sourceNoteId || !noteIds.has(value)) {
+      continue
+    }
+
+    unique.add(value)
+  }
+
+  return [...unique]
 }
 
 function normalizeNote(value) {

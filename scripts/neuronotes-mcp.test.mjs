@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { callTool, handleMcpMessage, parseCliArgs, resolveDatabasePath } from './neuronotes-mcp.mjs'
+import { callTool, handleMcpMessage, parseCliArgs, readNeuronotesDatabase, resolveDatabasePath } from './neuronotes-mcp.mjs'
 
 let tempDir
 let dbPath
@@ -218,6 +218,55 @@ describe('neuronotes MCP server', () => {
         title: 'Roadmap Neuronotes'
       })
     ])
+  })
+
+  it('normalizes stale note references before exposing MCP context', async () => {
+    const staleDatabase = sampleDatabase()
+    staleDatabase.notes[0].trainingReviewedAt = '2026-06-15T00:03:00.000Z'
+    staleDatabase.notes[0].related.push(
+      {
+        noteId: 'missing-note',
+        title: 'No existe',
+        score: 0.8,
+        reason: 'Debe filtrarse.'
+      },
+      {
+        noteId: 'note-health',
+        title: 'Self',
+        score: 1,
+        reason: 'Self link.'
+      }
+    )
+    staleDatabase.notes[0].analysisRun.ragNoteIds.push('missing-note', 'note-health', 'note-project')
+    staleDatabase.notes[0].analysisRun.ragContext.push(
+      {
+        noteId: 'missing-note',
+        title: 'No existe',
+        category: 'Ideas',
+        tags: [],
+        score: 0.8,
+        reason: 'Debe filtrarse.',
+        excerpt: 'Contexto stale.'
+      },
+      {
+        noteId: 'note-health',
+        title: 'Self',
+        category: 'Salud',
+        tags: ['salud'],
+        score: 1,
+        reason: 'Self context.',
+        excerpt: 'No debe exponerse.'
+      }
+    )
+    await writeFile(dbPath, `${JSON.stringify(staleDatabase, null, 2)}\n`, 'utf8')
+
+    const database = await readNeuronotesDatabase(dbPath)
+    const note = database.notes.find((item) => item.id === 'note-health')
+
+    expect(note.related.map((related) => related.noteId)).toEqual(['note-project'])
+    expect(note.analysisRun.ragNoteIds).toEqual(['note-project'])
+    expect(note.analysisRun.ragContext.map((item) => item.noteId)).toEqual(['note-project'])
+    expect(note.trainingReviewedAt).toBeUndefined()
   })
 
   it('lists open action intents without returning completed actions', async () => {

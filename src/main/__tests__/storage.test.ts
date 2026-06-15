@@ -138,6 +138,11 @@ describe('normalizeDatabase', () => {
           trainingReviewedAt: ' 2026-06-15T00:02:00.000Z '
         },
         {
+          id: 'target',
+          title: 'Contexto RAG',
+          content: 'Nota de contexto valida para RAG local.'
+        },
+        {
           content: 'sin id'
         }
       ],
@@ -178,7 +183,7 @@ describe('normalizeDatabase', () => {
       ragMaxNotes: 6,
       ragExcerptLength: 160
     })
-    expect(normalized.notes).toHaveLength(1)
+    expect(normalized.notes).toHaveLength(2)
     expect(normalized.notes[0]).toMatchObject({
       id: 'valid',
       title: 'Nota importada',
@@ -231,6 +236,100 @@ describe('normalizeDatabase', () => {
       confidence: 1,
       status: 'open',
       updatedAt: '2026-06-15T00:01:00.000Z'
+    })
+  })
+
+  it('drops dangling note references and invalidates reviewed examples when the graph changes', () => {
+    const normalized = normalizeDatabase({
+      notes: [
+        {
+          id: 'reviewed',
+          content: 'Nota revisada con referencias stale.',
+          related: [
+            {
+              noteId: 'keep',
+              title: 'Referencia valida',
+              score: 0.7,
+              reason: 'Relacion vigente.'
+            },
+            {
+              noteId: 'missing',
+              title: 'No existe',
+              score: 0.8,
+              reason: 'Debe salir.'
+            },
+            {
+              noteId: 'reviewed',
+              title: 'Self',
+              score: 1,
+              reason: 'Self link.'
+            }
+          ],
+          analysisRun: {
+            provider: 'qwen',
+            model: 'qwen3.5:0.8b',
+            analyzedAt: '2026-06-15T00:00:00.000Z',
+            durationMs: 1000,
+            ragNoteIds: ['keep', 'missing', 'reviewed', 'keep'],
+            ragContext: [
+              {
+                noteId: 'keep',
+                title: 'Referencia valida',
+                category: 'Proyecto',
+                tags: ['qwen'],
+                score: 0.7,
+                reason: 'Contexto vigente.',
+                excerpt: 'Contexto valido.'
+              },
+              {
+                noteId: 'missing',
+                title: 'No existe',
+                category: 'Ideas',
+                tags: [],
+                score: 0.8,
+                reason: 'Debe salir.',
+                excerpt: 'Contexto stale.'
+              },
+              {
+                noteId: 'reviewed',
+                title: 'Self',
+                category: 'Inbox',
+                tags: [],
+                score: 1,
+                reason: 'Self context.',
+                excerpt: 'No debe usarse.'
+              }
+            ]
+          },
+          trainingReviewedAt: '2026-06-15T00:02:00.000Z'
+        },
+        {
+          id: 'keep',
+          content: 'Referencia valida.'
+        }
+      ]
+    } as unknown as Partial<DatabaseFile>)
+
+    expect(normalized.notes[0]).toMatchObject({
+      id: 'reviewed',
+      related: [
+        {
+          noteId: 'keep',
+          title: 'Referencia valida',
+          score: 0.7,
+          reason: 'Relacion vigente.'
+        }
+      ],
+      analysisRun: {
+        ragNoteIds: ['keep'],
+        ragContext: [
+          {
+            noteId: 'keep',
+            title: 'Referencia valida'
+          }
+        ]
+      },
+      trainingReviewedAt: undefined
     })
   })
 })

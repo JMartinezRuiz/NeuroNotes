@@ -69,10 +69,11 @@ export function normalizeDatabase(raw: Partial<DatabaseFile> | null | undefined)
   const source = raw && typeof raw === 'object' ? raw : {}
   const notes = Array.isArray(source.notes) ? source.notes.map(normalizeNote).filter(isNoteRecord) : []
   const noteIds = new Set(notes.map((note) => note.id))
+  const normalizedNotes = notes.map((note) => normalizeNoteReferences(note, noteIds))
 
   return {
     version: 1,
-    notes,
+    notes: normalizedNotes,
     actions: Array.isArray(source.actions)
       ? source.actions
           .map(normalizeActionItem)
@@ -81,6 +82,72 @@ export function normalizeDatabase(raw: Partial<DatabaseFile> | null | undefined)
       : [],
     settings: normalizeSettings(source.settings)
   }
+}
+
+function normalizeNoteReferences(note: NoteRecord, noteIds: Set<string>): NoteRecord {
+  let changed = false
+  const related = note.related.filter((related) => {
+    const keep = related.noteId !== note.id && noteIds.has(related.noteId)
+
+    if (!keep) {
+      changed = true
+    }
+
+    return keep
+  })
+  const analysisRunResult = normalizeAnalysisRunReferences(note.analysisRun, note.id, noteIds)
+  changed = changed || analysisRunResult.changed
+
+  return {
+    ...note,
+    related,
+    analysisRun: analysisRunResult.analysisRun,
+    trainingReviewedAt: changed ? undefined : note.trainingReviewedAt
+  }
+}
+
+function normalizeAnalysisRunReferences(
+  analysisRun: AnalysisRun | undefined,
+  sourceNoteId: string,
+  noteIds: Set<string>
+): { analysisRun: AnalysisRun | undefined; changed: boolean } {
+  if (!analysisRun) {
+    return {
+      analysisRun: undefined,
+      changed: false
+    }
+  }
+
+  const ragNoteIds = uniqueValidReferenceIds(analysisRun.ragNoteIds, sourceNoteId, noteIds)
+  const ragContext = (analysisRun.ragContext ?? []).filter(
+    (item) => item.noteId !== sourceNoteId && noteIds.has(item.noteId)
+  )
+  const changed =
+    ragNoteIds.length !== analysisRun.ragNoteIds.length ||
+    ragContext.length !== (analysisRun.ragContext ?? []).length
+
+  return {
+    analysisRun: {
+      ...analysisRun,
+      ragNoteIds,
+      ragContext
+    },
+    changed
+  }
+}
+
+function uniqueValidReferenceIds(values: string[], sourceNoteId: string, noteIds: Set<string>): string[] {
+  const unique = new Set<string>()
+
+  for (const value of values) {
+    if (value === sourceNoteId || !noteIds.has(value)) {
+      continue
+    }
+
+    unique.add(value)
+  }
+
+  return [...unique]
 }
 
 export async function readDatabase(): Promise<DatabaseFile> {
