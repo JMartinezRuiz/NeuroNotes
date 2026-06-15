@@ -27,6 +27,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Native desktop menu with keyboard shortcuts for capture, search, save, analysis, export, settings, and note/network views.
 - Native confirmation before deleting notes.
 - Automatic and manual note analysis.
+- Auto-analysis covers new and pending edited notes: it uses local fallback when Qwen is unavailable and can upgrade those notes once Qwen becomes ready.
 - Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
 - Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.
 - Configurable RAG context limits for Qwen: number of retrieved notes and excerpt length.

@@ -288,8 +288,8 @@ export default function App(): JSX.Element {
   )
   const pendingAnalysisCount = pendingAnalysisNotes.length
   const pendingAnalysisKey = useMemo(
-    () => buildPendingAnalysisKey(settings.model, pendingAnalysisNotes),
-    [pendingAnalysisNotes, settings.model]
+    () => buildPendingAnalysisKey(settings.model, pendingAnalysisNotes, pendingEngine),
+    [pendingAnalysisNotes, pendingEngine, settings.model]
   )
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>()
@@ -374,7 +374,6 @@ export default function App(): JSX.Element {
         autoAnalyze: settings.autoAnalyze,
         bootstrapped,
         busy,
-        healthOk: health.ok,
         lastAttemptKey: autoAnalyzeAttemptKey.current,
         pendingCount: pendingAnalysisCount,
         pendingKey: pendingAnalysisKey
@@ -385,7 +384,7 @@ export default function App(): JSX.Element {
 
     autoAnalyzeAttemptKey.current = pendingAnalysisKey
     void runPendingAnalysis('auto')
-  }, [bootstrapped, busy, health.ok, pendingAnalysisCount, pendingAnalysisKey, settings.autoAnalyze])
+  }, [bootstrapped, busy, pendingAnalysisCount, pendingAnalysisKey, settings.autoAnalyze])
 
   useEffect(() => {
     if (selectedNote) {
@@ -1104,7 +1103,7 @@ export default function App(): JSX.Element {
                 onChange={(event) => updateSettings({ autoAnalyze: event.target.checked })}
                 type="checkbox"
               />
-              Analizar al crear
+              Autoanalizar notas
             </label>
             <label>
               Notas RAG

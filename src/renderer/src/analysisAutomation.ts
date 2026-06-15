@@ -7,7 +7,6 @@ export interface AutoAnalyzeDecision {
   autoAnalyze: boolean
   bootstrapped: boolean
   busy: string | null
-  healthOk: boolean
   lastAttemptKey: string
   pendingCount: number
   pendingKey: string
@@ -25,13 +24,17 @@ export interface PendingAnalysisResultSummary {
   total: number
 }
 
-export function buildPendingAnalysisKey(model: string, notes: PendingAnalysisNote[]): string {
+export function buildPendingAnalysisKey(
+  model: string,
+  notes: PendingAnalysisNote[],
+  engine: PendingAnalysisEngine = 'qwen'
+): string {
   if (notes.length === 0) {
     return ''
   }
 
   const noteFingerprints = notes.map((note) => `${note.id}:${fingerprint(note.content)}`)
-  return [model.trim().toLowerCase(), ...noteFingerprints].join('|')
+  return [engine, model.trim().toLowerCase(), ...noteFingerprints].join('|')
 }
 
 export function pendingAnalysisEngine(healthOk: boolean): PendingAnalysisEngine {
@@ -58,7 +61,7 @@ export function pendingAnalysisProgressMessage(
   const pending = formatPendingCount(count)
 
   if (mode === 'auto') {
-    return `Qwen listo. Reanalizando ${pending}...`
+    return engine === 'qwen' ? `Qwen listo. Reanalizando ${pending}...` : `Analizando ${pending} localmente...`
   }
 
   return engine === 'qwen'
@@ -102,7 +105,6 @@ export function shouldAutoAnalyzePending(decision: AutoAnalyzeDecision): boolean
   return (
     decision.bootstrapped &&
     decision.autoAnalyze &&
-    decision.healthOk &&
     decision.pendingCount > 0 &&
     decision.busy === null &&
     decision.pendingKey.length > 0 &&

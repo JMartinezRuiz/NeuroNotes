@@ -11,29 +11,52 @@ import {
 
 describe('buildPendingAnalysisKey', () => {
   it('returns an empty key when there are no pending notes', () => {
-    expect(buildPendingAnalysisKey('qwen3.5:0.8b', [])).toBe('')
+    expect(buildPendingAnalysisKey('qwen3.5:0.8b', [], 'local')).toBe('')
   })
 
-  it('changes when the model or pending note content changes', () => {
-    const original = buildPendingAnalysisKey('qwen3.5:0.8b', [
-      {
-        id: 'note-1',
-        content: 'Proyecto Neuronotes con Qwen.'
-      }
-    ])
-    const changedModel = buildPendingAnalysisKey('otro-modelo', [
-      {
-        id: 'note-1',
-        content: 'Proyecto Neuronotes con Qwen.'
-      }
-    ])
-    const changedContent = buildPendingAnalysisKey('qwen3.5:0.8b', [
-      {
-        id: 'note-1',
-        content: 'Proyecto Neuronotes con Qwen y RAG.'
-      }
-    ])
+  it('changes when the engine, model, or pending note content changes', () => {
+    const original = buildPendingAnalysisKey(
+      'qwen3.5:0.8b',
+      [
+        {
+          id: 'note-1',
+          content: 'Proyecto Neuronotes con Qwen.'
+        }
+      ],
+      'qwen'
+    )
+    const changedEngine = buildPendingAnalysisKey(
+      'qwen3.5:0.8b',
+      [
+        {
+          id: 'note-1',
+          content: 'Proyecto Neuronotes con Qwen.'
+        }
+      ],
+      'local'
+    )
+    const changedModel = buildPendingAnalysisKey(
+      'otro-modelo',
+      [
+        {
+          id: 'note-1',
+          content: 'Proyecto Neuronotes con Qwen.'
+        }
+      ],
+      'qwen'
+    )
+    const changedContent = buildPendingAnalysisKey(
+      'qwen3.5:0.8b',
+      [
+        {
+          id: 'note-1',
+          content: 'Proyecto Neuronotes con Qwen y RAG.'
+        }
+      ],
+      'qwen'
+    )
 
+    expect(original).not.toBe(changedEngine)
     expect(original).not.toBe(changedModel)
     expect(original).not.toBe(changedContent)
   })
@@ -44,14 +67,27 @@ describe('shouldAutoAnalyzePending', () => {
     autoAnalyze: true,
     bootstrapped: true,
     busy: null,
-    healthOk: true,
     lastAttemptKey: '',
     pendingCount: 1,
-    pendingKey: 'qwen3.5:0.8b|note-1:abc'
+    pendingKey: 'qwen|qwen3.5:0.8b|note-1:abc'
   }
 
-  it('starts when Qwen is ready and there are pending notes', () => {
+  it('starts when auto analyze is enabled and there are pending notes', () => {
     expect(shouldAutoAnalyzePending(readyDecision)).toBe(true)
+  })
+
+  it('allows a local auto-analysis pass before a later Qwen upgrade pass', () => {
+    const localKey = 'local|qwen3.5:0.8b|note-1:abc'
+    const qwenKey = 'qwen|qwen3.5:0.8b|note-1:abc'
+
+    expect(shouldAutoAnalyzePending({ ...readyDecision, pendingKey: localKey })).toBe(true)
+    expect(
+      shouldAutoAnalyzePending({
+        ...readyDecision,
+        lastAttemptKey: localKey,
+        pendingKey: qwenKey
+      })
+    ).toBe(true)
   })
 
   it('does not start while another action is busy', () => {
@@ -72,10 +108,9 @@ describe('shouldAutoAnalyzePending', () => {
     ).toBe(false)
   })
 
-  it('requires bootstrap, auto analyze, healthy Qwen, and pending notes', () => {
+  it('requires bootstrap, auto analyze, and pending notes', () => {
     expect(shouldAutoAnalyzePending({ ...readyDecision, bootstrapped: false })).toBe(false)
     expect(shouldAutoAnalyzePending({ ...readyDecision, autoAnalyze: false })).toBe(false)
-    expect(shouldAutoAnalyzePending({ ...readyDecision, healthOk: false })).toBe(false)
     expect(shouldAutoAnalyzePending({ ...readyDecision, pendingCount: 0, pendingKey: '' })).toBe(false)
   })
 })
@@ -111,6 +146,10 @@ describe('pending analysis labels', () => {
 
   it('keeps auto retry labeled as Qwen because it only starts after health is ready', () => {
     expect(pendingAnalysisProgressMessage('auto', 'qwen', 3)).toBe('Qwen listo. Reanalizando 3 pendientes...')
+  })
+
+  it('labels automatic local fallback analysis without implying Qwen is ready', () => {
+    expect(pendingAnalysisProgressMessage('auto', 'local', 2)).toBe('Analizando 2 pendientes localmente...')
   })
 })
 
