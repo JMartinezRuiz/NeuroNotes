@@ -71,6 +71,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Manual link and unlink controls.
 - Incoming backlinks are visible in the note inspector, so notes that are referenced by other notes do not appear isolated.
 - Graph view for direct links, backlinks, and library connection counts.
+- MCP graph inspection exposes deduplicated note edges, backlinks, and isolated notes for local hosts.
 - Analysis audit metadata: provider, model, elapsed time, timestamp, retrieved RAG note IDs, scores, and excerpts.
 - RAG audit view in the inspector showing the context snippets used during analysis.
 - Auto retry of pending notes once Qwen becomes ready, guarded to avoid retry loops.
@@ -110,6 +111,7 @@ Neuronotes includes a read-only MCP stdio server for local hosts. It exposes not
 
 - `neuronotes_search_notes`
 - `neuronotes_get_note`
+- `neuronotes_note_graph`
 - `neuronotes_analysis_queue`
 - `neuronotes_list_open_actions`
 - `neuronotes_mcp_handoff`
@@ -120,6 +122,7 @@ Neuronotes includes a read-only MCP stdio server for local hosts. It exposes not
 It also exposes MCP resources:
 
 - `neuronotes://library/summary`
+- `neuronotes://graph/links`
 - `neuronotes://actions/open`
 - `neuronotes://actions/handoff`
 - `neuronotes://analysis/queue`

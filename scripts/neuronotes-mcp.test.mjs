@@ -58,6 +58,7 @@ describe('neuronotes MCP server', () => {
     expect(response.result.tools.map((tool) => tool.name)).toEqual([
       'neuronotes_search_notes',
       'neuronotes_get_note',
+      'neuronotes_note_graph',
       'neuronotes_analysis_queue',
       'neuronotes_list_open_actions',
       'neuronotes_mcp_handoff',
@@ -83,6 +84,10 @@ describe('neuronotes MCP server', () => {
         expect.objectContaining({
           uri: 'neuronotes://library/summary',
           title: 'Neuronotes Library Summary'
+        }),
+        expect.objectContaining({
+          uri: 'neuronotes://graph/links',
+          title: 'Neuronotes Note Graph'
         }),
         expect.objectContaining({
           uri: 'neuronotes://actions/open',
@@ -134,6 +139,26 @@ describe('neuronotes MCP server', () => {
           }
         ]
       }
+    })
+
+    const graphResponse = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 'resources-graph',
+        method: 'resources/read',
+        params: {
+          uri: 'neuronotes://graph/links'
+        }
+      },
+      { dbPath }
+    )
+    const graphPayload = JSON.parse(graphResponse.result.contents[0].text)
+
+    expect(graphPayload).toMatchObject({
+      schema: 'neuronotes.mcp.graph.v1',
+      nodeCount: 2,
+      edgeCount: 1,
+      orphanCount: 0
     })
 
     const fineTuneResponse = await handleMcpMessage(
@@ -409,6 +434,77 @@ describe('neuronotes MCP server', () => {
         title: 'Roadmap Neuronotes'
       })
     ])
+  })
+
+  it('summarizes the note graph with backlinks and isolated notes', async () => {
+    const graphDatabase = sampleDatabase()
+    graphDatabase.notes.push({
+      id: 'note-isolated',
+      title: 'Idea aislada',
+      content: 'Nota sin enlaces todavia.',
+      summary: 'No tiene relaciones.',
+      category: 'Ideas',
+      tags: ['suelta'],
+      related: [],
+      suggestedActions: [],
+      analysisStatus: 'idle',
+      createdAt: '2026-06-15T00:00:00.000Z',
+      updatedAt: '2026-06-15T00:03:00.000Z'
+    })
+    await writeFile(dbPath, `${JSON.stringify(graphDatabase, null, 2)}\n`, 'utf8')
+
+    const result = await callTool('neuronotes_note_graph', {}, { dbPath })
+    const healthNode = result.nodes.find((node) => node.id === 'note-health')
+    const projectNode = result.nodes.find((node) => node.id === 'note-project')
+
+    expect(result).toMatchObject({
+      schema: 'neuronotes.mcp.graph.v1',
+      targetModel: 'qwen3.5:0.8b',
+      nodeCount: 3,
+      edgeCount: 1,
+      orphanCount: 1,
+      backlinkCount: 1,
+      edges: [
+        expect.objectContaining({
+          id: 'note-health::note-project',
+          sourceId: 'note-health',
+          targetId: 'note-project',
+          bidirectional: false,
+          relationCount: 1,
+          reasons: ['Ambas notas mencionan Qwen local.']
+        })
+      ],
+      orphanNotes: [
+        expect.objectContaining({
+          id: 'note-isolated',
+          isolated: true
+        })
+      ],
+      execution: {
+        mode: 'read-only-context',
+        canModifyNotes: false,
+        canCreateLinks: false,
+        canAnalyzeNotes: false
+      }
+    })
+    expect(healthNode).toMatchObject({
+      directLinkIds: ['note-project'],
+      backlinkIds: [],
+      linkedNoteIds: ['note-project'],
+      isolated: false
+    })
+    expect(projectNode).toMatchObject({
+      directLinkIds: [],
+      backlinkIds: ['note-health'],
+      linkedNoteIds: ['note-health'],
+      isolated: false
+    })
+
+    await expect(callTool('neuronotes_note_graph', { category: 'Ideas' }, { dbPath })).resolves.toMatchObject({
+      category: 'Ideas',
+      nodeCount: 1,
+      orphanCount: 1
+    })
   })
 
   it('lists analysis queues for Qwen upgrades and local fallback retries', async () => {

@@ -12,8 +12,10 @@ const PROTOCOL_VERSION = '2025-06-18'
 const DATABASE_FILE = 'neuronotes.json'
 const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 25
+const MAX_GRAPH_NODES = 100
 const RESOURCE_URIS = {
   summary: 'neuronotes://library/summary',
+  noteGraph: 'neuronotes://graph/links',
   openActions: 'neuronotes://actions/open',
   mcpHandoff: 'neuronotes://actions/handoff',
   analysisQueue: 'neuronotes://analysis/queue',
@@ -77,6 +79,29 @@ const TOOLS = [
         includeContent: {
           type: 'boolean',
           description: 'Include full note content. Defaults to true.'
+        }
+      }
+    }
+  },
+  {
+    name: 'neuronotes_note_graph',
+    description: 'Inspect the local Neuronotes link graph with deduplicated edges, backlinks, and isolated notes.',
+    annotations: {
+      readOnlyHint: true
+    },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        category: {
+          type: 'string',
+          description: 'Optional exact category filter for graph nodes.'
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: MAX_GRAPH_NODES,
+          description: `Maximum graph nodes to return. Default: ${MAX_GRAPH_NODES}.`
         }
       }
     }
@@ -300,6 +325,10 @@ export async function callTool(name, args = {}, context = {}) {
     return getNote(database, args)
   }
 
+  if (name === 'neuronotes_note_graph') {
+    return noteGraph(database, args)
+  }
+
   if (name === 'neuronotes_analysis_queue') {
     return analysisQueue(database, args)
   }
@@ -437,6 +466,17 @@ function listResources(database) {
         }
       },
       {
+        uri: RESOURCE_URIS.noteGraph,
+        name: 'note-graph',
+        title: 'Neuronotes Note Graph',
+        description: 'Deduplicated note links, backlinks, and isolated notes in the local graph.',
+        mimeType: 'application/json',
+        annotations: {
+          audience: ['assistant'],
+          priority: 0.87
+        }
+      },
+      {
         uri: RESOURCE_URIS.openActions,
         name: 'open-actions',
         title: 'Open Neuronotes Actions',
@@ -514,6 +554,10 @@ function listResources(database) {
 function readResource(uri, database, dbPath) {
   if (uri === RESOURCE_URIS.summary) {
     return jsonResource(uri, librarySummary(database, dbPath))
+  }
+
+  if (uri === RESOURCE_URIS.noteGraph) {
+    return jsonResource(uri, noteGraph(database, { limit: MAX_GRAPH_NODES }))
   }
 
   if (uri === RESOURCE_URIS.openActions) {
@@ -760,6 +804,114 @@ function getNote(database, args) {
       analysisRun: note.analysisRun ?? null
     }
   }
+}
+
+function noteGraph(database, args = {}) {
+  const category = stringArg(args.category)
+  const limit = graphLimitArg(args.limit)
+  const notes = database.notes
+    .filter((note) => !category || note.category === category)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, limit)
+  const notesById = new Map(notes.map((note) => [note.id, note]))
+  const outgoing = new Map(notes.map((note) => [note.id, new Set()]))
+  const incoming = new Map(notes.map((note) => [note.id, new Set()]))
+  const edgesById = new Map()
+
+  for (const source of notes) {
+    for (const related of source.related) {
+      const target = notesById.get(related.noteId)
+
+      if (!target || target.id === source.id) {
+        continue
+      }
+
+      outgoing.get(source.id).add(target.id)
+      incoming.get(target.id).add(source.id)
+
+      const [sourceId, targetId] = [source.id, target.id].sort()
+      const id = `${sourceId}::${targetId}`
+      const edge = edgesById.get(id) ?? {
+        id,
+        sourceId,
+        targetId,
+        sourceTitle: notesById.get(sourceId)?.title ?? source.title,
+        targetTitle: notesById.get(targetId)?.title ?? target.title,
+        score: 0,
+        reasons: [],
+        directedLinks: []
+      }
+
+      edge.score = Math.max(edge.score, related.score)
+      if (!edge.reasons.includes(related.reason)) {
+        edge.reasons.push(related.reason)
+      }
+      edge.directedLinks.push({
+        sourceId: source.id,
+        targetId: target.id,
+        score: related.score,
+        reason: related.reason
+      })
+      edgesById.set(id, edge)
+    }
+  }
+
+  const nodes = notes.map((note) => {
+    const directLinkIds = [...(outgoing.get(note.id) ?? [])].sort((a, b) => a.localeCompare(b))
+    const backlinkIds = [...(incoming.get(note.id) ?? [])].sort((a, b) => a.localeCompare(b))
+    const linkedNoteIds = [...new Set([...directLinkIds, ...backlinkIds])].sort((a, b) => a.localeCompare(b))
+
+    return {
+      ...noteSummary(note, 1),
+      directLinkIds,
+      backlinkIds,
+      linkedNoteIds,
+      directLinkCount: directLinkIds.length,
+      backlinkCount: backlinkIds.length,
+      linkedNoteCount: linkedNoteIds.length,
+      isolated: linkedNoteIds.length === 0
+    }
+  })
+  const edges = [...edgesById.values()]
+    .map((edge) => ({
+      ...edge,
+      bidirectional: hasBothDirections(edge.directedLinks),
+      relationCount: edge.directedLinks.length
+    }))
+    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+  const orphanNotes = nodes.filter((node) => node.isolated)
+
+  return {
+    schema: 'neuronotes.mcp.graph.v1',
+    targetModel: database.settings.model,
+    category: category || null,
+    limit,
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+    orphanCount: orphanNotes.length,
+    backlinkCount: nodes.reduce((total, node) => total + node.backlinkCount, 0),
+    nodes,
+    edges,
+    orphanNotes,
+    execution: {
+      mode: 'read-only-context',
+      canModifyNotes: false,
+      canCreateLinks: false,
+      canAnalyzeNotes: false
+    }
+  }
+}
+
+function hasBothDirections(directedLinks) {
+  const directions = new Set(directedLinks.map((link) => `${link.sourceId}->${link.targetId}`))
+
+  for (const link of directedLinks) {
+    if (directions.has(`${link.targetId}->${link.sourceId}`)) {
+      return true
+    }
+  }
+
+  return false
 }
 
 function analysisQueues(database) {
@@ -1647,6 +1799,10 @@ function countBy(values, selector) {
 
 function limitArg(value) {
   return clampInteger(value, 1, MAX_LIMIT, DEFAULT_LIMIT)
+}
+
+function graphLimitArg(value) {
+  return clampInteger(value, 1, MAX_GRAPH_NODES, MAX_GRAPH_NODES)
 }
 
 function stringArg(value) {
