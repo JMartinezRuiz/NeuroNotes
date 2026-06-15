@@ -5,6 +5,7 @@ import {
   pendingAnalysisButtonTitle,
   pendingAnalysisEngine,
   pendingAnalysisProgressMessage,
+  pendingAnalysisQueueLabel,
   pendingAnalysisResultMessage,
   shouldAutoAnalyzePending
 } from '../analysisAutomation'
@@ -150,6 +151,32 @@ describe('pending analysis labels', () => {
 
   it('labels automatic local fallback analysis without implying Qwen is ready', () => {
     expect(pendingAnalysisProgressMessage('auto', 'local', 2)).toBe('Analizando 2 pendientes localmente...')
+  })
+
+  it('summarizes local pending batches by note status', () => {
+    expect(
+      pendingAnalysisQueueLabel('local', [
+        { id: 'new-1', content: 'Nueva nota', status: 'idle' },
+        { id: 'new-2', content: 'Otra nota', status: 'idle' },
+        { id: 'failed-1', content: 'Reintentar', status: 'error' }
+      ])
+    ).toBe('Local: 2 nuevas, 1 con error')
+  })
+
+  it('summarizes Qwen upgrade batches separately from fresh notes', () => {
+    expect(
+      pendingAnalysisQueueLabel('qwen', [
+        { id: 'new-1', content: 'Nueva nota', status: 'idle' },
+        { id: 'local-1', content: 'Ya analizada localmente', status: 'fallback' },
+        { id: 'local-2', content: 'Tambien local', status: 'fallback' }
+      ])
+    ).toBe('Qwen: 1 nueva, 2 mejoras locales')
+  })
+
+  it('falls back to total count when a queue has no status-specific label', () => {
+    expect(pendingAnalysisQueueLabel('local', [{ id: 'done', content: 'Ya lista', status: 'qwen' }])).toBe(
+      'Local: 1 pendiente'
+    )
   })
 })
 

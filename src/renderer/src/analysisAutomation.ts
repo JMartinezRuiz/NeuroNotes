@@ -1,6 +1,7 @@
 export interface PendingAnalysisNote {
   id: string
   content: string
+  status?: PendingAnalysisStatus
 }
 
 export interface AutoAnalyzeDecision {
@@ -43,6 +44,28 @@ export function pendingAnalysisEngine(healthOk: boolean): PendingAnalysisEngine 
 
 export function pendingAnalysisButtonTitle(engine: PendingAnalysisEngine): string {
   return engine === 'qwen' ? 'Analizar pendientes con Qwen' : 'Analizar pendientes con analisis local'
+}
+
+export function pendingAnalysisQueueLabel(
+  engine: PendingAnalysisEngine,
+  notes: PendingAnalysisNote[]
+): string {
+  if (notes.length === 0) {
+    return engine === 'qwen' ? 'Qwen sin pendientes' : 'Local sin pendientes'
+  }
+
+  const counts = countPendingStatuses(notes)
+  const parts =
+    engine === 'qwen'
+      ? [
+          formatStatusCount(counts.idle, 'nueva', 'nuevas'),
+          formatStatusCount(counts.fallback, 'mejora local', 'mejoras locales'),
+          formatStatusCount(counts.error, 'con error', 'con error')
+        ]
+      : [formatStatusCount(counts.idle, 'nueva', 'nuevas'), formatStatusCount(counts.error, 'con error', 'con error')]
+  const detail = parts.filter(Boolean)
+
+  return `${engine === 'qwen' ? 'Qwen' : 'Local'}: ${detail.length > 0 ? detail.join(', ') : formatPendingCount(notes.length)}`
 }
 
 export function isPendingForAnalysis(status: PendingAnalysisStatus, engine: PendingAnalysisEngine): boolean {
@@ -89,6 +112,29 @@ function formatPendingCount(count: number): string {
 
 function formatFailureCount(count: number): string {
   return count === 1 ? '1 fallo' : `${count} fallaron`
+}
+
+function formatStatusCount(count: number, singular: string, plural: string): string {
+  if (count === 0) {
+    return ''
+  }
+
+  return `${count} ${count === 1 ? singular : plural}`
+}
+
+function countPendingStatuses(notes: PendingAnalysisNote[]): Record<PendingAnalysisStatus, number> {
+  return notes.reduce(
+    (counts, note) => {
+      counts[note.status ?? 'idle'] += 1
+      return counts
+    },
+    {
+      idle: 0,
+      qwen: 0,
+      fallback: 0,
+      error: 0
+    }
+  )
 }
 
 function pendingAnalysisDetail(result: PendingAnalysisResultSummary): string {

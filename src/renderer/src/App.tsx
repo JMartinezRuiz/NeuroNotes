@@ -27,6 +27,7 @@ import {
   pendingAnalysisButtonTitle,
   pendingAnalysisEngine,
   pendingAnalysisProgressMessage,
+  pendingAnalysisQueueLabel,
   pendingAnalysisResultMessage,
   shouldAutoAnalyzePending
 } from './analysisAutomation'
@@ -278,11 +279,16 @@ export default function App(): JSX.Element {
         .filter((note) => note.content.trim().length > 0 && isPendingForAnalysis(note.analysisStatus, pendingEngine))
         .map((note) => ({
           id: note.id,
-          content: note.content
+          content: note.content,
+          status: note.analysisStatus
         })),
     [notes, pendingEngine]
   )
   const pendingAnalysisCount = pendingAnalysisNotes.length
+  const pendingAnalysisLabel = useMemo(
+    () => pendingAnalysisQueueLabel(pendingEngine, pendingAnalysisNotes),
+    [pendingAnalysisNotes, pendingEngine]
+  )
   const pendingAnalysisKey = useMemo(
     () => buildPendingAnalysisKey(settings.model, pendingAnalysisNotes, pendingEngine),
     [pendingAnalysisNotes, pendingEngine, settings.model]
@@ -1211,16 +1217,21 @@ export default function App(): JSX.Element {
               </div>
             )}
             {pendingAnalysisCount > 0 && (
-              <button
-                type="button"
-                className="batch-button"
-                onClick={() => runPendingAnalysis('manual')}
-                disabled={busy === 'analyzePending'}
-                title={pendingAnalysisButtonTitle(pendingEngine)}
-              >
-                {busy === 'analyzePending' ? <Loader2 className="spin" size={16} /> : <Sparkles size={16} />}
-                Pendientes {pendingAnalysisCount}
-              </button>
+              <div className="pending-analysis-group">
+                <span className="pending-analysis-label" data-engine={pendingEngine}>
+                  {pendingAnalysisLabel}
+                </span>
+                <button
+                  type="button"
+                  className="batch-button"
+                  onClick={() => runPendingAnalysis('manual')}
+                  disabled={busy === 'analyzePending'}
+                  title={pendingAnalysisButtonTitle(pendingEngine)}
+                >
+                  {busy === 'analyzePending' ? <Loader2 className="spin" size={16} /> : <Sparkles size={16} />}
+                  Pendientes {pendingAnalysisCount}
+                </button>
+              </div>
             )}
             <button type="button" className="icon-button" onClick={refreshHealth} title="Comprobar IA">
               <RefreshCw size={17} />
