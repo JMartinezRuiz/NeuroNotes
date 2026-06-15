@@ -36,6 +36,7 @@ import { aiSetupSteps } from './aiSetupReadiness'
 import { formatFineTuneExampleCount, isFineTuneReviewable, summarizeFineTuneReadiness } from './fineTuneReadiness'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges } from './graph'
+import { mcpActionReadiness, summarizeMcpActionReadiness } from './mcpActionReadiness'
 import { normalizeSearchText, noteMatchesSearch } from './search'
 import { commandFromKeyboardShortcut } from './shortcuts'
 import {
@@ -231,7 +232,7 @@ export default function App(): JSX.Element {
   const doneActions = useMemo(() => actions.filter((action) => action.status === 'done'), [actions])
   const openActionCount = openActions.length
   const doneActionCount = doneActions.length
-  const mcpApprovedActionCount = openActions.filter((action) => Boolean(action.mcpApprovedAt)).length
+  const mcpReadinessSummary = useMemo(() => summarizeMcpActionReadiness(actions), [actions])
   const actionNotesById = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes])
   const savedSuggestedActionKeys = useMemo(
     () => new Set(selectedActionItems.map((action) => actionIdentity(action))),
@@ -1023,6 +1024,7 @@ export default function App(): JSX.Element {
     const sourceNote = actionNotesById.get(action.noteId)
     const isDone = action.status === 'done'
     const isMcpApproved = Boolean(action.mcpApprovedAt)
+    const mcpReadiness = mcpActionReadiness(action)
 
     return (
       <div className="plan-action-row" data-status={action.status} key={action.id}>
@@ -1036,6 +1038,9 @@ export default function App(): JSX.Element {
           {action.toolHint && <code>{action.toolHint}</code>}
           <code data-approval={isMcpApproved ? 'approved' : 'pending'}>
             {isMcpApproved ? 'MCP aprobado' : 'MCP por revisar'}
+          </code>
+          <code data-mcp-readiness={mcpReadiness.state} title={mcpReadiness.detail}>
+            {mcpReadiness.label}
           </code>
         </span>
         <div className="plan-action-buttons">
@@ -1478,8 +1483,8 @@ export default function App(): JSX.Element {
                   Hechas
                 </span>
                 <span>
-                  <strong>{mcpApprovedActionCount}</strong>
-                  MCP OK
+                  <strong>{mcpReadinessSummary.ready}</strong>
+                  MCP listas
                 </span>
               </div>
 
@@ -1520,6 +1525,20 @@ export default function App(): JSX.Element {
                 <p className="summary-text">
                   Las acciones abiertas se exportan con nota fuente, contexto RAG, aprobacion MCP y un borrador de tool-call para revision externa.
                 </p>
+                <div className="mcp-readiness-summary">
+                  <span data-state="ready">
+                    <strong>{mcpReadinessSummary.ready}</strong>
+                    Listas
+                  </span>
+                  <span data-state="needs-approval">
+                    <strong>{mcpReadinessSummary.needsApproval}</strong>
+                    Por aprobar
+                  </span>
+                  <span data-state="needs-tool">
+                    <strong>{mcpReadinessSummary.needsTool}</strong>
+                    Sin tool
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={exportMcpHandoff}
@@ -1742,57 +1761,68 @@ export default function App(): JSX.Element {
                 </div>
                 <div className="saved-action-list">
                   {selectedActionItems.length > 0 ? (
-                    selectedActionItems.map((action) => (
-                      <div className="saved-action-row" data-status={action.status} key={action.id}>
-                        <span>
-                          <strong>{action.title}</strong>
-                          <small>{action.detail}</small>
-                          {action.toolHint && <code>{action.toolHint}</code>}
-                          <code data-approval={action.mcpApprovedAt ? 'approved' : 'pending'}>
-                            {action.mcpApprovedAt ? 'MCP aprobado' : 'MCP por revisar'}
-                          </code>
-                        </span>
-                        <div className="saved-action-actions">
-                          <button
-                            type="button"
-                            onClick={() => toggleActionMcpApproval(action)}
-                            disabled={busy === `mcpApproval:${action.id}` || action.status === 'done'}
-                            title={action.mcpApprovedAt ? 'Revocar aprobacion MCP' : 'Aprobar para handoff MCP'}
-                          >
-                            {busy === `mcpApproval:${action.id}` ? (
-                              <Loader2 className="spin" size={14} />
-                            ) : action.mcpApprovedAt ? (
-                              <CheckCircle2 size={14} />
-                            ) : (
-                              <CircleAlert size={14} />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleActionStatus(action)}
-                            disabled={busy === `actionStatus:${action.id}`}
-                            title={action.status === 'done' ? 'Reabrir accion' : 'Marcar como hecha'}
-                          >
-                            {busy === `actionStatus:${action.id}` ? (
-                              <Loader2 className="spin" size={14} />
-                            ) : action.status === 'done' ? (
-                              <CheckCircle2 size={14} />
-                            ) : (
-                              <Circle size={14} />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            className="danger"
-                            onClick={() => removeActionItem(action.id)}
-                            disabled={busy === `deleteAction:${action.id}`}
-                            title="Eliminar accion"
-                          >
-                            {busy === `deleteAction:${action.id}` ? <Loader2 className="spin" size={14} /> : <Trash2 size={14} />}
-                          </button>
+                    selectedActionItems.map((action) => {
+                      const mcpReadiness = mcpActionReadiness(action)
+
+                      return (
+                        <div className="saved-action-row" data-status={action.status} key={action.id}>
+                          <span>
+                            <strong>{action.title}</strong>
+                            <small>{action.detail}</small>
+                            {action.toolHint && <code>{action.toolHint}</code>}
+                            <code data-approval={action.mcpApprovedAt ? 'approved' : 'pending'}>
+                              {action.mcpApprovedAt ? 'MCP aprobado' : 'MCP por revisar'}
+                            </code>
+                            <code data-mcp-readiness={mcpReadiness.state} title={mcpReadiness.detail}>
+                              {mcpReadiness.label}
+                            </code>
+                          </span>
+                          <div className="saved-action-actions">
+                            <button
+                              type="button"
+                              onClick={() => toggleActionMcpApproval(action)}
+                              disabled={busy === `mcpApproval:${action.id}` || action.status === 'done'}
+                              title={action.mcpApprovedAt ? 'Revocar aprobacion MCP' : 'Aprobar para handoff MCP'}
+                            >
+                              {busy === `mcpApproval:${action.id}` ? (
+                                <Loader2 className="spin" size={14} />
+                              ) : action.mcpApprovedAt ? (
+                                <CheckCircle2 size={14} />
+                              ) : (
+                                <CircleAlert size={14} />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleActionStatus(action)}
+                              disabled={busy === `actionStatus:${action.id}`}
+                              title={action.status === 'done' ? 'Reabrir accion' : 'Marcar como hecha'}
+                            >
+                              {busy === `actionStatus:${action.id}` ? (
+                                <Loader2 className="spin" size={14} />
+                              ) : action.status === 'done' ? (
+                                <CheckCircle2 size={14} />
+                              ) : (
+                                <Circle size={14} />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              className="danger"
+                              onClick={() => removeActionItem(action.id)}
+                              disabled={busy === `deleteAction:${action.id}`}
+                              title="Eliminar accion"
+                            >
+                              {busy === `deleteAction:${action.id}` ? (
+                                <Loader2 className="spin" size={14} />
+                              ) : (
+                                <Trash2 size={14} />
+                              )}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      )
+                    })
                   ) : (
                     <p className="muted">Sin acciones guardadas.</p>
                   )}
