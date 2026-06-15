@@ -77,6 +77,24 @@ function createWindow(): void {
   }
 }
 
+function focusMainWindow(): void {
+  const window = BrowserWindow.getAllWindows()[0]
+
+  if (!window) {
+    return
+  }
+
+  if (window.isMinimized()) {
+    window.restore()
+  }
+
+  if (!window.isVisible()) {
+    window.show()
+  }
+
+  window.focus()
+}
+
 function sendCommand(command: AppCommand): void {
   const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
 
@@ -179,29 +197,42 @@ function createAppMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
-app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.neuronotes.desktop')
+const singleInstanceLock = app.requestSingleInstanceLock()
 
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
+if (!singleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    focusMainWindow()
   })
 
-  registerIpcHandlers()
-  createAppMenu()
-  createWindow()
+  app.whenReady().then(() => {
+    electronApp.setAppUserModelId('com.neuronotes.desktop')
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
+    app.on('browser-window-created', (_, window) => {
+      optimizer.watchWindowShortcuts(window)
+    })
+
+    registerIpcHandlers()
+    createAppMenu()
+    createWindow()
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow()
+        return
+      }
+
+      focusMainWindow()
+    })
+  })
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit()
     }
   })
-})
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
-})
+}
 
 function registerIpcHandlers(): void {
   ipcMain.handle('notes:list', async () => listNotes())
