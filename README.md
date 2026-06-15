@@ -90,6 +90,18 @@ Neuronotes includes a read-only MCP stdio server for local hosts. It exposes not
 - `neuronotes_list_open_actions`
 - `neuronotes_library_summary`
 
+It also exposes MCP resources:
+
+- `neuronotes://library/summary`
+- `neuronotes://actions/open`
+- `neuronotes://notes/{noteId}`
+
+And user-controlled prompt templates:
+
+- `neuronotes_review_rag_analysis`
+- `neuronotes_prepare_action_plan`
+- `neuronotes_library_brief`
+
 Run it from the repo with an explicit database path:
 
 ```powershell
@@ -109,7 +121,7 @@ MCP tool execution is not wired into the shipped app yet. The intended direction
 - Running structured automations over selected notes.
 - Connecting a local assistant to user-approved tools while keeping note data local-first.
 
-When MCP lands, it should be added as a separate integration layer with clear permissions, tests, and UI indicators showing what data is being sent to a tool.
+When MCP tool execution lands, it should be added as a separate integration layer with clear permissions, tests, and UI indicators showing what data is being sent to a tool.
 
 The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, manual-approval flags, stored RAG snippets, tool summaries, and action-kind summaries. The stdio server is also intentionally read-only today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
 

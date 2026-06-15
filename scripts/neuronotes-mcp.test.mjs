@@ -41,7 +41,9 @@ describe('neuronotes MCP server', () => {
           name: 'neuronotes'
         },
         capabilities: {
-          tools: {}
+          tools: {},
+          resources: {},
+          prompts: {}
         }
       }
     })
@@ -59,6 +61,111 @@ describe('neuronotes MCP server', () => {
       'neuronotes_list_open_actions',
       'neuronotes_library_summary'
     ])
+  })
+
+  it('exposes library, actions, and notes as MCP resources', async () => {
+    const listResponse = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 'resources-1',
+        method: 'resources/list',
+        params: {}
+      },
+      { dbPath }
+    )
+
+    expect(listResponse.result.resources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          uri: 'neuronotes://library/summary',
+          title: 'Neuronotes Library Summary'
+        }),
+        expect.objectContaining({
+          uri: 'neuronotes://actions/open',
+          title: 'Open Neuronotes Actions'
+        }),
+        expect.objectContaining({
+          uri: 'neuronotes://notes/note-health',
+          title: 'Cita medico'
+        })
+      ])
+    )
+
+    const readResponse = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 'resources-2',
+        method: 'resources/read',
+        params: {
+          uri: 'neuronotes://notes/note-health'
+        }
+      },
+      { dbPath }
+    )
+    const payload = JSON.parse(readResponse.result.contents[0].text)
+
+    expect(payload).toMatchObject({
+      schema: 'neuronotes.mcp.note.v1',
+      note: {
+        id: 'note-health',
+        savedActions: [
+          {
+            id: 'action-reminder'
+          }
+        ]
+      }
+    })
+  })
+
+  it('exposes MCP prompts for RAG review and action planning', async () => {
+    const listResponse = await handleMcpMessage({
+      jsonrpc: '2.0',
+      id: 'prompts-1',
+      method: 'prompts/list',
+      params: {}
+    })
+
+    expect(listResponse.result.prompts.map((prompt) => prompt.name)).toEqual([
+      'neuronotes_review_rag_analysis',
+      'neuronotes_prepare_action_plan',
+      'neuronotes_library_brief'
+    ])
+
+    const reviewResponse = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 'prompts-2',
+        method: 'prompts/get',
+        params: {
+          name: 'neuronotes_review_rag_analysis',
+          arguments: {
+            noteId: 'note-health'
+          }
+        }
+      },
+      { dbPath }
+    )
+
+    expect(reviewResponse.result.messages[0].content.text).toContain('Roadmap Neuronotes')
+    expect(reviewResponse.result.messages[0].content.text).toContain('No ejecutes herramientas externas')
+
+    const actionPlanResponse = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 'prompts-3',
+        method: 'prompts/get',
+        params: {
+          name: 'neuronotes_prepare_action_plan',
+          arguments: {
+            kind: 'reminder'
+          }
+        }
+      },
+      { dbPath }
+    )
+
+    expect(actionPlanResponse.result.messages[0].content.text).toContain('action-reminder')
+    expect(actionPlanResponse.result.messages[0].content.text).not.toContain('action-done')
   })
 
   it('searches local notes with normalized Spanish text', async () => {

@@ -12,6 +12,10 @@ const PROTOCOL_VERSION = '2025-06-18'
 const DATABASE_FILE = 'neuronotes.json'
 const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 25
+const RESOURCE_URIS = {
+  summary: 'neuronotes://library/summary',
+  openActions: 'neuronotes://actions/open'
+}
 
 const TOOLS = [
   {
@@ -112,6 +116,39 @@ const TOOLS = [
       additionalProperties: false,
       properties: {}
     }
+  }
+]
+
+const PROMPTS = [
+  {
+    name: 'neuronotes_review_rag_analysis',
+    title: 'Review Qwen RAG Analysis',
+    description: 'Review one analyzed note, its stored RAG context, and whether the local Qwen output looks useful.',
+    arguments: [
+      {
+        name: 'noteId',
+        description: 'Neuronotes note id to review.',
+        required: true
+      }
+    ]
+  },
+  {
+    name: 'neuronotes_prepare_action_plan',
+    title: 'Prepare Local Action Plan',
+    description: 'Turn open Neuronotes action intents into a user-approved follow-up plan without executing tools.',
+    arguments: [
+      {
+        name: 'kind',
+        description: 'Optional action kind filter: task, reminder, research, or mcp.',
+        required: false
+      }
+    ]
+  },
+  {
+    name: 'neuronotes_library_brief',
+    title: 'Neuronotes Library Brief',
+    description: 'Summarize the local library, AI readiness, categories, and open action workload.',
+    arguments: []
   }
 ]
 
@@ -227,7 +264,9 @@ async function routeRequest(method, params, context) {
     return {
       protocolVersion: PROTOCOL_VERSION,
       capabilities: {
-        tools: {}
+        tools: {},
+        resources: {},
+        prompts: {}
       },
       serverInfo: {
         name: SERVER_NAME,
@@ -244,6 +283,37 @@ async function routeRequest(method, params, context) {
     return {
       tools: TOOLS
     }
+  }
+
+  if (method === 'resources/list') {
+    return listResources(await readNeuronotesDatabase(context.dbPath))
+  }
+
+  if (method === 'resources/read') {
+    if (!isObject(params) || typeof params.uri !== 'string') {
+      throw rpcError(-32602, 'resources/read requires a resource uri')
+    }
+
+    return readResource(params.uri, await readNeuronotesDatabase(context.dbPath), context.dbPath)
+  }
+
+  if (method === 'prompts/list') {
+    return {
+      prompts: PROMPTS
+    }
+  }
+
+  if (method === 'prompts/get') {
+    if (!isObject(params) || typeof params.name !== 'string') {
+      throw rpcError(-32602, 'prompts/get requires a prompt name')
+    }
+
+    return getPrompt(
+      params.name,
+      isObject(params.arguments) ? params.arguments : {},
+      await readNeuronotesDatabase(context.dbPath),
+      context.dbPath
+    )
   }
 
   if (method === 'tools/call') {
@@ -264,6 +334,186 @@ async function routeRequest(method, params, context) {
   }
 
   throw rpcError(-32601, `Method not found: ${method}`)
+}
+
+function listResources(database) {
+  return {
+    resources: [
+      {
+        uri: RESOURCE_URIS.summary,
+        name: 'library-summary',
+        title: 'Neuronotes Library Summary',
+        description: 'Counts, Qwen settings, RAG settings, categories, and MCP execution posture.',
+        mimeType: 'application/json',
+        annotations: {
+          audience: ['assistant'],
+          priority: 0.9
+        }
+      },
+      {
+        uri: RESOURCE_URIS.openActions,
+        name: 'open-actions',
+        title: 'Open Neuronotes Actions',
+        description: 'Saved action intents awaiting user-approved follow-up.',
+        mimeType: 'application/json',
+        annotations: {
+          audience: ['assistant'],
+          priority: 0.85
+        }
+      },
+      ...database.notes
+        .slice()
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .slice(0, 100)
+        .map((note) => ({
+          uri: noteResourceUri(note.id),
+          name: `note-${note.id}`,
+          title: note.title,
+          description: `${note.category} - ${note.summary || excerpt(note.content, 120)}`,
+          mimeType: 'application/json',
+          annotations: {
+            audience: ['assistant'],
+            priority: note.analysisStatus === 'qwen' ? 0.75 : 0.55,
+            lastModified: note.updatedAt
+          }
+        }))
+    ]
+  }
+}
+
+function readResource(uri, database, dbPath) {
+  if (uri === RESOURCE_URIS.summary) {
+    return jsonResource(uri, librarySummary(database, dbPath))
+  }
+
+  if (uri === RESOURCE_URIS.openActions) {
+    return jsonResource(uri, listOpenActions(database, { limit: MAX_LIMIT }))
+  }
+
+  const noteId = parseNoteResourceUri(uri)
+
+  if (noteId) {
+    if (!database.notes.some((note) => note.id === noteId)) {
+      throw rpcError(-32002, `Resource not found: ${uri}`)
+    }
+
+    return jsonResource(uri, getNote(database, { noteId }))
+  }
+
+  throw rpcError(-32002, `Resource not found: ${uri}`)
+}
+
+function getPrompt(name, args, database, dbPath) {
+  if (name === 'neuronotes_review_rag_analysis') {
+    const noteId = stringArg(args.noteId)
+
+    if (!noteId) {
+      throw rpcError(-32602, 'noteId is required')
+    }
+
+    const notePayload = getNote(database, { noteId })
+
+    return {
+      description: 'Review the stored local AI analysis and RAG context for one Neuronotes note.',
+      messages: [
+        textPromptMessage(
+          [
+            'Revisa esta nota de Neuronotes y evalua si el analisis local es util.',
+            'No ejecutes herramientas externas. Si propones seguimiento MCP, dejalo como recomendacion que requiere aprobacion del usuario.',
+            '',
+            'Criterios:',
+            '- El resumen debe reflejar la nota original.',
+            '- La categoria y etiquetas deben ser especificas.',
+            '- Los enlaces RAG deben estar justificados por el contenido.',
+            '- Las acciones sugeridas deben ser concretas y no inventar permisos.',
+            '',
+            JSON.stringify(notePayload, null, 2)
+          ].join('\n')
+        )
+      ]
+    }
+  }
+
+  if (name === 'neuronotes_prepare_action_plan') {
+    const actionsPayload = listOpenActions(database, {
+      kind: args.kind,
+      limit: MAX_LIMIT
+    })
+
+    return {
+      description: 'Prepare a local action plan from saved Neuronotes action intents.',
+      messages: [
+        textPromptMessage(
+          [
+            'Convierte estas acciones abiertas de Neuronotes en un plan de seguimiento.',
+            'No ejecutes herramientas. Agrupa por prioridad, tipo y herramienta MCP sugerida.',
+            'Marca claramente que cualquier ejecucion futura requiere aprobacion del usuario.',
+            '',
+            JSON.stringify(actionsPayload, null, 2)
+          ].join('\n')
+        )
+      ]
+    }
+  }
+
+  if (name === 'neuronotes_library_brief') {
+    return {
+      description: 'Brief the user on Neuronotes library state and local AI readiness.',
+      messages: [
+        textPromptMessage(
+          [
+            'Resume el estado de la biblioteca local de Neuronotes.',
+            'Incluye cobertura de Qwen, fallback local, acciones abiertas, categorias dominantes y riesgos para RAG/fine-tuning.',
+            'No asumas que Qwen esta disponible si la evidencia no lo prueba.',
+            '',
+            JSON.stringify(librarySummary(database, dbPath), null, 2)
+          ].join('\n')
+        )
+      ]
+    }
+  }
+
+  throw rpcError(-32602, `Unknown prompt: ${name}`)
+}
+
+function jsonResource(uri, payload) {
+  return {
+    contents: [
+      {
+        uri,
+        mimeType: 'application/json',
+        text: JSON.stringify(payload, null, 2)
+      }
+    ]
+  }
+}
+
+function textPromptMessage(text) {
+  return {
+    role: 'user',
+    content: {
+      type: 'text',
+      text
+    }
+  }
+}
+
+function noteResourceUri(noteId) {
+  return `neuronotes://notes/${encodeURIComponent(noteId)}`
+}
+
+function parseNoteResourceUri(uri) {
+  const prefix = 'neuronotes://notes/'
+
+  if (!uri.startsWith(prefix)) {
+    return ''
+  }
+
+  try {
+    return decodeURIComponent(uri.slice(prefix.length)).trim()
+  } catch {
+    return ''
+  }
 }
 
 function searchNotes(database, args) {
