@@ -150,7 +150,13 @@ Build the Windows installer:
 npm run dist:win
 ```
 
-The Windows installer is emitted under `release/`.
+The Windows installer is emitted under `release/`. The `dist:win` script also verifies the NSIS installer, blockmap, update metadata, unpacked executable, and bundled `app.asar`.
+
+Verify an existing Windows build without rebuilding:
+
+```powershell
+npm run verify:win-dist
+```
 
 ## Development Notes
 

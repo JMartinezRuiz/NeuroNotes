@@ -16,9 +16,10 @@
     "verify:qwen": "node scripts/verify-qwen.mjs",
     "verify:qwen:pull": "node scripts/verify-qwen.mjs --pull",
     "verify:qwen:json": "node scripts/verify-qwen.mjs --json",
+    "verify:win-dist": "node scripts/verify-win-dist.mjs",
     "build": "npm run icons && npm run typecheck && npm test && electron-vite build",
     "preview": "electron-vite preview",
-    "dist:win": "npm run build && electron-builder --win nsis",
+    "dist:win": "npm run build && electron-builder --win nsis && npm run verify:win-dist",
     "dist:mac": "npm run build && electron-builder --mac dmg"
   },
   "dependencies": {
