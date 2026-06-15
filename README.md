@@ -42,7 +42,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Editing note content clears stale AI summaries, suggested actions, and automatic links while preserving manual links.
 - Late AI results are ignored if the note changed while analysis was running, preventing stale Qwen/local output from overwriting user edits.
 - Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
-- Local action plan: users can save suggested actions, mark them done, delete them, and carry them through library/Markdown export.
+- Local action plan: users can save suggested actions, review them in a global Plan view, mark them done, delete them, and carry them through library/Markdown export.
 - MCP handoff JSON export for open local actions, including tool summaries, action-kind summaries, tool hints, source-note context, and stored RAG snippets without executing external tools.
 - Read-only MCP stdio server for local hosts that need to search notes, read note context, list open action intents, and inspect library readiness.
 - MCP connection config is available from the app settings panel, including the stdio command, database path, and host-ready `mcpServers.neuronotes` JSON.

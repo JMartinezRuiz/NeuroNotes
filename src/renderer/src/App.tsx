@@ -9,6 +9,7 @@ import {
   FileText,
   FileUp,
   Link2,
+  ListTodo,
   Loader2,
   Network,
   Plus,
@@ -48,7 +49,7 @@ import {
 
 type NeuronotesApi = NonNullable<Window['neuronotes']>
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error'
-type WorkspaceView = 'note' | 'network'
+type WorkspaceView = 'note' | 'network' | 'plan'
 
 const emptySettings: AppSettings = {
   model: 'qwen3.5:0.8b',
@@ -245,6 +246,12 @@ export default function App(): JSX.Element {
     () => (selectedNote ? actions.filter((action) => action.noteId === selectedNote.id) : []),
     [actions, selectedNote?.id]
   )
+  const openActions = useMemo(() => actions.filter((action) => action.status === 'open'), [actions])
+  const doneActions = useMemo(() => actions.filter((action) => action.status === 'done'), [actions])
+  const openActionCount = openActions.length
+  const doneActionCount = doneActions.length
+  const mcpReadyActionCount = actions.filter((action) => action.toolHint || action.kind === 'mcp').length
+  const actionNotesById = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes])
   const savedSuggestedActionKeys = useMemo(
     () => new Set(selectedActionItems.map((action) => actionIdentity(action))),
     [selectedActionItems]
@@ -568,6 +575,11 @@ export default function App(): JSX.Element {
 
     if (command === 'view-network') {
       setWorkspaceView('network')
+      return
+    }
+
+    if (command === 'view-plan') {
+      setWorkspaceView('plan')
     }
   }
 
@@ -988,6 +1000,60 @@ export default function App(): JSX.Element {
     }
   }
 
+  function renderPlanAction(action: ActionItem): JSX.Element {
+    const sourceNote = actionNotesById.get(action.noteId)
+    const isDone = action.status === 'done'
+
+    return (
+      <div className="plan-action-row" data-status={action.status} key={action.id}>
+        <span>
+          <strong>{action.title}</strong>
+          <small>{action.detail}</small>
+          <small>
+            {suggestedActionKindLabel(action.kind)}
+            {sourceNote ? ` - ${sourceNote.title}` : ` - ${action.noteTitle}`}
+          </small>
+          {action.toolHint && <code>{action.toolHint}</code>}
+        </span>
+        <div className="plan-action-buttons">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedId(action.noteId)
+              setWorkspaceView('note')
+            }}
+            title="Abrir nota fuente"
+          >
+            <FileText size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleActionStatus(action)}
+            disabled={busy === `actionStatus:${action.id}`}
+            title={isDone ? 'Reabrir accion' : 'Marcar como hecha'}
+          >
+            {busy === `actionStatus:${action.id}` ? (
+              <Loader2 className="spin" size={14} />
+            ) : isDone ? (
+              <CheckCircle2 size={14} />
+            ) : (
+              <Circle size={14} />
+            )}
+          </button>
+          <button
+            type="button"
+            className="danger"
+            onClick={() => removeActionItem(action.id)}
+            disabled={busy === `deleteAction:${action.id}`}
+            title="Eliminar accion"
+          >
+            {busy === `deleteAction:${action.id}` ? <Loader2 className="spin" size={14} /> : <Trash2 size={14} />}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -1085,6 +1151,15 @@ export default function App(): JSX.Element {
             >
               <Network size={16} />
               Red
+            </button>
+            <button
+              type="button"
+              className={workspaceView === 'plan' ? 'active' : ''}
+              onClick={() => setWorkspaceView('plan')}
+              title="Vista plan"
+            >
+              <ListTodo size={16} />
+              Plan {openActionCount > 0 ? openActionCount : ''}
             </button>
           </div>
           <div className="topbar-actions">
@@ -1299,7 +1374,103 @@ export default function App(): JSX.Element {
           </section>
         )}
 
-        {selectedNote && workspaceView === 'note' ? (
+        {workspaceView === 'plan' ? (
+          <section className="plan-workspace">
+            <article className="plan-board">
+              <div className="plan-header">
+                <div>
+                  <p>Plan local</p>
+                  <h2>Acciones guardadas</h2>
+                </div>
+                <span>{openActionCount} abiertas</span>
+              </div>
+
+              <div className="plan-stats">
+                <span>
+                  <strong>{openActionCount}</strong>
+                  Abiertas
+                </span>
+                <span>
+                  <strong>{doneActionCount}</strong>
+                  Hechas
+                </span>
+                <span>
+                  <strong>{mcpReadyActionCount}</strong>
+                  MCP
+                </span>
+              </div>
+
+              <div className="plan-columns">
+                <section>
+                  <div className="section-title">
+                    <h3>Por hacer</h3>
+                    <span>{openActions.length}</span>
+                  </div>
+                  <div className="plan-action-list">
+                    {openActions.length > 0 ? (
+                      openActions.map(renderPlanAction)
+                    ) : (
+                      <p className="muted">Sin acciones abiertas.</p>
+                    )}
+                  </div>
+                </section>
+
+                <section>
+                  <div className="section-title">
+                    <h3>Hechas</h3>
+                    <span>{doneActions.length}</span>
+                  </div>
+                  <div className="plan-action-list">
+                    {doneActions.length > 0 ? (
+                      doneActions.map(renderPlanAction)
+                    ) : (
+                      <p className="muted">Sin acciones completadas.</p>
+                    )}
+                  </div>
+                </section>
+              </div>
+            </article>
+
+            <aside className="plan-details">
+              <section>
+                <h3>Handoff MCP</h3>
+                <p className="summary-text">
+                  Las acciones abiertas se exportan con nota fuente, contexto RAG y pista de herramienta para seguimiento aprobado por el usuario.
+                </p>
+                <button
+                  type="button"
+                  onClick={exportMcpHandoff}
+                  disabled={libraryBusy}
+                  title="Exportar handoff MCP"
+                >
+                  {busy === 'exportMcp' ? <Loader2 className="spin" size={16} /> : <Network size={16} />}
+                  Exportar MCP JSON
+                </button>
+              </section>
+
+              <section>
+                <h3>Tipos</h3>
+                <div className="plan-kind-list">
+                  {(['task', 'reminder', 'research', 'mcp'] as SuggestedActionKind[]).map((kind) => {
+                    const count = actions.filter((action) => action.kind === kind).length
+
+                    return (
+                      <span key={kind}>
+                        <strong>{count}</strong>
+                        {suggestedActionKindLabel(kind)}
+                      </span>
+                    )
+                  })}
+                </div>
+              </section>
+
+              <section>
+                <h3>Estado</h3>
+                <p className="summary-text">{libraryMessage || 'Guarda acciones sugeridas desde una nota analizada para construir este plan.'}</p>
+              </section>
+            </aside>
+          </section>
+        ) : selectedNote && workspaceView === 'note' ? (
           <section className="note-workspace">
             <article className="editor-pane">
               <div className="note-heading">

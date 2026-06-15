@@ -12,6 +12,7 @@ export type AppCommand =
   | 'export-library'
   | 'toggle-settings'
   | 'view-note'
+  | 'view-plan'
   | 'view-network'
 
 export interface RelatedNote {

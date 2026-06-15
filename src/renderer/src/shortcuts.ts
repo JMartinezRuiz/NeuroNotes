@@ -45,6 +45,10 @@ export function commandFromKeyboardShortcut(input: KeyboardShortcutInput): AppCo
     return 'view-network'
   }
 
+  if (!input.shiftKey && key === '3') {
+    return 'view-plan'
+  }
+
   if (!input.shiftKey && input.key === ',') {
     return 'toggle-settings'
   }

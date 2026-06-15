@@ -197,6 +197,11 @@ function createAppMenu(): void {
           accelerator: 'CommandOrControl+2',
           click: () => sendCommand('view-network')
         },
+        {
+          label: 'Plan',
+          accelerator: 'CommandOrControl+3',
+          click: () => sendCommand('view-plan')
+        },
         { type: 'separator' },
         {
           label: 'Ajustes',

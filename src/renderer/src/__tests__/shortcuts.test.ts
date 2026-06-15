@@ -23,6 +23,7 @@ describe('commandFromKeyboardShortcut', () => {
   it('maps view and settings shortcuts', () => {
     expect(shortcut('1')).toBe('view-note')
     expect(shortcut('2')).toBe('view-network')
+    expect(shortcut('3')).toBe('view-plan')
     expect(shortcut(',')).toBe('toggle-settings')
   })
 
