@@ -39,6 +39,9 @@ interface OllamaPullResponse {
   error?: string
 }
 
+const OLLAMA_HEALTH_TIMEOUT_MS = 3500
+const QWEN_GENERATE_TIMEOUT_MS = 45000
+
 interface AiPayload {
   title?: unknown
   summary?: unknown
@@ -53,7 +56,12 @@ interface AiPayload {
 
 export async function checkOllama(settings: AppSettings): Promise<AiHealth> {
   try {
-    const response = await fetch(`${settings.ollamaUrl}/api/tags`, { method: 'GET' })
+    const response = await fetchWithTimeout(
+      `${settings.ollamaUrl}/api/tags`,
+      { method: 'GET' },
+      OLLAMA_HEALTH_TIMEOUT_MS,
+      `Ollama no respondio en ${formatSeconds(OLLAMA_HEALTH_TIMEOUT_MS)}`
+    )
     if (!response.ok) {
       return {
         ok: false,
@@ -291,22 +299,27 @@ async function analyzeWithQwen(
   settings: AppSettings,
   ragContext: string
 ): Promise<Omit<AnalysisResult, 'status' | 'error' | 'analysisRun'>> {
-  const response = await fetch(`${settings.ollamaUrl}/api/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: settings.model,
-      stream: false,
-      format: 'json',
-      options: {
-        temperature: 0.2,
-        num_predict: 550
+  const response = await fetchWithTimeout(
+    `${settings.ollamaUrl}/api/generate`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
       },
-      prompt: buildPrompt(note, ragContext)
-    })
-  })
+      body: JSON.stringify({
+        model: settings.model,
+        stream: false,
+        format: 'json',
+        options: {
+          temperature: 0.2,
+          num_predict: 550
+        },
+        prompt: buildPrompt(note, ragContext)
+      })
+    },
+    QWEN_GENERATE_TIMEOUT_MS,
+    `${settings.model} no respondio en ${formatSeconds(QWEN_GENERATE_TIMEOUT_MS)}`
+  )
 
   if (!response.ok) {
     throw new Error(`Ollama respondio ${response.status}. Revisa que ${settings.model} este instalado.`)
@@ -494,6 +507,38 @@ function mergeRelated(primary: RelatedNote[], fallback: RelatedNote[]): RelatedN
 
 function firstArray(...values: unknown[]): unknown {
   return values.find((value) => Array.isArray(value))
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => {
+    controller.abort()
+  }, timeoutMs)
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal
+    })
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(timeoutMessage)
+    }
+
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function formatSeconds(milliseconds: number): string {
+  const seconds = milliseconds / 1000
+  return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)} s`
 }
 
 function normalizeSuggestedActions(value: unknown): SuggestedAction[] {

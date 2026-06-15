@@ -29,6 +29,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Automatic and manual note analysis.
 - Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
 - Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.
+- Bounded Ollama health and Qwen generation requests, so stalled local AI calls fall back instead of blocking notes.
 - Local fallback analyzer when Ollama/Qwen is unavailable.
 - Local fallback analyzer normalizes Spanish accents for category, tag, and action heuristics.
 - Manual pending-note analysis can use the local fallback before Qwen is ready without contacting Ollama; when Qwen becomes available, fallback notes can be upgraded through the Qwen pending flow.
@@ -59,7 +60,7 @@ The analysis flow is:
 7. The user can promote suggested actions into a local note plan before any future MCP tool execution is allowed.
 8. Open local actions can be exported as a Neuronotes MCP handoff JSON file for a future user-approved tool layer.
 9. Analyzed notes can be exported as local supervised JSONL examples for future Qwen fine-tuning if RAG alone is not enough.
-10. If Qwen is unavailable, the app uses local fallback categorization, summary, tags, links, and action hints.
+10. If Qwen is unavailable or does not answer in time, the app uses local fallback categorization, summary, tags, links, and action hints.
 11. The note stores an audit record of the analysis run, including the retrieved RAG snippets.
 
 Default model:

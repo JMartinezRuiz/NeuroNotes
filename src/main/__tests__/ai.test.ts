@@ -27,6 +27,7 @@ function note(overrides: Partial<NoteRecord> & Pick<NoteRecord, 'id' | 'content'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 describe('checkOllama', () => {
@@ -78,6 +79,28 @@ describe('checkOllama', () => {
     await expect(checkOllama(settings)).resolves.toMatchObject({
       ok: false,
       status: 'ollama-missing',
+      ollamaAvailable: false
+    })
+  })
+
+  it('times out health checks that do not answer', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn((_url: string, request: RequestInit) => {
+      return new Promise<Response>((_, reject) => {
+        request.signal?.addEventListener('abort', () => {
+          reject(new Error('aborted'))
+        })
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const health = checkOllama(settings)
+    await vi.advanceTimersByTimeAsync(3500)
+
+    await expect(health).resolves.toMatchObject({
+      ok: false,
+      status: 'ollama-missing',
+      message: 'Ollama no respondio en 3.5 s',
       ollamaAvailable: false
     })
   })
@@ -299,6 +322,39 @@ describe('analyzeNote', () => {
         })
       ]
     })
+  })
+
+  it('falls back locally when Qwen generation does not answer in time', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn((_url: string, request: RequestInit) => {
+      return new Promise<Response>((_, reject) => {
+        request.signal?.addEventListener('abort', () => {
+          reject(new Error('aborted'))
+        })
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const source = note({
+      id: 'source',
+      content: 'Proyecto Neuronotes: preparar tarea de producto y revisar enlaces automaticos.'
+    })
+
+    const analysis = analyzeNote(source, [source], settings)
+    await vi.advanceTimersByTimeAsync(45000)
+
+    await expect(analysis).resolves.toMatchObject({
+      status: 'fallback',
+      error: 'qwen3.5:0.8b no respondio en 45 s',
+      category: 'Proyecto',
+      suggestedActions: [
+        expect.objectContaining({
+          kind: 'task',
+          toolHint: 'task.create'
+        })
+      ]
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('can run local analysis without contacting Ollama', async () => {
