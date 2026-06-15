@@ -588,15 +588,17 @@ export default function App(): JSX.Element {
   }, [editorContent, editorTitle, editingNoteId, selectedNote?.id, selectedNote?.content, selectedNote?.title])
 
   async function bootstrap(): Promise<void> {
-    const [storedNotes, storedSettings, storedActions] = await Promise.all([
+    const [storedNotes, storedSettings, storedActions, storedDiagnostics] = await Promise.all([
       api.listNotes(),
       api.getSettings(),
-      api.listActions()
+      api.listActions(),
+      api.getAiDiagnostics()
     ])
 
     setNotes(storedNotes)
     setSettings(storedSettings)
     setActions(storedActions)
+    setLastDiagnostics(storedDiagnostics)
     setSelectedId(storedNotes[0]?.id ?? null)
     await refreshHealth()
     setBootstrapped(true)

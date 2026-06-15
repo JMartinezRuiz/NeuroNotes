@@ -530,6 +530,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('settings:update', async (_, settings: Partial<AppSettings>) => {
     return mutateDatabase((database) => {
+      const previousSettings = database.settings
       database.settings = {
         ...database.settings,
         ...settings,
@@ -543,6 +544,11 @@ function registerIpcHandlers(): void {
           database.settings.ragExcerptLength
         )
       }
+
+      if (!sameAiSettings(previousSettings, database.settings)) {
+        database.aiDiagnostics = undefined
+      }
+
       return database.settings
     })
   })
@@ -747,7 +753,21 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('ai:diagnostics', async () => {
     const database = await readDatabase()
-    return runAiDiagnostics(database.settings)
+    const settings = database.settings
+    const diagnostics = await runAiDiagnostics(settings)
+
+    await mutateDatabase((currentDatabase) => {
+      if (sameAiSettings(currentDatabase.settings, settings)) {
+        currentDatabase.aiDiagnostics = diagnostics
+      }
+    })
+
+    return diagnostics
+  })
+
+  ipcMain.handle('ai:getDiagnostics', async () => {
+    const database = await readDatabase()
+    return database.aiDiagnostics ?? null
   })
 
   ipcMain.handle('ai:openOllamaDownload', async () => {
@@ -951,4 +971,13 @@ async function mergeImportedDatabase(
       actionsSkipped
     }
   })
+}
+
+function sameAiSettings(left: AppSettings, right: AppSettings): boolean {
+  return (
+    left.model === right.model &&
+    left.ollamaUrl === right.ollamaUrl &&
+    left.ragMaxNotes === right.ragMaxNotes &&
+    left.ragExcerptLength === right.ragExcerptLength
+  )
 }

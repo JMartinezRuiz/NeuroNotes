@@ -594,6 +594,12 @@ describe('neuronotes MCP server', () => {
         pendingReviewCount: 2,
         status: 'needs-review'
       }),
+      aiDiagnostics: expect.objectContaining({
+        ok: true,
+        model: 'qwen3.5:0.8b',
+        ollamaUrl: 'http://127.0.0.1:11434',
+        related: 1
+      }),
       qwenAnalyzedCount: 1,
       fallbackAnalyzedCount: 1,
       execution: {
@@ -615,6 +621,20 @@ function sampleDatabase() {
       autoAnalyze: true,
       ragMaxNotes: 5,
       ragExcerptLength: 550
+    },
+    aiDiagnostics: {
+      ok: true,
+      status: 'qwen',
+      message: 'qwen3.5:0.8b respondio correctamente',
+      model: 'qwen3.5:0.8b',
+      ollamaUrl: 'http://127.0.0.1:11434',
+      ragMaxNotes: 5,
+      ragExcerptLength: 550,
+      diagnosedAt: '2026-06-15T00:05:00.000Z',
+      durationMs: 842,
+      category: 'Proyecto',
+      summary: 'Diagnostico JSON valido.',
+      related: 1
     },
     notes: [
       {

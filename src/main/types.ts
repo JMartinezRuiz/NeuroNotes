@@ -114,6 +114,10 @@ export interface AiDiagnosticsResult {
   status: AnalysisStatus
   message: string
   model: string
+  ollamaUrl: string
+  ragMaxNotes: number
+  ragExcerptLength: number
+  diagnosedAt: string
   durationMs: number
   category: string
   summary: string
@@ -208,6 +212,7 @@ export interface DatabaseFile {
   notes: NoteRecord[]
   actions: ActionItem[]
   settings: AppSettings
+  aiDiagnostics?: AiDiagnosticsResult
 }
 
 export interface AnalysisResult {

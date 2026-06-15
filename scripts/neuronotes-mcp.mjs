@@ -838,6 +838,7 @@ function librarySummary(database, dbPath) {
     mcpApprovedActionCount: approvedActionCount,
     reviewedFineTuneCount: database.notes.filter((note) => Boolean(note.trainingReviewedAt)).length,
     fineTune: fineTuneReadiness(database, { includeNotes: false }),
+    aiDiagnostics: database.aiDiagnostics ?? null,
     qwenAnalyzedCount: statusCounts.qwen ?? 0,
     fallbackAnalyzedCount: statusCounts.fallback ?? 0,
     categories: categoryCounts,
@@ -1018,12 +1019,14 @@ function normalizeDatabase(raw) {
         .filter((action) => action && noteIds.has(action.noteId))
         .map((action) => normalizeActionReferences(action, normalizedNotesById))
     : []
+  const settings = normalizeSettings(source.settings)
 
   return {
     version: 1,
     notes: normalizedNotes,
     actions,
-    settings: normalizeSettings(source.settings)
+    settings,
+    aiDiagnostics: normalizeAiDiagnostics(source.aiDiagnostics, settings)
   }
 }
 
@@ -1262,6 +1265,54 @@ function normalizeSettings(value) {
     ragMaxNotes: clampInteger(settings.ragMaxNotes, 0, 6, 5),
     ragExcerptLength: clampInteger(settings.ragExcerptLength, 160, 1200, 550)
   }
+}
+
+function normalizeAiDiagnostics(value, settings) {
+  if (!isObject(value)) {
+    return undefined
+  }
+
+  const model = stringArg(value.model)
+  const ollamaUrl = stringArg(value.ollamaUrl).replace(/\/$/, '')
+
+  if (
+    model !== settings.model ||
+    ollamaUrl !== settings.ollamaUrl ||
+    value.ragMaxNotes !== settings.ragMaxNotes ||
+    value.ragExcerptLength !== settings.ragExcerptLength
+  ) {
+    return undefined
+  }
+
+  const status = normalizeAnalysisStatus(value.status)
+  const diagnosedAt = stringArg(value.diagnosedAt)
+  const message = stringArg(value.message)
+
+  if (!diagnosedAt || !message) {
+    return undefined
+  }
+
+  const result = {
+    ok: Boolean(value.ok),
+    status,
+    message: excerpt(message, 240),
+    model,
+    ollamaUrl,
+    ragMaxNotes: settings.ragMaxNotes,
+    ragExcerptLength: settings.ragExcerptLength,
+    diagnosedAt,
+    durationMs: clampInteger(value.durationMs, 0, Number.MAX_SAFE_INTEGER, 0),
+    category: excerpt(stringArg(value.category) || 'Inbox', 80),
+    summary: excerpt(stringArg(value.summary), 320),
+    related: clampInteger(value.related, 0, Number.MAX_SAFE_INTEGER, 0)
+  }
+
+  const error = stringArg(value.error)
+  if (error) {
+    result.error = excerpt(error, 240)
+  }
+
+  return result
 }
 
 function normalizeAnalysisStatus(value) {

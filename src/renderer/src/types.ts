@@ -129,6 +129,10 @@ export interface AiDiagnosticsResult {
   status: AnalysisStatus
   message: string
   model: string
+  ollamaUrl: string
+  ragMaxNotes: number
+  ragExcerptLength: number
+  diagnosedAt: string
   durationMs: number
   category: string
   summary: string

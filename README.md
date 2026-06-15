@@ -34,15 +34,15 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Automatic and manual note analysis.
 - Auto-analysis covers new and pending edited notes: it uses local fallback when Qwen is unavailable and can upgrade those notes once Qwen becomes ready.
 - Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
-- Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.
+- Health checks, Ollama start attempt, model pull action, and persisted Qwen diagnostics.
 - Qwen verifier output includes actionable next steps and setup commands when Ollama or the model is missing.
-- Local AI setup checklist in settings for Ollama, model availability, and fallback/Qwen analysis mode.
+- Local AI setup checklist in settings for Ollama, model availability, persisted JSON/RAG diagnostic contract, and fallback/Qwen analysis mode.
 - Settings can copy PowerShell setup commands for installing Ollama, starting the local runtime, pulling the configured Qwen model, and running a JSON probe on Windows.
 - Configurable RAG context limits for Qwen: number of retrieved notes and excerpt length.
 - RAG budget indicator in settings to keep context compact enough for Qwen 0.8B.
 - Bounded Ollama health and Qwen generation requests, so stalled local AI calls fall back instead of blocking notes.
 - Qwen JSON responses are sanitized and lightly repaired for common model output issues such as Markdown fences and trailing commas.
-- In-app Qwen setup checklist separates Ollama runtime, model install, JSON/RAG diagnostic contract, and local fallback state.
+- MCP library summary includes the latest matching Qwen JSON/RAG diagnostic result so external hosts can see whether local AI was actually verified.
 - Qwen prompts include the note reference date and current title/category/tags, improving time-sensitive actions and metadata-aware categorization.
 - Local fallback analyzer when Ollama/Qwen is unavailable.
 - Single-note analysis uses the local analyzer immediately when Qwen is not ready, and Qwen can upgrade those notes later.

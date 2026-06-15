@@ -243,6 +243,10 @@ export async function runAiDiagnostics(settings: AppSettings): Promise<AiDiagnos
       ? `${settings.model} respondio correctamente`
       : `La prueba uso analisis local: ${analysis.error ?? 'Qwen no respondio'}`,
     model: settings.model,
+    ollamaUrl: settings.ollamaUrl,
+    ragMaxNotes: settings.ragMaxNotes,
+    ragExcerptLength: settings.ragExcerptLength,
+    diagnosedAt: new Date().toISOString(),
     durationMs: Date.now() - startedAt,
     category: analysis.category,
     summary: analysis.summary,

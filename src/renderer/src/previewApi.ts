@@ -1,6 +1,6 @@
 import { NeuronotesApi } from '../../preload'
 import { isFineTuneReviewable } from './fineTuneReadiness'
-import { ActionItem, ActionItemStatus, AiHealth, AppSettings, NoteRecord } from './types'
+import { ActionItem, ActionItemStatus, AiDiagnosticsResult, AiHealth, AppSettings, NoteRecord } from './types'
 
 type Api = NeuronotesApi
 
@@ -11,6 +11,8 @@ const settings: AppSettings = {
   ragMaxNotes: 5,
   ragExcerptLength: 550
 }
+
+let aiDiagnostics: AiDiagnosticsResult | null = null
 
 const MANUAL_LINK_REASON = 'Enlace manual.'
 const MANUAL_RECIPROCAL_REASON = 'Enlace reciproco: Enlace manual.'
@@ -661,6 +663,14 @@ export function createPreviewApi(): Api {
       Object.assign(settings, updates)
       settings.ragMaxNotes = clampNumber(settings.ragMaxNotes, 0, 6)
       settings.ragExcerptLength = clampNumber(settings.ragExcerptLength, 160, 1200)
+      if (
+        'model' in updates ||
+        'ollamaUrl' in updates ||
+        'ragMaxNotes' in updates ||
+        'ragExcerptLength' in updates
+      ) {
+        aiDiagnostics = null
+      }
       return { ...settings }
     },
     checkAiHealth: async () => previewHealth(),
@@ -675,17 +685,26 @@ export function createPreviewApi(): Api {
       reason: 'not-installed',
       message: 'Ollama no esta instalado'
     }),
-    runAiDiagnostics: async () => ({
-      ok: false,
-      status: 'fallback',
-      message: 'Vista previa: Qwen solo corre dentro de Electron/Ollama.',
-      model: settings.model,
-      durationMs: 0,
-      category: 'Proyecto',
-      summary: 'Diagnostico simulado de Neuronotes.',
-      related: 1,
-      error: 'Vista previa sin Ollama.'
-    }),
+    runAiDiagnostics: async () => {
+      aiDiagnostics = {
+        ok: false,
+        status: 'fallback',
+        message: 'Vista previa: Qwen solo corre dentro de Electron/Ollama.',
+        model: settings.model,
+        ollamaUrl: settings.ollamaUrl,
+        ragMaxNotes: settings.ragMaxNotes,
+        ragExcerptLength: settings.ragExcerptLength,
+        diagnosedAt: new Date().toISOString(),
+        durationMs: 0,
+        category: 'Proyecto',
+        summary: 'Diagnostico simulado de Neuronotes.',
+        related: 1,
+        error: 'Vista previa sin Ollama.'
+      }
+
+      return aiDiagnostics
+    },
+    getAiDiagnostics: async () => aiDiagnostics,
     openOllamaDownload: async () => {
       window.open('https://ollama.com/download', '_blank', 'noopener,noreferrer')
     },

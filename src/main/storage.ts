@@ -8,6 +8,7 @@ import {
   ActionItemStatus,
   AnalysisRun,
   AnalysisStatus,
+  AiDiagnosticsResult,
   DatabaseFile,
   DEFAULT_SETTINGS,
   NoteRecord,
@@ -82,6 +83,8 @@ export function normalizeDatabase(raw: Partial<DatabaseFile> | null | undefined)
   const normalizedNotes = notes.map((note) => normalizeNoteReferences(note, notesById, noteIds))
   const normalizedNotesById = new Map(normalizedNotes.map((note) => [note.id, note]))
 
+  const settings = normalizeSettings(source.settings)
+
   return {
     version: 1,
     notes: normalizedNotes,
@@ -92,7 +95,8 @@ export function normalizeDatabase(raw: Partial<DatabaseFile> | null | undefined)
           .filter((action) => noteIds.has(action.noteId))
           .map((action) => normalizeActionReferences(action, normalizedNotesById))
       : [],
-    settings: normalizeSettings(source.settings)
+    settings,
+    aiDiagnostics: normalizeAiDiagnostics(source.aiDiagnostics, settings)
   }
 }
 
@@ -304,6 +308,54 @@ function normalizeSettings(settings: unknown): DatabaseFile['settings'] {
     ragMaxNotes: clampInteger(source.ragMaxNotes, 0, 6, DEFAULT_SETTINGS.ragMaxNotes),
     ragExcerptLength: clampInteger(source.ragExcerptLength, 160, 1200, DEFAULT_SETTINGS.ragExcerptLength)
   }
+}
+
+function normalizeAiDiagnostics(value: unknown, settings: DatabaseFile['settings']): AiDiagnosticsResult | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+
+  const source = value as Partial<AiDiagnosticsResult>
+  const model = typeof source.model === 'string' ? source.model.trim() : ''
+  const ollamaUrl = typeof source.ollamaUrl === 'string' ? source.ollamaUrl.trim().replace(/\/$/, '') : ''
+
+  if (
+    model !== settings.model ||
+    ollamaUrl !== settings.ollamaUrl ||
+    source.ragMaxNotes !== settings.ragMaxNotes ||
+    source.ragExcerptLength !== settings.ragExcerptLength
+  ) {
+    return undefined
+  }
+
+  const status = ANALYSIS_STATUSES.has(source.status as AnalysisStatus) ? (source.status as AnalysisStatus) : undefined
+  const diagnosedAt = typeof source.diagnosedAt === 'string' && source.diagnosedAt.trim() ? source.diagnosedAt.trim() : ''
+  const message = typeof source.message === 'string' && source.message.trim() ? source.message.trim().slice(0, 240) : ''
+
+  if (!status || !diagnosedAt || !message) {
+    return undefined
+  }
+
+  const normalized: AiDiagnosticsResult = {
+    ok: Boolean(source.ok),
+    status,
+    message,
+    model,
+    ollamaUrl,
+    ragMaxNotes: settings.ragMaxNotes,
+    ragExcerptLength: settings.ragExcerptLength,
+    diagnosedAt,
+    durationMs: Math.max(0, Math.round(Number.isFinite(source.durationMs) ? Number(source.durationMs) : 0)),
+    category: typeof source.category === 'string' && source.category.trim() ? source.category.trim().slice(0, 80) : 'Inbox',
+    summary: typeof source.summary === 'string' ? source.summary.trim().slice(0, 320) : '',
+    related: Math.max(0, Math.round(Number.isFinite(source.related) ? Number(source.related) : 0))
+  }
+
+  if (typeof source.error === 'string' && source.error.trim()) {
+    normalized.error = source.error.trim().slice(0, 240)
+  }
+
+  return normalized
 }
 
 function clampInteger(value: unknown, min: number, max: number, fallback: number): number {

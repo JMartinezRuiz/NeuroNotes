@@ -253,6 +253,49 @@ describe('normalizeDatabase', () => {
     })
   })
 
+  it('preserves current AI diagnostics and drops stale diagnostics after settings changes', () => {
+    const aiDiagnostics = {
+      ok: true,
+      status: 'qwen',
+      message: 'qwen3.5:0.8b respondio correctamente',
+      model: DEFAULT_SETTINGS.model,
+      ollamaUrl: DEFAULT_SETTINGS.ollamaUrl,
+      ragMaxNotes: DEFAULT_SETTINGS.ragMaxNotes,
+      ragExcerptLength: DEFAULT_SETTINGS.ragExcerptLength,
+      diagnosedAt: '2026-06-15T00:05:00.000Z',
+      durationMs: 842,
+      category: ' Proyecto ',
+      summary: '  Diagnostico JSON valido.  ',
+      related: 1
+    }
+
+    expect(
+      normalizeDatabase({
+        settings: { ...DEFAULT_SETTINGS },
+        aiDiagnostics
+      } as unknown as Partial<DatabaseFile>).aiDiagnostics
+    ).toMatchObject({
+      ok: true,
+      status: 'qwen',
+      model: DEFAULT_SETTINGS.model,
+      ollamaUrl: DEFAULT_SETTINGS.ollamaUrl,
+      ragMaxNotes: DEFAULT_SETTINGS.ragMaxNotes,
+      ragExcerptLength: DEFAULT_SETTINGS.ragExcerptLength,
+      diagnosedAt: '2026-06-15T00:05:00.000Z',
+      durationMs: 842,
+      category: 'Proyecto',
+      summary: 'Diagnostico JSON valido.',
+      related: 1
+    })
+
+    expect(
+      normalizeDatabase({
+        settings: { ...DEFAULT_SETTINGS, ragMaxNotes: 3 },
+        aiDiagnostics
+      } as unknown as Partial<DatabaseFile>).aiDiagnostics
+    ).toBeUndefined()
+  })
+
   it('drops dangling note references and invalidates reviewed examples when the graph changes', () => {
     const normalized = normalizeDatabase({
       notes: [

@@ -60,6 +60,7 @@ const api = {
   pullModel: (): Promise<PullModelResult> => ipcRenderer.invoke('ai:pullModel'),
   startAiRuntime: (): Promise<AiRuntimeStartResult> => ipcRenderer.invoke('ai:startRuntime'),
   runAiDiagnostics: (): Promise<AiDiagnosticsResult> => ipcRenderer.invoke('ai:diagnostics'),
+  getAiDiagnostics: (): Promise<AiDiagnosticsResult | null> => ipcRenderer.invoke('ai:getDiagnostics'),
   openOllamaDownload: (): Promise<void> => ipcRenderer.invoke('ai:openOllamaDownload'),
   copyAiSetupCommand: (): Promise<AiSetupCommandResult> => ipcRenderer.invoke('ai:copySetupCommand'),
   onCommand: (callback: (command: AppCommand) => void): (() => void) => {
