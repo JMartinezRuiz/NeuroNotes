@@ -256,6 +256,14 @@ button:disabled {
   white-space: nowrap;
 }
 
+.note-meta-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .note-meta,
 .note-summary {
   overflow: hidden;
@@ -263,6 +271,44 @@ button:disabled {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.note-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  max-width: 82px;
+  height: 20px;
+  padding: 0 7px;
+  overflow: hidden;
+  color: var(--muted);
+  border: 1px solid rgba(121, 115, 104, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.78);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-ai-badge[data-status='qwen'] {
+  color: var(--accent-strong);
+  border-color: rgba(31, 122, 100, 0.26);
+  background: #e5f4ec;
+}
+
+.note-ai-badge[data-status='fallback'] {
+  color: #746126;
+  border-color: rgba(116, 97, 38, 0.28);
+  background: #f5edc8;
+}
+
+.note-ai-badge[data-status='error'] {
+  color: var(--danger);
+  border-color: rgba(180, 61, 47, 0.28);
+  background: #f9e4df;
 }
 
 .empty-list {

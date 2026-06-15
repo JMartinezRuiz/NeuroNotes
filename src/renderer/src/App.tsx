@@ -1168,8 +1168,13 @@ export default function App(): JSX.Element {
                 type="button"
               >
                 <span className="note-title">{note.title}</span>
-                <span className="note-meta">
-                  {note.category} - {formatDate(note.updatedAt)}
+                <span className="note-meta-row">
+                  <span className="note-meta">
+                    {note.category} - {formatDate(note.updatedAt)}
+                  </span>
+                  <span className="note-ai-badge" data-status={note.analysisStatus} title={`Estado IA: ${statusLabel(note)}`}>
+                    {statusLabel(note)}
+                  </span>
                 </span>
                 {note.summary && <span className="note-summary">{note.summary}</span>}
               </button>
