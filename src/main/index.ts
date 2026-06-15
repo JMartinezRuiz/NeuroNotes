@@ -17,7 +17,7 @@ import { buildFineTuneExamples, buildMcpHandoffPayload, fineTuneDatasetToJsonl, 
 import { synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
-import { canApplyAnalysisResult, clearTrainingReview, resetAnalysisAfterContentEdit } from './noteLifecycle'
+import { canApplyAnalysisResult, clearTrainingReview, hasContentChanged, resetAnalysisAfterContentEdit } from './noteLifecycle'
 import { createNoteDraft, listNotes, mutateDatabase, normalizeDatabase, readDatabase } from './storage'
 import { captureWindowState, readWindowState, writeWindowState } from './windowState'
 import {
@@ -262,8 +262,11 @@ function registerIpcHandlers(): void {
       }
 
       if (typeof updates.content === 'string') {
+        const contentChanged = hasContentChanged(note, updates.content)
         note.content = updates.content.trim()
-        resetAnalysisAfterContentEdit(note)
+        if (contentChanged) {
+          resetAnalysisAfterContentEdit(note)
+        }
       }
 
       if (typeof updates.title === 'string' && updates.title.trim()) {

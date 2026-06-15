@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canApplyAnalysisResult, isManualRelatedLink, resetAnalysisAfterContentEdit } from '../noteLifecycle'
+import { canApplyAnalysisResult, hasContentChanged, isManualRelatedLink, resetAnalysisAfterContentEdit } from '../noteLifecycle'
 import { NoteRecord } from '../types'
 
 function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
@@ -86,6 +86,21 @@ describe('isManualRelatedLink', () => {
     expect(isManualRelatedLink({ noteId: 'a', title: 'A', score: 1, reason: 'Enlace manual.' })).toBe(true)
     expect(isManualRelatedLink({ noteId: 'a', title: 'A', score: 1, reason: 'Enlace reciproco: Enlace manual.' })).toBe(true)
     expect(isManualRelatedLink({ noteId: 'a', title: 'A', score: 1, reason: 'Enlace reciproco: Comparte vocabulario.' })).toBe(false)
+  })
+})
+
+describe('hasContentChanged', () => {
+  it('ignores unchanged saved content when title or metadata updates resend the editor body', () => {
+    const source = note({ content: 'Contenido estable' })
+
+    expect(hasContentChanged(source, 'Contenido estable')).toBe(false)
+    expect(hasContentChanged(source, '  Contenido estable  ')).toBe(false)
+  })
+
+  it('detects meaningful content edits that must invalidate stale AI output', () => {
+    const source = note({ content: 'Contenido estable' })
+
+    expect(hasContentChanged(source, 'Contenido estable con una idea nueva')).toBe(true)
   })
 })
 

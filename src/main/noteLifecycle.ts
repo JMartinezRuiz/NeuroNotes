@@ -13,6 +13,10 @@ export function resetAnalysisAfterContentEdit(note: NoteRecord): void {
   clearTrainingReview(note)
 }
 
+export function hasContentChanged(note: NoteRecord, nextContent: string): boolean {
+  return nextContent.trim() !== note.content
+}
+
 export function isManualRelatedLink(link: RelatedNote): boolean {
   return link.reason === MANUAL_LINK_REASON || link.reason === MANUAL_RECIPROCAL_REASON
 }
