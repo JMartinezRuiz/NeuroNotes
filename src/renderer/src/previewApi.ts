@@ -11,6 +11,9 @@ const settings: AppSettings = {
   ragExcerptLength: 550
 }
 
+const MANUAL_LINK_REASON = 'Enlace manual.'
+const MANUAL_RECIPROCAL_REASON = 'Enlace reciproco: Enlace manual.'
+
 let notes: NoteRecord[] = [
   {
     id: 'preview-roadmap',
@@ -158,6 +161,17 @@ const fineTuneExampleCount = (): number =>
   notes.filter((note) => Boolean(note.trainingReviewedAt) && isFineTuneReviewable(note)).length
 const clampNumber = (value: unknown, min: number, max: number): number =>
   Number.isFinite(value) ? Math.max(min, Math.min(max, Math.round(Number(value)))) : min
+const isManualRelatedLink = (related: NoteRecord['related'][number]): boolean =>
+  related.reason === MANUAL_LINK_REASON || related.reason === MANUAL_RECIPROCAL_REASON
+const resetPreviewAnalysisAfterContentEdit = (note: NoteRecord): void => {
+  note.summary = ''
+  note.related = note.related.filter(isManualRelatedLink)
+  note.suggestedActions = []
+  note.analysisStatus = 'idle'
+  note.analysisError = undefined
+  note.analysisRun = undefined
+  note.trainingReviewedAt = undefined
+}
 
 const previewHealth = (): AiHealth => ({
   ok: false,
@@ -207,9 +221,12 @@ export function createPreviewApi(): Api {
         throw new Error('Nota no encontrada')
       }
 
-      if (updates.content) {
+      if (typeof updates.content === 'string') {
+        const contentChanged = updates.content !== note.content
         note.content = updates.content
-        note.trainingReviewedAt = undefined
+        if (contentChanged) {
+          resetPreviewAnalysisAfterContentEdit(note)
+        }
       }
 
       if (updates.title) {
@@ -286,7 +303,7 @@ export function createPreviewApi(): Api {
           noteId: target.id,
           title: target.title,
           score: 0.72,
-          reason: 'Enlace manual.'
+          reason: MANUAL_LINK_REASON
         }
       ]
       target.related = [
@@ -295,7 +312,7 @@ export function createPreviewApi(): Api {
           noteId: source.id,
           title: source.title,
           score: 0.65,
-          reason: 'Enlace reciproco: Enlace manual.'
+          reason: MANUAL_RECIPROCAL_REASON
         }
       ]
       source.updatedAt = new Date().toISOString()
