@@ -15,3 +15,7 @@ export function resetAnalysisAfterContentEdit(note: NoteRecord): void {
 export function isManualRelatedLink(link: RelatedNote): boolean {
   return link.reason === MANUAL_LINK_REASON || link.reason === MANUAL_RECIPROCAL_REASON
 }
+
+export function canApplyAnalysisResult(current: NoteRecord, analyzedSource: NoteRecord): boolean {
+  return current.content === analyzedSource.content && current.updatedAt === analyzedSource.updatedAt
+}

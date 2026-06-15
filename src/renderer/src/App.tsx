@@ -140,6 +140,24 @@ function saveStateLabel(saveState: SaveState): string {
   return 'Guardado'
 }
 
+function analysisResultMessage(note: NoteRecord, requestedEngine: 'qwen' | 'local'): string {
+  if (note.analysisStatus === 'qwen') {
+    return 'Analisis Qwen listo.'
+  }
+
+  if (note.analysisStatus === 'fallback') {
+    return requestedEngine === 'local'
+      ? 'Analisis local listo. Qwen puede actualizar esta nota cuando el modelo este disponible.'
+      : 'Qwen no respondio; analisis local listo.'
+  }
+
+  if (note.analysisStatus === 'error') {
+    return 'No se pudo analizar la nota.'
+  }
+
+  return 'La nota cambio durante el analisis. Vuelve a analizarla para actualizar la IA.'
+}
+
 function directionLabel(direction: GraphConnection['direction']): string {
   if (direction === 'both') {
     return 'Mutua'
@@ -740,11 +758,7 @@ export default function App(): JSX.Element {
       const engine = pendingAnalysisEngine(health.ok)
       const analyzed = await api.analyzeNote(id, engine)
       await refreshNotes(analyzed.id)
-      setEditorMessage(
-        engine === 'local'
-          ? 'Analisis local listo. Qwen puede actualizar esta nota cuando el modelo este disponible.'
-          : 'Analisis Qwen listo.'
-      )
+      setEditorMessage(analysisResultMessage(analyzed, engine))
     } finally {
       setBusy(null)
     }

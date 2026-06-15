@@ -37,6 +37,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - RAG context generation from locally related notes before Qwen analysis, with TF-IDF-style scoring, phrase/tag/title signals, stored excerpts, and scores for auditability.
 - Automatic summaries, categories, tags, and related-note suggestions.
 - Editing note content clears stale AI summaries, suggested actions, and automatic links while preserving manual links.
+- Late AI results are ignored if the note changed while analysis was running, preventing stale Qwen/local output from overwriting user edits.
 - Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
 - Local action plan: users can save suggested actions, mark them done, delete them, and carry them through library/Markdown export.
 - MCP handoff JSON export for open local actions, including tool hints and source-note context without executing external tools.

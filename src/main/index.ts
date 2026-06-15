@@ -17,7 +17,7 @@ import { buildFineTuneExamples, buildMcpHandoffPayload, fineTuneDatasetToJsonl, 
 import { synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
-import { resetAnalysisAfterContentEdit } from './noteLifecycle'
+import { canApplyAnalysisResult, resetAnalysisAfterContentEdit } from './noteLifecycle'
 import { createNoteDraft, listNotes, mutateDatabase, normalizeDatabase, readDatabase } from './storage'
 import { captureWindowState, readWindowState, writeWindowState } from './windowState'
 import {
@@ -656,17 +656,25 @@ async function analyzeAndPersistNote(id: string, mode: AnalysisMode = 'qwen'): P
   }
 
   const updated = await analyzeNoteSnapshot(note, database, mode)
+  let persisted = updated
 
   await mutateDatabase((nextDatabase) => {
     const index = nextDatabase.notes.findIndex((item) => item.id === id)
     if (index !== -1) {
+      const current = nextDatabase.notes[index]
+
+      if (!canApplyAnalysisResult(current, note)) {
+        persisted = current
+        return
+      }
+
       nextDatabase.notes[index] = updated
       syncActionNoteTitle(nextDatabase, updated)
       synchronizeRelatedGraph(nextDatabase.notes, updated.id)
     }
   })
 
-  return updated
+  return persisted
 }
 
 async function analyzeNoteSnapshot(note: NoteRecord, database: DatabaseFile, mode: AnalysisMode): Promise<NoteRecord> {
