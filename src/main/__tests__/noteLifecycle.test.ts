@@ -4,6 +4,7 @@ import {
   hasContentChanged,
   isManualRelatedLink,
   preserveManualLinksAfterAnalysis,
+  removeDeletedNoteReferences,
   resetAnalysisAfterContentEdit
 } from '../noteLifecycle'
 import { NoteRecord } from '../types'
@@ -161,6 +162,57 @@ describe('preserveManualLinksAfterAnalysis', () => {
         reason: 'Nueva relacion detectada por RAG.'
       }
     ])
+  })
+})
+
+describe('removeDeletedNoteReferences', () => {
+  it('removes links to deleted notes and invalidates affected training examples', () => {
+    const reviewed = note({
+      id: 'reviewed',
+      related: [
+        {
+          noteId: 'deleted',
+          title: 'Nota eliminada',
+          score: 0.8,
+          reason: 'Enlace manual.'
+        },
+        {
+          noteId: 'kept',
+          title: 'Nota conservada',
+          score: 0.6,
+          reason: 'Relacion vigente.'
+        }
+      ]
+    })
+    const untouched = note({
+      id: 'untouched',
+      related: [
+        {
+          noteId: 'kept',
+          title: 'Nota conservada',
+          score: 0.6,
+          reason: 'Relacion vigente.'
+        }
+      ],
+      trainingReviewedAt: '2026-06-15T00:02:00.000Z'
+    })
+    const now = '2026-06-15T00:03:00.000Z'
+
+    const affected = removeDeletedNoteReferences([reviewed, untouched], 'deleted', now)
+
+    expect(affected).toBe(1)
+    expect(reviewed.related).toEqual([
+      {
+        noteId: 'kept',
+        title: 'Nota conservada',
+        score: 0.6,
+        reason: 'Relacion vigente.'
+      }
+    ])
+    expect(reviewed.trainingReviewedAt).toBeUndefined()
+    expect(reviewed.updatedAt).toBe(now)
+    expect(untouched.trainingReviewedAt).toBe('2026-06-15T00:02:00.000Z')
+    expect(untouched.updatedAt).toBe('2026-06-15T00:00:00.000Z')
   })
 })
 

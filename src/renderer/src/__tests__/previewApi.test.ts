@@ -102,4 +102,21 @@ describe('createPreviewApi', () => {
       })
     )
   })
+
+  it('removes deleted note references and clears reviewed preview examples', async () => {
+    const api = createPreviewApi()
+    const source = await api.createNote('Nota revisada con enlace manual')
+    const target = await api.createNote('Referencia que se eliminara')
+
+    await api.analyzeNote(source.id, 'qwen')
+    await api.addManualLink(source.id, target.id)
+    await api.setTrainingReview(source.id, true)
+    await api.deleteNote(target.id)
+
+    const notes = await api.listNotes()
+    const updated = notes.find((note) => note.id === source.id)
+
+    expect(updated?.related.some((related) => related.noteId === target.id)).toBe(false)
+    expect(updated?.trainingReviewedAt).toBeUndefined()
+  })
 })

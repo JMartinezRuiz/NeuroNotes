@@ -198,6 +198,21 @@ const resetPreviewAnalysisAfterContentEdit = (note: NoteRecord): void => {
   note.analysisRun = undefined
   note.trainingReviewedAt = undefined
 }
+const removePreviewDeletedNoteReferences = (deletedNoteId: string): void => {
+  const now = new Date().toISOString()
+
+  for (const note of notes) {
+    const nextRelated = note.related.filter((related) => related.noteId !== deletedNoteId)
+
+    if (nextRelated.length === note.related.length) {
+      continue
+    }
+
+    note.related = nextRelated
+    note.updatedAt = now
+    note.trainingReviewedAt = undefined
+  }
+}
 
 const previewHealth = (): AiHealth => ({
   ok: false,
@@ -306,6 +321,7 @@ export function createPreviewApi(): Api {
     },
     deleteNote: async (id) => {
       notes = notes.filter((note) => note.id !== id)
+      removePreviewDeletedNoteReferences(id)
       actions = actions.filter((action) => action.noteId !== id)
       return {
         ok: true,

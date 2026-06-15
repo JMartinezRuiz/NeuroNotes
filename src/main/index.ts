@@ -22,6 +22,7 @@ import {
   clearTrainingReview,
   hasContentChanged,
   preserveManualLinksAfterAnalysis,
+  removeDeletedNoteReferences,
   resetAnalysisAfterContentEdit
 } from './noteLifecycle'
 import { createNoteDraft, listNotes, mutateDatabase, normalizeDatabase, readDatabase } from './storage'
@@ -353,12 +354,8 @@ function registerIpcHandlers(): void {
     }
 
     await mutateDatabase((database) => {
-      database.notes = database.notes
-        .filter((note) => note.id !== id)
-        .map((note) => ({
-          ...note,
-          related: note.related.filter((related) => related.noteId !== id)
-      }))
+      database.notes = database.notes.filter((note) => note.id !== id)
+      removeDeletedNoteReferences(database.notes, id)
       removeActionItemsForNote(database, id)
     })
 

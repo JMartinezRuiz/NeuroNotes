@@ -45,6 +45,29 @@ export function preserveManualLinksAfterAnalysis(note: NoteRecord, analysisLinks
   return [...linksById.values()].slice(0, 10)
 }
 
+export function removeDeletedNoteReferences(
+  notes: NoteRecord[],
+  deletedNoteId: string,
+  now = new Date().toISOString()
+): number {
+  let affected = 0
+
+  for (const note of notes) {
+    const nextRelated = note.related.filter((related) => related.noteId !== deletedNoteId)
+
+    if (nextRelated.length === note.related.length) {
+      continue
+    }
+
+    note.related = nextRelated
+    note.updatedAt = now
+    clearTrainingReview(note)
+    affected += 1
+  }
+
+  return affected
+}
+
 export function clearTrainingReview(note: NoteRecord): void {
   note.trainingReviewedAt = undefined
 }
