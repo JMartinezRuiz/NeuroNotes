@@ -36,6 +36,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Manual pending-note analysis can use the local fallback before Qwen is ready without contacting Ollama; when Qwen becomes available, fallback notes can be upgraded through the Qwen pending flow.
 - RAG context generation from locally related notes before Qwen analysis, with TF-IDF-style scoring, phrase/tag/title signals, stored excerpts, and scores for auditability.
 - Automatic summaries, categories, tags, and related-note suggestions.
+- Editing note content clears stale AI summaries, suggested actions, and automatic links while preserving manual links.
 - Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
 - Local action plan: users can save suggested actions, mark them done, delete them, and carry them through library/Markdown export.
 - MCP handoff JSON export for open local actions, including tool hints and source-note context without executing external tools.
