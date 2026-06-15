@@ -3,6 +3,7 @@
 import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import asar from '@electron/asar'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const packageJson = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'))
@@ -48,6 +49,30 @@ const requiredArtifacts = [
   }
 ]
 
+const asarRelativePath = path.join('win-unpacked', 'resources', 'app.asar')
+const asarContentChecks = [
+  {
+    label: 'asar main bundle',
+    path: '/out/main/index.js',
+    includes: ['../preload/index.mjs']
+  },
+  {
+    label: 'asar preload bundle',
+    path: '/out/preload/index.mjs',
+    includes: ['exposeInMainWorld', 'neuronotes']
+  },
+  {
+    label: 'asar renderer entry',
+    path: '/out/renderer/index.html',
+    includes: ['assets/']
+  },
+  {
+    label: 'asar package metadata',
+    path: '/package.json',
+    includes: ['"main": "out/main/index.js"']
+  }
+]
+
 const results = []
 
 for (const artifact of requiredArtifacts) {
@@ -74,6 +99,42 @@ for (const artifact of requiredArtifacts) {
   }
 }
 
+const asarPath = path.join(releaseDir, asarRelativePath)
+
+try {
+  const entries = new Set(asar.listPackage(asarPath, { isPack: false }).map(normalizeAsarEntry))
+
+  for (const check of asarContentChecks) {
+    const archiveEntry = normalizeAsarEntry(check.path)
+    const listed = entries.has(archiveEntry)
+    const contentOk = listed ? asarFileIncludes(asarPath, archiveEntry, check.includes) : false
+
+    results.push({
+      label: check.label,
+      relativePath: `${asarRelativePath}:${check.path}`,
+      minBytes: 1,
+      includes: check.includes,
+      fullPath: asarPath,
+      size: listed ? 1 : 0,
+      contentOk,
+      ok: listed && contentOk
+    })
+  }
+} catch {
+  for (const check of asarContentChecks) {
+    results.push({
+      label: check.label,
+      relativePath: `${asarRelativePath}:${check.path}`,
+      minBytes: 1,
+      includes: check.includes,
+      fullPath: asarPath,
+      size: 0,
+      contentOk: false,
+      ok: false
+    })
+  }
+}
+
 const failed = results.filter((result) => !result.ok)
 
 if (failed.length > 0) {
@@ -93,4 +154,17 @@ if (failed.length > 0) {
 async function fileIncludes(filePath, needles) {
   const content = await readFile(filePath, 'utf8')
   return needles.every((needle) => content.includes(needle))
+}
+
+function asarFileIncludes(archivePath, filePath, needles) {
+  try {
+    const content = asar.extractFile(archivePath, path.normalize(filePath)).toString('utf8')
+    return needles.every((needle) => content.includes(needle))
+  } catch {
+    return false
+  }
+}
+
+function normalizeAsarEntry(entry) {
+  return entry.replace(/^[/\\]+/, '').replace(/\\/g, '/')
 }
