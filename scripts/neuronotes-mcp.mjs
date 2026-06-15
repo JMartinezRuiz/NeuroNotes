@@ -15,6 +15,7 @@ const MAX_LIMIT = 25
 const RESOURCE_URIS = {
   summary: 'neuronotes://library/summary',
   openActions: 'neuronotes://actions/open',
+  mcpHandoff: 'neuronotes://actions/handoff',
   analysisQueue: 'neuronotes://analysis/queue',
   qwenSetup: 'neuronotes://qwen/setup',
   fineTuneReadiness: 'neuronotes://finetune/readiness'
@@ -130,6 +131,18 @@ const TOOLS = [
           description: `Maximum actions to return. Default: ${DEFAULT_LIMIT}.`
         }
       }
+    }
+  },
+  {
+    name: 'neuronotes_mcp_handoff',
+    description: 'Build a read-only Neuronotes MCP handoff package with open action drafts, approval state, source note context, and RAG snippets.',
+    annotations: {
+      readOnlyHint: true
+    },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {}
     }
   },
   {
@@ -289,6 +302,10 @@ export async function callTool(name, args = {}, context = {}) {
     return listOpenActions(database, args)
   }
 
+  if (name === 'neuronotes_mcp_handoff') {
+    return mcpHandoff(database)
+  }
+
   if (name === 'neuronotes_library_summary') {
     return librarySummary(database, context.dbPath)
   }
@@ -425,6 +442,17 @@ function listResources(database) {
         }
       },
       {
+        uri: RESOURCE_URIS.mcpHandoff,
+        name: 'mcp-handoff',
+        title: 'Neuronotes MCP Handoff',
+        description: 'Open action drafts with approval state, source note context, and stored RAG snippets for external review.',
+        mimeType: 'application/json',
+        annotations: {
+          audience: ['assistant'],
+          priority: 0.855
+        }
+      },
+      {
         uri: RESOURCE_URIS.analysisQueue,
         name: 'analysis-queue',
         title: 'Neuronotes Analysis Queue',
@@ -484,6 +512,10 @@ function readResource(uri, database, dbPath) {
 
   if (uri === RESOURCE_URIS.openActions) {
     return jsonResource(uri, listOpenActions(database, { limit: MAX_LIMIT }))
+  }
+
+  if (uri === RESOURCE_URIS.mcpHandoff) {
+    return jsonResource(uri, mcpHandoff(database))
   }
 
   if (uri === RESOURCE_URIS.analysisQueue) {
@@ -824,6 +856,112 @@ function listOpenActions(database, args) {
     approvedCount: actions.filter((action) => action.approval.state === 'approved').length,
     actions
   }
+}
+
+function mcpHandoff(database) {
+  const notesById = new Map(database.notes.map((note) => [note.id, note]))
+  const openActions = database.actions
+    .filter((action) => action.status === 'open' && notesById.has(action.noteId))
+    .sort(compareActionItems)
+  const actions = openActions.map((action) => {
+    const note = notesById.get(action.noteId)
+
+    return {
+      id: action.id,
+      kind: action.kind,
+      status: action.status,
+      title: action.title,
+      detail: action.detail,
+      toolHint: action.toolHint ?? null,
+      confidence: action.confidence,
+      approval: mcpApproval(action),
+      toolCallDraft: buildToolCallDraft(action, note),
+      createdAt: action.createdAt,
+      updatedAt: action.updatedAt,
+      sourceNote: {
+        id: note.id,
+        title: note.title,
+        summary: note.summary,
+        category: note.category,
+        tags: note.tags,
+        contentExcerpt: excerpt(note.content, 1200),
+        relatedNoteIds: note.related.map((related) => related.noteId),
+        analysis: note.analysisRun
+          ? {
+              provider: note.analysisRun.provider,
+              model: note.analysisRun.model,
+              analyzedAt: note.analysisRun.analyzedAt,
+              ragNoteIds: note.analysisRun.ragNoteIds,
+              ragContext: note.analysisRun.ragContext ?? []
+            }
+          : null
+      }
+    }
+  })
+
+  return {
+    schema: 'neuronotes.mcp-handoff.v1',
+    exportedAt: new Date().toISOString(),
+    execution: {
+      mode: 'manual-user-approved',
+      requiresUserApproval: true,
+      sideEffects: 'none-export-only'
+    },
+    model: database.settings.model,
+    ollamaUrl: database.settings.ollamaUrl,
+    actionCount: actions.length,
+    approvedActionCount: actions.filter((action) => action.approval.state === 'approved').length,
+    doneActionCount: database.actions.filter((action) => action.status === 'done').length,
+    toolSummary: buildToolSummary(actions),
+    kindSummary: buildKindSummary(actions),
+    actions
+  }
+}
+
+function compareActionItems(a, b) {
+  if (a.status !== b.status) {
+    return a.status === 'open' ? -1 : 1
+  }
+
+  return b.updatedAt.localeCompare(a.updatedAt)
+}
+
+function buildToolSummary(actions) {
+  const summary = new Map()
+
+  for (const action of actions) {
+    const toolHint = action.toolHint ?? 'unassigned'
+    const entry = summary.get(toolHint) ?? {
+      kinds: new Set(),
+      sourceNoteIds: new Set(),
+      actionCount: 0
+    }
+    entry.actionCount += 1
+    entry.kinds.add(action.kind)
+    entry.sourceNoteIds.add(action.sourceNote.id)
+    summary.set(toolHint, entry)
+  }
+
+  return [...summary.entries()]
+    .map(([toolHint, entry]) => ({
+      toolHint,
+      actionCount: entry.actionCount,
+      kinds: [...entry.kinds].sort((a, b) => a.localeCompare(b)),
+      sourceNoteIds: [...entry.sourceNoteIds].sort((a, b) => a.localeCompare(b))
+    }))
+    .sort((a, b) => b.actionCount - a.actionCount || a.toolHint.localeCompare(b.toolHint))
+}
+
+function buildKindSummary(actions) {
+  const summary = new Map()
+
+  for (const action of actions) {
+    summary.set(action.kind, (summary.get(action.kind) ?? 0) + 1)
+  }
+
+  return [...summary.entries()]
+    .map(([kind, actionCount]) => ({ kind, actionCount }))
+    .sort((a, b) => b.actionCount - a.actionCount || a.kind.localeCompare(b.kind))
 }
 
 function mcpApproval(action) {

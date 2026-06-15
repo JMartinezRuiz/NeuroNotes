@@ -60,13 +60,14 @@ describe('neuronotes MCP server', () => {
       'neuronotes_get_note',
       'neuronotes_analysis_queue',
       'neuronotes_list_open_actions',
+      'neuronotes_mcp_handoff',
       'neuronotes_library_summary',
       'neuronotes_qwen_setup',
       'neuronotes_finetune_readiness'
     ])
   })
 
-  it('exposes library, actions, Qwen setup, fine-tuning readiness, and notes as MCP resources', async () => {
+  it('exposes library, actions, handoff, Qwen setup, fine-tuning readiness, and notes as MCP resources', async () => {
     const listResponse = await handleMcpMessage(
       {
         jsonrpc: '2.0',
@@ -86,6 +87,10 @@ describe('neuronotes MCP server', () => {
         expect.objectContaining({
           uri: 'neuronotes://actions/open',
           title: 'Open Neuronotes Actions'
+        }),
+        expect.objectContaining({
+          uri: 'neuronotes://actions/handoff',
+          title: 'Neuronotes MCP Handoff'
         }),
         expect.objectContaining({
           uri: 'neuronotes://analysis/queue',
@@ -150,6 +155,41 @@ describe('neuronotes MCP server', () => {
       reviewedExampleCount: 0,
       pendingReviewCount: 2,
       status: 'needs-review'
+    })
+
+    const handoffResponse = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 'resources-handoff',
+        method: 'resources/read',
+        params: {
+          uri: 'neuronotes://actions/handoff'
+        }
+      },
+      { dbPath }
+    )
+    const handoffPayload = JSON.parse(handoffResponse.result.contents[0].text)
+
+    expect(handoffPayload).toMatchObject({
+      schema: 'neuronotes.mcp-handoff.v1',
+      execution: {
+        requiresUserApproval: true,
+        sideEffects: 'none-export-only'
+      },
+      actionCount: 1,
+      approvedActionCount: 1,
+      doneActionCount: 1,
+      actions: [
+        expect.objectContaining({
+          id: 'action-reminder',
+          toolHint: 'reminder.create',
+          approval: {
+            required: true,
+            state: 'approved',
+            approvedAt: '2026-06-15T00:01:30.000Z'
+          }
+        })
+      ]
     })
 
     const queueResponse = await handleMcpMessage(
@@ -611,6 +651,66 @@ describe('neuronotes MCP server', () => {
         }
       ]
     })
+  })
+
+  it('builds a read-only MCP handoff package for external review', async () => {
+    const result = await callTool('neuronotes_mcp_handoff', {}, { dbPath })
+
+    expect(result).toMatchObject({
+      schema: 'neuronotes.mcp-handoff.v1',
+      model: 'qwen3.5:0.8b',
+      ollamaUrl: 'http://127.0.0.1:11434',
+      execution: {
+        mode: 'manual-user-approved',
+        requiresUserApproval: true,
+        sideEffects: 'none-export-only'
+      },
+      actionCount: 1,
+      approvedActionCount: 1,
+      doneActionCount: 1,
+      toolSummary: [
+        {
+          toolHint: 'reminder.create',
+          actionCount: 1,
+          kinds: ['reminder'],
+          sourceNoteIds: ['note-health']
+        }
+      ],
+      kindSummary: [
+        {
+          kind: 'reminder',
+          actionCount: 1
+        }
+      ],
+      actions: [
+        expect.objectContaining({
+          id: 'action-reminder',
+          status: 'open',
+          toolCallDraft: {
+            status: 'ready-for-review',
+            toolName: 'reminder.create',
+            arguments: expect.objectContaining({
+              sourceNoteId: 'note-health',
+              relatedNoteIds: ['note-project'],
+              ragContext: [
+                expect.objectContaining({
+                  noteId: 'note-project'
+                })
+              ]
+            })
+          },
+          sourceNote: expect.objectContaining({
+            id: 'note-health',
+            contentExcerpt: 'Recordar cita con el medico manana y revisar Qwen local.',
+            analysis: expect.objectContaining({
+              provider: 'qwen',
+              ragNoteIds: ['note-project']
+            })
+          })
+        })
+      ]
+    })
+    expect(result.actions.map((action) => action.id)).not.toContain('action-done')
   })
 
   it('normalizes saved action note titles from linked notes', async () => {
