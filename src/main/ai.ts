@@ -376,7 +376,10 @@ ${context}`
 }
 
 function parseJson(text: string): AiPayload {
-  const clean = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+  const clean = text
+    .replace(/<think>[\s\S]*?<\/think>/g, '')
+    .replace(/```(?:json)?/gi, '')
+    .trim()
   const start = clean.indexOf('{')
   const end = clean.lastIndexOf('}')
 
@@ -384,7 +387,17 @@ function parseJson(text: string): AiPayload {
     throw new Error('Qwen no devolvio JSON valido')
   }
 
-  return JSON.parse(clean.slice(start, end + 1)) as AiPayload
+  const candidate = clean.slice(start, end + 1)
+
+  try {
+    return JSON.parse(candidate) as AiPayload
+  } catch {
+    return JSON.parse(repairJsonCandidate(candidate)) as AiPayload
+  }
+}
+
+function repairJsonCandidate(value: string): string {
+  return value.replace(/,\s*([}\]])/g, '$1')
 }
 
 function sanitizeAiPayload(payload: AiPayload, allNotes: NoteRecord[]): Omit<AnalysisResult, 'status' | 'error' | 'analysisRun'> {

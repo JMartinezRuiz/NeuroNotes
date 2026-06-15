@@ -283,6 +283,56 @@ describe('analyzeNote', () => {
     })
   })
 
+  it('repairs fenced Qwen JSON with trailing commas before falling back', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            response: `\`\`\`json
+{
+  "title": "Respuesta reparada",
+  "summary": "Qwen devolvio JSON con formato tolerable.",
+  "category": "Proyecto",
+  "tags": ["qwen", "rag",],
+  "related": [],
+  "suggestedActions": [
+    {
+      "kind": "task",
+      "title": "Revisar salida Qwen",
+      "detail": "Confirmar que la respuesta reparada conserva acciones.",
+      "toolHint": "task.create",
+      "confidence": 0.8,
+    },
+  ],
+}
+\`\`\``
+          }),
+          { status: 200 }
+        )
+      )
+    )
+
+    const source = note({
+      id: 'source',
+      content: 'Proyecto Neuronotes: revisar tolerancia JSON para Qwen 0.8B.'
+    })
+
+    await expect(analyzeNote(source, [source], settings)).resolves.toMatchObject({
+      status: 'qwen',
+      title: 'Respuesta reparada',
+      category: 'Proyecto',
+      tags: ['qwen', 'rag'],
+      suggestedActions: [
+        expect.objectContaining({
+          kind: 'task',
+          title: 'Revisar salida Qwen',
+          toolHint: 'task.create'
+        })
+      ]
+    })
+  })
+
   it('falls back to local categorization and related-note ranking when Qwen is unavailable', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Ollama no disponible')))
 

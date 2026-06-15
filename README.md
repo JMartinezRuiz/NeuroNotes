@@ -36,6 +36,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Configurable RAG context limits for Qwen: number of retrieved notes and excerpt length.
 - RAG budget indicator in settings to keep context compact enough for Qwen 0.8B.
 - Bounded Ollama health and Qwen generation requests, so stalled local AI calls fall back instead of blocking notes.
+- Qwen JSON responses are sanitized and lightly repaired for common model output issues such as Markdown fences and trailing commas.
 - Local fallback analyzer when Ollama/Qwen is unavailable.
 - Single-note analysis uses the local analyzer immediately when Qwen is not ready, and Qwen can upgrade those notes later.
 - Local fallback analyzer normalizes Spanish accents for category, tag, and action heuristics.
