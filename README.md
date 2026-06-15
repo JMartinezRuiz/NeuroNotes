@@ -28,7 +28,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
 - Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.
 - Local fallback analyzer when Ollama/Qwen is unavailable.
-- RAG context generation from locally related notes before Qwen analysis, with stored excerpts and scores for auditability.
+- RAG context generation from locally related notes before Qwen analysis, with TF-IDF-style scoring, phrase/tag/title signals, stored excerpts, and scores for auditability.
 - Automatic summaries, categories, tags, and related-note suggestions.
 - Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
 - Local action plan: users can save suggested actions, mark them done, delete them, and carry them through library/Markdown export.
@@ -45,7 +45,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 The analysis flow is:
 
 1. A note is created or selected for analysis.
-2. Neuronotes ranks nearby notes locally using lexical similarity, tag overlap, and category signals.
+2. Neuronotes ranks nearby notes locally using TF-IDF-style lexical similarity, phrase overlap, tag overlap, title matches, and category signals.
 3. The strongest matches are serialized as RAG context with score, reason, tags, and excerpt.
 4. Qwen 0.8B is called through Ollama with a strict JSON prompt.
 5. The response is sanitized and merged with local related-note ranking.

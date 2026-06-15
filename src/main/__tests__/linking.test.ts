@@ -50,6 +50,48 @@ describe('rankRelatedNotes', () => {
     })
     expect(ranked.some((item) => item.noteId === 'source')).toBe(false)
   })
+
+  it('normalizes accents and prioritizes specific phrase matches', () => {
+    const source = note({
+      id: 'source',
+      category: 'Personal',
+      content: 'Recordar reunion manana sobre permisos MCP locales.'
+    })
+    const accentMatch = note({
+      id: 'accent-match',
+      title: 'Reunion de manana',
+      category: 'Personal',
+      content: 'La reunión de mañana define permisos MCP locales para Neuronotes.'
+    })
+    const genericReminder = note({
+      id: 'generic-reminder',
+      title: 'Agenda personal',
+      category: 'Personal',
+      content: 'Recordar revisar agenda personal y pendientes generales.'
+    })
+
+    const ranked = rankRelatedNotes(source, [source, genericReminder, accentMatch])
+
+    expect(ranked[0]).toMatchObject({
+      noteId: 'accent-match',
+      reason: 'Comparte frases y conceptos especificos.'
+    })
+  })
+
+  it('does not link notes that only share a category', () => {
+    const source = note({
+      id: 'source',
+      category: 'Proyecto',
+      content: 'Configurar Ollama Qwen para analisis RAG local.'
+    })
+    const sameCategory = note({
+      id: 'same-category',
+      category: 'Proyecto',
+      content: 'Factura trimestral, impuestos y presupuesto operativo.'
+    })
+
+    expect(rankRelatedNotes(source, [source, sameCategory])).toEqual([])
+  })
 })
 
 describe('buildRagContext', () => {
