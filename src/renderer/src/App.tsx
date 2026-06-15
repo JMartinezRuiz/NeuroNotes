@@ -467,6 +467,16 @@ export default function App(): JSX.Element {
   })
 
   useEffect(() => {
+    if (!bootstrapped) {
+      return
+    }
+
+    return api.onLibraryChanged(() => {
+      void Promise.all([refreshNotes(selectedId ?? undefined), refreshActions()]).catch(() => undefined)
+    })
+  }, [api, bootstrapped, selectedId])
+
+  useEffect(() => {
     const listener = (event: KeyboardEvent): void => {
       const command = commandFromKeyboardShortcut(event)
 

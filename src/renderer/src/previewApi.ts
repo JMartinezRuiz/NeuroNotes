@@ -737,6 +737,9 @@ export function createPreviewApi(): Api {
         command
       }
     },
+    onLibraryChanged: () => {
+      return () => undefined
+    },
     onCommand: () => {
       return () => undefined
     }

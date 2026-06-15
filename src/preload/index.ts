@@ -64,6 +64,16 @@ const api = {
   getAiDiagnostics: (): Promise<AiDiagnosticsResult | null> => ipcRenderer.invoke('ai:getDiagnostics'),
   openOllamaDownload: (): Promise<void> => ipcRenderer.invoke('ai:openOllamaDownload'),
   copyAiSetupCommand: (): Promise<AiSetupCommandResult> => ipcRenderer.invoke('ai:copySetupCommand'),
+  onLibraryChanged: (callback: () => void): (() => void) => {
+    const listener = (): void => {
+      callback()
+    }
+
+    ipcRenderer.on('library:changed', listener)
+    return () => {
+      ipcRenderer.removeListener('library:changed', listener)
+    }
+  },
   onCommand: (callback: (command: AppCommand) => void): (() => void) => {
     const listener = (_event: IpcRendererEvent, command: AppCommand): void => {
       callback(command)

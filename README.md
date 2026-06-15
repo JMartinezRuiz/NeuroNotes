@@ -66,6 +66,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - MCP handoff JSON export for open local actions, including tool summaries, action-kind summaries, tool hints, source-note context, and stored RAG snippets without executing external tools.
 - Read-only MCP stdio server for local hosts that need to search notes, read note context, inspect analysis queues, list open action intents, build MCP handoff packages, and inspect library/fine-tuning readiness.
 - Opt-in MCP write mode for trusted local hosts that need to capture new notes into Neuronotes without executing external tools.
+- Live library refresh when an external MCP capture writes to the local database while the app is open.
 - MCP connection config is available from the app settings panel, including separate host-ready JSON for read-only access and opt-in note capture.
 - Fine-tuning dataset JSONL export from user-reviewed analyzed notes, for future local Qwen tuning experiments without sending data outside the machine.
 - Fine-tuning readiness summary in settings, showing reviewed JSONL examples and analyzed notes still awaiting approval.
@@ -127,6 +128,7 @@ When the server is explicitly started with `NEURONOTES_MCP_WRITE=1` or `--write`
 - `neuronotes_create_note`
 
 That write tool only creates a local note marked as pending analysis. It does not call Qwen, execute external MCP tools, create links, or approve action handoffs.
+When the desktop app is open, it watches the local database and refreshes notes/actions after trusted MCP capture writes.
 
 It also exposes MCP resources:
 

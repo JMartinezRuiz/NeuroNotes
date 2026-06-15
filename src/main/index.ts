@@ -15,6 +15,7 @@ import {
   syncActionNoteTitle
 } from './actions'
 import { AppCommand } from './commands'
+import { createDatabaseChangeWatcher, DatabaseChangeWatcher } from './databaseWatcher'
 import { buildFineTuneExamples, buildMcpHandoffPayload, fineTuneDatasetToJsonl, noteToMarkdown, safeMarkdownFileName } from './export'
 import { synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
@@ -224,6 +225,7 @@ function createAppMenu(): void {
 }
 
 const singleInstanceLock = app.requestSingleInstanceLock()
+let databaseChangeWatcher: DatabaseChangeWatcher | undefined
 
 if (!singleInstanceLock) {
   app.quit()
@@ -232,7 +234,7 @@ if (!singleInstanceLock) {
     focusMainWindow()
   })
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     electronApp.setAppUserModelId('com.neuronotes.desktop')
 
     app.on('browser-window-created', (_, window) => {
@@ -240,6 +242,14 @@ if (!singleInstanceLock) {
     })
 
     registerIpcHandlers()
+    try {
+      databaseChangeWatcher = await createDatabaseChangeWatcher({
+        userDataPath: app.getPath('userData'),
+        onChange: notifyLibraryChanged
+      })
+    } catch (error) {
+      console.warn('Neuronotes database watcher disabled:', error)
+    }
     createAppMenu()
     createWindow()
 
@@ -258,6 +268,19 @@ if (!singleInstanceLock) {
       app.quit()
     }
   })
+
+  app.on('before-quit', () => {
+    databaseChangeWatcher?.close()
+    databaseChangeWatcher = undefined
+  })
+}
+
+function notifyLibraryChanged(): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send('library:changed')
+    }
+  }
 }
 
 function registerIpcHandlers(): void {
