@@ -176,7 +176,7 @@ The app already stores action intents with an optional `toolHint` field and lets
 
 ## Fine-Tuning Dataset
 
-Neuronotes can export reviewed analyzed notes as newline-delimited JSON examples using the `neuronotes.finetune-example.v1` schema. Each line contains `messages` with a system prompt, a note plus retrieved context, and the expected JSON answer with title, summary, category, tags, related notes, and suggested actions.
+Neuronotes can export reviewed analyzed notes as newline-delimited JSON examples using the `neuronotes.finetune-example.v1` schema. Each line contains `messages` with a system prompt, a note plus retrieved context, and the expected JSON answer with title, summary, category, tags, related notes, and suggested actions. Each example also carries audit metadata for the source note, analysis provider/model, analysis duration, RAG IDs/context count, active RAG settings, and the latest matching Qwen JSON/RAG diagnostic when available.
 
 This does not train a model by itself. It creates a local dataset from notes the user has explicitly approved for training, so unverified Qwen/local outputs are not exported by accident. Those examples can be used later for Qwen fine-tuning experiments if the RAG flow is not accurate enough.
 

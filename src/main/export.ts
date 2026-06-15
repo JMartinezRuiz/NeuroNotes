@@ -18,12 +18,25 @@ export interface FineTuneExample {
     noteId: string
     analysisStatus: string
     analysisProvider: string | null
+    analysisModel: string | null
     analyzedAt: string | null
+    analysisDurationMs: number | null
     category: string
     tagCount: number
     relatedCount: number
     suggestedActionCount: number
     ragNoteIds: string[]
+    ragContextCount: number
+    ragSettings: {
+      maxNotes: number
+      excerptLength: number
+    }
+    qwenDiagnostic: {
+      ok: boolean
+      diagnosedAt: string
+      model: string
+      related: number
+    } | null
     reviewedForTraining: boolean
     reviewedAt: string | null
   }
@@ -301,12 +314,28 @@ export function buildFineTuneExamples(database: DatabaseFile, exportedAt = new D
           noteId: note.id,
           analysisStatus: note.analysisStatus,
           analysisProvider: note.analysisRun?.provider ?? null,
+          analysisModel: note.analysisRun?.model ?? null,
           analyzedAt: note.analysisRun?.analyzedAt ?? null,
+          analysisDurationMs: note.analysisRun?.durationMs ?? null,
           category: note.category,
           tagCount: note.tags.length,
           relatedCount: assistantPayload.related.length,
           suggestedActionCount: assistantPayload.suggestedActions.length,
           ragNoteIds: note.analysisRun?.ragNoteIds ?? [],
+          ragContextCount: note.analysisRun?.ragContext?.length ?? 0,
+          ragSettings: {
+            maxNotes: database.settings.ragMaxNotes,
+            excerptLength: database.settings.ragExcerptLength
+          },
+          qwenDiagnostic:
+            database.aiDiagnostics && database.aiDiagnostics.model === database.settings.model
+              ? {
+                  ok: database.aiDiagnostics.ok,
+                  diagnosedAt: database.aiDiagnostics.diagnosedAt,
+                  model: database.aiDiagnostics.model,
+                  related: database.aiDiagnostics.related
+                }
+              : null,
           reviewedForTraining: true,
           reviewedAt: note.trainingReviewedAt ?? null
         }

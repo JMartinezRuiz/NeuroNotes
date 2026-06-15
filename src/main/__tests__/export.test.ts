@@ -353,7 +353,21 @@ describe('fine-tune dataset export', () => {
         })
       ],
       settings: { ...DEFAULT_SETTINGS },
-      actions: []
+      actions: [],
+      aiDiagnostics: {
+        ok: true,
+        status: 'qwen',
+        message: 'qwen3.5:0.8b respondio correctamente',
+        model: DEFAULT_SETTINGS.model,
+        ollamaUrl: DEFAULT_SETTINGS.ollamaUrl,
+        ragMaxNotes: DEFAULT_SETTINGS.ragMaxNotes,
+        ragExcerptLength: DEFAULT_SETTINGS.ragExcerptLength,
+        diagnosedAt: '2026-06-15T00:05:00.000Z',
+        durationMs: 842,
+        category: 'Proyecto',
+        summary: 'Diagnostico JSON valido.',
+        related: 1
+      }
     }
 
     const examples = buildFineTuneExamples(database, now)
@@ -368,11 +382,24 @@ describe('fine-tune dataset export', () => {
         noteId: sourceNote.id,
         analysisStatus: 'qwen',
         analysisProvider: 'qwen',
+        analysisModel: 'qwen3.5:0.8b',
+        analysisDurationMs: 840,
         category: 'Proyecto',
         tagCount: 2,
         relatedCount: 1,
         suggestedActionCount: 1,
         ragNoteIds: ['note-2'],
+        ragContextCount: 1,
+        ragSettings: {
+          maxNotes: 5,
+          excerptLength: 550
+        },
+        qwenDiagnostic: {
+          ok: true,
+          diagnosedAt: '2026-06-15T00:05:00.000Z',
+          model: 'qwen3.5:0.8b',
+          related: 1
+        },
         reviewedForTraining: true,
         reviewedAt: now
       }
