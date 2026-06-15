@@ -90,6 +90,24 @@ Install Ollama and pull the model:
 ollama pull qwen3.5:0.8b
 ```
 
+Verify the local Qwen runtime from the repo:
+
+```powershell
+npm run verify:qwen
+```
+
+If Ollama is running but the model is missing, the verifier can pull it first:
+
+```powershell
+npm run verify:qwen:pull
+```
+
+For machine-readable output:
+
+```powershell
+npm run verify:qwen:json
+```
+
 Run the desktop app:
 
 ```powershell
@@ -133,4 +151,4 @@ The Windows installer is emitted under `release/`.
 - The app icon source is `build/icon.svg`; `npm run icons` regenerates `build/icon.ico`.
 - The development build is currently unsigned.
 - For public Windows distribution, add a signing certificate and remove `signExecutable: false` from the Electron Builder config.
-- Real Qwen inference requires Ollama installed locally and the `qwen3.5:0.8b` model pulled.
+- Real Qwen inference requires Ollama installed locally and the `qwen3.5:0.8b` model pulled. Use `npm run verify:qwen` to prove the local runtime can generate a valid Neuronotes analysis.
