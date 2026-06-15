@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { createInterface } from 'node:readline'
-import { readFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import os from 'node:os'
 import path from 'node:path'
@@ -10,9 +11,11 @@ const SERVER_NAME = 'neuronotes'
 const SERVER_VERSION = '0.1.0'
 const PROTOCOL_VERSION = '2025-06-18'
 const DATABASE_FILE = 'neuronotes.json'
+const DATABASE_BACKUP_FILE = `${DATABASE_FILE}.bak`
 const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 25
 const MAX_GRAPH_NODES = 100
+const MAX_MCP_NOTE_CONTENT_LENGTH = 20000
 const RESOURCE_URIS = {
   summary: 'neuronotes://library/summary',
   noteGraph: 'neuronotes://graph/links',
@@ -23,7 +26,7 @@ const RESOURCE_URIS = {
   fineTuneReadiness: 'neuronotes://finetune/readiness'
 }
 
-const TOOLS = [
+const READ_ONLY_TOOLS = [
   {
     name: 'neuronotes_search_notes',
     description: 'Search the local Neuronotes library by query, category, tag, or analysis status.',
@@ -208,6 +211,51 @@ const TOOLS = [
   }
 ]
 
+const WRITE_TOOLS = [
+  {
+    name: 'neuronotes_create_note',
+    description:
+      'Create a new local Neuronotes note from an authorized MCP host. Requires the server to be started with NEURONOTES_MCP_WRITE=1 or --write.',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false
+    },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['content'],
+      properties: {
+        content: {
+          type: 'string',
+          maxLength: MAX_MCP_NOTE_CONTENT_LENGTH,
+          description: 'Note body to save locally. The note is stored as pending analysis for Neuronotes/Qwen.'
+        },
+        title: {
+          type: 'string',
+          maxLength: 160,
+          description: 'Optional note title. When omitted, Neuronotes derives it from the first content line.'
+        },
+        category: {
+          type: 'string',
+          maxLength: 80,
+          description: 'Optional local category. Defaults to Inbox.'
+        },
+        tags: {
+          type: 'array',
+          maxItems: 10,
+          items: {
+            type: 'string',
+            maxLength: 40
+          },
+          description: 'Optional tags to normalize and attach to the new note.'
+        }
+      }
+    }
+  }
+]
+
 const PROMPTS = [
   {
     name: 'neuronotes_review_rag_analysis',
@@ -251,6 +299,7 @@ export function parseCliArgs(argv) {
   const options = {
     dbPath: process.env.NEURONOTES_DB_PATH || '',
     userDataPath: process.env.NEURONOTES_USER_DATA || '',
+    writeEnabled: process.env.NEURONOTES_MCP_WRITE === '1',
     help: false
   }
 
@@ -269,6 +318,10 @@ export function parseCliArgs(argv) {
       index += 1
     } else if (arg.startsWith('--user-data=')) {
       options.userDataPath = arg.slice('--user-data='.length)
+    } else if (arg === '--write') {
+      options.writeEnabled = true
+    } else if (arg === '--read-only') {
+      options.writeEnabled = false
     } else {
       throw new Error(`Unknown option: ${arg}`)
     }
@@ -317,6 +370,10 @@ export async function handleMcpMessage(message, context = {}) {
 export async function callTool(name, args = {}, context = {}) {
   const database = await readNeuronotesDatabase(context.dbPath)
 
+  if (name === 'neuronotes_create_note') {
+    return createNoteFromMcp(database, args, context)
+  }
+
   if (name === 'neuronotes_search_notes') {
     return searchNotes(database, args)
   }
@@ -342,7 +399,7 @@ export async function callTool(name, args = {}, context = {}) {
   }
 
   if (name === 'neuronotes_library_summary') {
-    return librarySummary(database, context.dbPath)
+    return librarySummary(database, context.dbPath, context)
   }
 
   if (name === 'neuronotes_qwen_setup') {
@@ -361,6 +418,26 @@ export async function readNeuronotesDatabase(dbPath) {
   return normalizeDatabase(JSON.parse(raw))
 }
 
+export async function writeNeuronotesDatabase(dbPath, database) {
+  const normalized = normalizeDatabase(database)
+  const directory = path.dirname(dbPath)
+  const tempPath = `${dbPath}.tmp`
+  const backupPath = path.basename(dbPath) === DATABASE_FILE ? path.join(directory, DATABASE_BACKUP_FILE) : `${dbPath}.bak`
+
+  await mkdir(directory, { recursive: true })
+  await writeFile(tempPath, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8')
+
+  try {
+    await rename(tempPath, dbPath)
+    await copyFile(dbPath, backupPath)
+  } catch (error) {
+    await unlink(tempPath).catch(() => undefined)
+    throw error
+  }
+
+  return normalized
+}
+
 function usage() {
   return `Neuronotes MCP stdio server
 
@@ -371,6 +448,11 @@ Usage:
 Environment:
   NEURONOTES_DB_PATH   Full path to neuronotes.json.
   NEURONOTES_USER_DATA Directory containing neuronotes.json.
+  NEURONOTES_MCP_WRITE Set to 1 to enable opt-in write tools.
+
+Options:
+  --write      Enable opt-in write tools for trusted MCP hosts.
+  --read-only  Force the default read-only posture even if NEURONOTES_MCP_WRITE=1.
 `
 }
 
@@ -396,7 +478,7 @@ async function routeRequest(method, params, context) {
 
   if (method === 'tools/list') {
     return {
-      tools: TOOLS
+      tools: toolsForContext(context)
     }
   }
 
@@ -409,7 +491,7 @@ async function routeRequest(method, params, context) {
       throw rpcError(-32602, 'resources/read requires a resource uri')
     }
 
-    return readResource(params.uri, await readNeuronotesDatabase(context.dbPath), context.dbPath)
+    return readResource(params.uri, await readNeuronotesDatabase(context.dbPath), context)
   }
 
   if (method === 'prompts/list') {
@@ -427,7 +509,7 @@ async function routeRequest(method, params, context) {
       params.name,
       isObject(params.arguments) ? params.arguments : {},
       await readNeuronotesDatabase(context.dbPath),
-      context.dbPath
+      context
     )
   }
 
@@ -449,6 +531,14 @@ async function routeRequest(method, params, context) {
   }
 
   throw rpcError(-32601, `Method not found: ${method}`)
+}
+
+function toolsForContext(context = {}) {
+  return isWriteEnabled(context) ? [...READ_ONLY_TOOLS, ...WRITE_TOOLS] : READ_ONLY_TOOLS
+}
+
+function isWriteEnabled(context = {}) {
+  return context.writeEnabled === true
 }
 
 function listResources(database) {
@@ -551,9 +641,9 @@ function listResources(database) {
   }
 }
 
-function readResource(uri, database, dbPath) {
+function readResource(uri, database, context = {}) {
   if (uri === RESOURCE_URIS.summary) {
-    return jsonResource(uri, librarySummary(database, dbPath))
+    return jsonResource(uri, librarySummary(database, context.dbPath, context))
   }
 
   if (uri === RESOURCE_URIS.noteGraph) {
@@ -593,7 +683,7 @@ function readResource(uri, database, dbPath) {
   throw rpcError(-32002, `Resource not found: ${uri}`)
 }
 
-function getPrompt(name, args, database, dbPath) {
+function getPrompt(name, args, database, context = {}) {
   if (name === 'neuronotes_review_rag_analysis') {
     const noteId = stringArg(args.noteId)
 
@@ -678,7 +768,7 @@ function getPrompt(name, args, database, dbPath) {
             'Incluye cobertura de Qwen, fallback local, acciones abiertas, categorias dominantes y riesgos para RAG/fine-tuning.',
             'No asumas que Qwen esta disponible si la evidencia no lo prueba.',
             '',
-            JSON.stringify(librarySummary(database, dbPath), null, 2)
+            JSON.stringify(librarySummary(database, context.dbPath, context), null, 2)
           ].join('\n')
         )
       ]
@@ -804,6 +894,90 @@ function getNote(database, args) {
       analysisRun: note.analysisRun ?? null
     }
   }
+}
+
+async function createNoteFromMcp(database, args, context) {
+  if (!isWriteEnabled(context)) {
+    throw rpcError(
+      -32003,
+      'MCP write mode is disabled. Start the server with NEURONOTES_MCP_WRITE=1 or --write for trusted hosts.'
+    )
+  }
+
+  if (!context.dbPath) {
+    throw rpcError(-32602, 'Database path is required to create notes')
+  }
+
+  const content = typeof args.content === 'string' ? args.content.trim() : ''
+
+  if (!content) {
+    throw rpcError(-32602, 'content is required')
+  }
+
+  if (content.length > MAX_MCP_NOTE_CONTENT_LENGTH) {
+    throw rpcError(-32602, `content must be ${MAX_MCP_NOTE_CONTENT_LENGTH} characters or fewer`)
+  }
+
+  const now = new Date().toISOString()
+  const note = {
+    id: randomUUID(),
+    title: mcpNoteTitle(args.title, content),
+    content,
+    summary: '',
+    category: excerpt(stringArg(args.category) || 'Inbox', 80),
+    tags: uniqueNormalizedTags(args.tags).slice(0, 10),
+    related: [],
+    suggestedActions: [],
+    analysisStatus: 'idle',
+    createdAt: now,
+    updatedAt: now
+  }
+
+  database.notes.unshift(note)
+
+  const stored = await writeNeuronotesDatabase(context.dbPath, database)
+  const created = stored.notes.find((item) => item.id === note.id) ?? note
+
+  return {
+    schema: 'neuronotes.mcp.write-note.v1',
+    writeMode: 'enabled',
+    message: 'Nota creada desde MCP y pendiente de analisis en Neuronotes.',
+    databasePath: context.dbPath,
+    note: {
+      ...noteSummary(created, 1),
+      content: created.content
+    },
+    next: {
+      analysisStatus: created.analysisStatus,
+      qwenQueue: 'pending',
+      reason: 'La app puede analizar esta nota despues con Qwen/RAG o fallback local.'
+    }
+  }
+}
+
+function mcpNoteTitle(value, content) {
+  const explicit = stringArg(value)
+
+  if (explicit) {
+    return excerpt(explicit, 120)
+  }
+
+  const firstLine = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean)
+
+  return excerpt(firstLine || 'Nota MCP', 120)
+}
+
+function uniqueNormalizedTags(values) {
+  const unique = new Set()
+
+  for (const tag of arrayArg(values).map(normalizeTag).filter(Boolean)) {
+    unique.add(tag)
+  }
+
+  return [...unique]
 }
 
 function noteGraph(database, args = {}) {
@@ -1172,11 +1346,12 @@ function buildToolCallDraft(action, note) {
   }
 }
 
-function librarySummary(database, dbPath) {
+function librarySummary(database, dbPath, context = {}) {
   const categoryCounts = countBy(database.notes, (note) => note.category)
   const statusCounts = countBy(database.notes, (note) => note.analysisStatus)
   const actionCounts = countBy(database.actions, (action) => action.status)
   const approvedActionCount = database.actions.filter((action) => action.status === 'open' && action.mcpApprovedAt).length
+  const writeEnabled = isWriteEnabled(context)
 
   return {
     schema: 'neuronotes.mcp.summary.v1',
@@ -1196,8 +1371,9 @@ function librarySummary(database, dbPath) {
     analysisStatuses: statusCounts,
     actionStatuses: actionCounts,
     execution: {
-      mode: 'read-only-context',
-      canModifyNotes: false,
+      mode: writeEnabled ? 'write-enabled-notes' : 'read-only-context',
+      canModifyNotes: writeEnabled,
+      canCreateNotes: writeEnabled,
       canExecuteExternalTools: false,
       requiresUserApprovalForFollowUp: true
     }
@@ -1872,12 +2048,13 @@ function writeMessage(message) {
 
 async function runStdioServer(options) {
   const dbPath = resolveDatabasePath(options)
+  const writeEnabled = options.writeEnabled === true
   const lines = createInterface({
     input: process.stdin,
     crlfDelay: Number.POSITIVE_INFINITY
   })
 
-  process.stderr.write(`Neuronotes MCP stdio server reading ${dbPath}\n`)
+  process.stderr.write(`Neuronotes MCP stdio server reading ${dbPath}${writeEnabled ? ' with write tools enabled' : ''}\n`)
 
   for await (const line of lines) {
     const trimmed = line.trim()
@@ -1887,7 +2064,7 @@ async function runStdioServer(options) {
     }
 
     try {
-      const response = await handleMcpMessage(JSON.parse(trimmed), { dbPath })
+      const response = await handleMcpMessage(JSON.parse(trimmed), { dbPath, writeEnabled })
 
       if (response) {
         writeMessage(response)

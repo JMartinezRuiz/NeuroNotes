@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -23,6 +23,8 @@ describe('neuronotes MCP server', () => {
 
     expect(resolveDatabasePath(options)).toBe(path.resolve(dbPath))
     expect(resolveDatabasePath(parseCliArgs(['--user-data', tempDir]))).toBe(path.join(tempDir, 'neuronotes.json'))
+    expect(parseCliArgs(['--db', dbPath, '--write']).writeEnabled).toBe(true)
+    expect(parseCliArgs(['--db', dbPath, '--write', '--read-only']).writeEnabled).toBe(false)
   })
 
   it('handles MCP initialize and tools/list requests', async () => {
@@ -65,6 +67,29 @@ describe('neuronotes MCP server', () => {
       'neuronotes_library_summary',
       'neuronotes_qwen_setup',
       'neuronotes_finetune_readiness'
+    ])
+
+    const writeResponse = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/list',
+        params: {}
+      },
+      { dbPath, writeEnabled: true }
+    )
+
+    expect(writeResponse.result.tools.map((tool) => tool.name)).toEqual([
+      'neuronotes_search_notes',
+      'neuronotes_get_note',
+      'neuronotes_note_graph',
+      'neuronotes_analysis_queue',
+      'neuronotes_list_open_actions',
+      'neuronotes_mcp_handoff',
+      'neuronotes_library_summary',
+      'neuronotes_qwen_setup',
+      'neuronotes_finetune_readiness',
+      'neuronotes_create_note'
     ])
   })
 
@@ -895,8 +920,76 @@ describe('neuronotes MCP server', () => {
       execution: {
         mode: 'read-only-context',
         canModifyNotes: false,
+        canCreateNotes: false,
         canExecuteExternalTools: false,
         requiresUserApprovalForFollowUp: true
+      }
+    })
+  })
+
+  it('creates notes only when MCP write mode is explicitly enabled', async () => {
+    await expect(
+      callTool(
+        'neuronotes_create_note',
+        {
+          title: 'Captura desde MCP',
+          content: 'Nueva idea capturada desde un host MCP autorizado.',
+          category: 'Ideas',
+          tags: ['#MCP', 'Qwen', 'mcp']
+        },
+        { dbPath }
+      )
+    ).rejects.toThrow('MCP write mode is disabled')
+
+    const created = await callTool(
+      'neuronotes_create_note',
+      {
+        title: 'Captura desde MCP',
+        content: 'Nueva idea capturada desde un host MCP autorizado.',
+        category: 'Ideas',
+        tags: ['#MCP', 'Qwen', 'mcp']
+      },
+      { dbPath, writeEnabled: true }
+    )
+
+    expect(created).toMatchObject({
+      schema: 'neuronotes.mcp.write-note.v1',
+      writeMode: 'enabled',
+      note: {
+        title: 'Captura desde MCP',
+        category: 'Ideas',
+        tags: ['mcp', 'qwen'],
+        analysisStatus: 'idle',
+        content: 'Nueva idea capturada desde un host MCP autorizado.'
+      },
+      next: {
+        analysisStatus: 'idle',
+        qwenQueue: 'pending'
+      }
+    })
+
+    const database = await readNeuronotesDatabase(dbPath)
+    expect(database.notes[0]).toMatchObject({
+      id: created.note.id,
+      title: 'Captura desde MCP',
+      analysisStatus: 'idle',
+      related: [],
+      suggestedActions: []
+    })
+
+    const backup = JSON.parse(await readFile(path.join(tempDir, 'neuronotes.json.bak'), 'utf8'))
+    expect(backup.notes[0]).toMatchObject({
+      id: created.note.id,
+      title: 'Captura desde MCP'
+    })
+
+    await expect(callTool('neuronotes_library_summary', {}, { dbPath, writeEnabled: true })).resolves.toMatchObject({
+      noteCount: 3,
+      execution: {
+        mode: 'write-enabled-notes',
+        canModifyNotes: true,
+        canCreateNotes: true,
+        canExecuteExternalTools: false
       }
     })
   })
