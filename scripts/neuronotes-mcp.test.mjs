@@ -250,6 +250,34 @@ describe('neuronotes MCP server', () => {
     })
   })
 
+  it('searches AI actions and stored RAG audit context', async () => {
+    const actionResult = await callTool(
+      'neuronotes_search_notes',
+      {
+        query: 'reminder.create'
+      },
+      { dbPath }
+    )
+
+    expect(actionResult.notes[0]).toMatchObject({
+      id: 'note-health',
+      suggestedActionCount: 1
+    })
+
+    const ragResult = await callTool(
+      'neuronotes_search_notes',
+      {
+        query: 'contexto recuperado rag'
+      },
+      { dbPath }
+    )
+
+    expect(ragResult.notes[0]).toMatchObject({
+      id: 'note-health',
+      analysisProvider: 'qwen'
+    })
+  })
+
   it('returns a full note with saved actions and RAG audit context', async () => {
     const response = await handleMcpMessage(
       {

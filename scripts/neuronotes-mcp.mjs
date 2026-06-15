@@ -922,6 +922,22 @@ function scoreNote(note, query, tags) {
   const content = normalizeText(note.content)
   const category = normalizeText(note.category)
   const noteTags = normalizeText(note.tags.join(' '))
+  const related = normalizeText(note.related.map((item) => `${item.title} ${item.reason}`).join(' '))
+  const actions = normalizeText(
+    note.suggestedActions
+      .map((action) => `${action.kind} ${action.title} ${action.detail} ${action.toolHint ?? ''}`)
+      .join(' ')
+  )
+  const rag = normalizeText(
+    [
+      note.analysisRun?.provider ?? '',
+      note.analysisRun?.model ?? '',
+      note.analysisRun?.ragNoteIds?.join(' ') ?? '',
+      ...(note.analysisRun?.ragContext ?? []).map(
+        (item) => `${item.title} ${item.category} ${item.tags.join(' ')} ${item.reason} ${item.excerpt}`
+      )
+    ].join(' ')
+  )
   const terms = query.split(/\s+/).filter(Boolean)
 
   if (title.includes(query)) {
@@ -936,6 +952,12 @@ function scoreNote(note, query, tags) {
   if (category.includes(query) || noteTags.includes(query)) {
     score += 2
   }
+  if (actions.includes(query)) {
+    score += 2.4
+  }
+  if (related.includes(query) || rag.includes(query)) {
+    score += 1.8
+  }
 
   for (const term of terms) {
     if (title.includes(term)) {
@@ -949,6 +971,12 @@ function scoreNote(note, query, tags) {
     }
     if (noteTags.includes(term)) {
       score += 1.2
+    }
+    if (actions.includes(term)) {
+      score += 1.1
+    }
+    if (related.includes(term) || rag.includes(term)) {
+      score += 0.8
     }
   }
 

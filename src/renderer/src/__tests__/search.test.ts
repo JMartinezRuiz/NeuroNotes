@@ -40,6 +40,50 @@ describe('noteMatchesSearch', () => {
     expect(noteMatchesSearch(note({ tags: ['accion', 'medico'] }), 'm\u00e9dico')).toBe(true)
   })
 
+  it('matches AI-generated actions, related notes, and stored RAG audit context', () => {
+    const source = note({
+      related: [
+        {
+          noteId: 'roadmap',
+          title: 'Roadmap Neuronotes',
+          score: 0.82,
+          reason: 'Ambas notas tratan MCP local.'
+        }
+      ],
+      suggestedActions: [
+        {
+          kind: 'reminder',
+          title: 'Crear seguimiento',
+          detail: 'La nota pide agendar un recordatorio.',
+          toolHint: 'reminder.create',
+          confidence: 0.79
+        }
+      ],
+      analysisRun: {
+        provider: 'qwen',
+        model: 'qwen3.5:0.8b',
+        analyzedAt: '2026-06-15T00:01:00.000Z',
+        durationMs: 900,
+        ragNoteIds: ['rag-context'],
+        ragContext: [
+          {
+            noteId: 'rag-context',
+            title: 'Contexto RAG local',
+            category: 'Proyecto',
+            tags: ['qwen', 'rag'],
+            score: 0.74,
+            reason: 'Contexto recuperado por RAG local.',
+            excerpt: 'Neuronotes usa Qwen 0.8B para enlazar notas.'
+          }
+        ]
+      }
+    })
+
+    expect(noteMatchesSearch(source, 'reminder.create')).toBe(true)
+    expect(noteMatchesSearch(source, 'roadmap mcp')).toBe(true)
+    expect(noteMatchesSearch(source, 'contexto rag qwen')).toBe(true)
+  })
+
   it('returns false when the query is not present', () => {
     expect(noteMatchesSearch(note(), 'finanzas')).toBe(false)
   })
