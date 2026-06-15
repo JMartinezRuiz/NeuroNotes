@@ -13,6 +13,7 @@ import {
   NoteRecord,
   NOTE_CATEGORIES,
   PullModelResult,
+  RagContextItem,
   RelatedNote,
   SuggestedAction,
   SuggestedActionKind
@@ -257,7 +258,7 @@ export async function analyzeNote(
       ...qwenResult,
       related: mergedRelated,
       status: 'qwen',
-      analysisRun: createAnalysisRun('qwen', settings, startedAt, ragContext.noteIds)
+      analysisRun: createAnalysisRun('qwen', settings, startedAt, ragContext.items)
     }
   } catch (error) {
     const fallback = fallbackAnalysis(note, localRelated)
@@ -266,7 +267,7 @@ export async function analyzeNote(
       ...fallback,
       status: 'fallback',
       error: error instanceof Error ? error.message : 'No se pudo analizar con Qwen',
-      analysisRun: createAnalysisRun('local', settings, startedAt, ragContext.noteIds)
+      analysisRun: createAnalysisRun('local', settings, startedAt, ragContext.items)
     }
   }
 }
@@ -579,14 +580,15 @@ function createAnalysisRun(
   provider: AnalysisProvider,
   settings: AppSettings,
   startedAt: number,
-  ragNoteIds: string[]
+  ragContext: RagContextItem[]
 ): AnalysisRun {
   return {
     provider,
     model: settings.model,
     analyzedAt: new Date().toISOString(),
     durationMs: Math.max(0, Date.now() - startedAt),
-    ragNoteIds
+    ragNoteIds: ragContext.map((item) => item.noteId),
+    ragContext
   }
 }
 

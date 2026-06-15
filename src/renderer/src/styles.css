@@ -1065,6 +1065,53 @@ button:disabled {
   background: #e5f4ec;
 }
 
+.rag-context-list {
+  display: grid;
+  gap: 8px;
+}
+
+.rag-context-list button {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 10px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  text-align: left;
+}
+
+.rag-context-list button:hover {
+  border-color: rgba(31, 122, 100, 0.32);
+  background: #e5f4ec;
+}
+
+.rag-context-list span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rag-context-list strong,
+.rag-context-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rag-context-list strong {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.rag-context-list small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .action-list {
   display: grid;
   gap: 8px;

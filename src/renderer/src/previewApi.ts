@@ -41,7 +41,18 @@ let notes: NoteRecord[] = [
       model: settings.model,
       analyzedAt: new Date(Date.now() - 1000 * 60 * 40).toISOString(),
       durationMs: 842,
-      ragNoteIds: ['preview-ui']
+      ragNoteIds: ['preview-ui'],
+      ragContext: [
+        {
+          noteId: 'preview-ui',
+          title: 'Interfaz minimalista',
+          category: 'Ideas',
+          tags: ['ui', 'minimalismo', 'escritura'],
+          score: 0.82,
+          reason: 'Ambas notas tratan la experiencia principal de Neuronotes.',
+          excerpt: 'Mantener una superficie similar a Notion o OneNote: limpia, rapida y enfocada en escribir.'
+        }
+      ]
     },
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
     updatedAt: new Date(Date.now() - 1000 * 60 * 40).toISOString()
@@ -77,7 +88,18 @@ let notes: NoteRecord[] = [
       model: settings.model,
       analyzedAt: new Date(Date.now() - 1000 * 60 * 55).toISOString(),
       durationMs: 14,
-      ragNoteIds: ['preview-roadmap']
+      ragNoteIds: ['preview-roadmap'],
+      ragContext: [
+        {
+          noteId: 'preview-roadmap',
+          title: 'Roadmap Neuronotes',
+          category: 'Proyecto',
+          tags: ['roadmap', 'producto', 'notas'],
+          score: 0.74,
+          reason: 'El roadmap alimenta el contexto visual de la nota.',
+          excerpt: 'Definir una experiencia de notas rapidas con resumen automatico, categorias limpias y enlaces entre ideas relacionadas.'
+        }
+      ]
     },
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
     updatedAt: new Date(Date.now() - 1000 * 60 * 55).toISOString()
@@ -272,7 +294,20 @@ export function createPreviewApi(): Api {
         model: settings.model,
         analyzedAt: new Date().toISOString(),
         durationMs: 12,
-        ragNoteIds: note.related.map((related) => related.noteId)
+        ragNoteIds: note.related.map((related) => related.noteId),
+        ragContext: note.related.map((related) => {
+          const candidate = notes.find((item) => item.id === related.noteId)
+
+          return {
+            noteId: related.noteId,
+            title: related.title,
+            category: candidate?.category ?? 'Inbox',
+            tags: candidate?.tags ?? [],
+            score: related.score,
+            reason: related.reason,
+            excerpt: candidate?.content.replace(/\s+/g, ' ').slice(0, 180) ?? ''
+          }
+        })
       }
       note.updatedAt = new Date().toISOString()
       return note
@@ -301,7 +336,19 @@ export function createPreviewApi(): Api {
           model: settings.model,
           analyzedAt: new Date().toISOString(),
           durationMs: 860,
-          ragNoteIds: notes.filter((candidate) => candidate.id !== note.id).slice(0, 3).map((candidate) => candidate.id)
+          ragNoteIds: notes.filter((candidate) => candidate.id !== note.id).slice(0, 3).map((candidate) => candidate.id),
+          ragContext: notes
+            .filter((candidate) => candidate.id !== note.id)
+            .slice(0, 3)
+            .map((candidate) => ({
+              noteId: candidate.id,
+              title: candidate.title,
+              category: candidate.category,
+              tags: candidate.tags,
+              score: 0.66,
+              reason: 'Contexto simulado para vista previa.',
+              excerpt: candidate.content.replace(/\s+/g, ' ').slice(0, 180)
+            }))
         }
         note.updatedAt = new Date().toISOString()
         lastUpdatedId = note.id

@@ -7,6 +7,16 @@ export interface RelatedNote {
   reason: string
 }
 
+export interface RagContextItem {
+  noteId: string
+  title: string
+  category: string
+  tags: string[]
+  score: number
+  reason: string
+  excerpt: string
+}
+
 export type SuggestedActionKind = 'task' | 'reminder' | 'research' | 'mcp'
 
 export interface SuggestedAction {
@@ -41,6 +51,7 @@ export interface AnalysisRun {
   analyzedAt: string
   durationMs: number
   ragNoteIds: string[]
+  ragContext?: RagContextItem[]
 }
 
 export interface NoteRecord {

@@ -23,6 +23,14 @@ export function noteToMarkdown(note: NoteRecord, localActions: ActionItem[] = []
         })
         .join('\n')
     : '- Sin acciones guardadas'
+  const ragContext = note.analysisRun?.ragContext?.length
+    ? note.analysisRun.ragContext
+        .map((item) => {
+          const tags = item.tags.length > 0 ? ` #${item.tags.map(escapeMarkdown).join(' #')}` : ''
+          return `- ${escapeMarkdown(item.title)} (${Math.round(item.score * 100)}%, ${escapeMarkdown(item.category)}${tags}): ${escapeMarkdown(item.excerpt || item.reason)}`
+        })
+        .join('\n')
+    : '- Sin contexto RAG guardado'
 
   return [
     `# ${escapeMarkdown(note.title)}`,
@@ -50,6 +58,10 @@ export function noteToMarkdown(note: NoteRecord, localActions: ActionItem[] = []
     '## Plan local',
     '',
     plan,
+    '',
+    '## Contexto RAG',
+    '',
+    ragContext,
     ''
   ].join('\n')
 }

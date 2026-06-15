@@ -10,6 +10,7 @@ import {
   DatabaseFile,
   DEFAULT_SETTINGS,
   NoteRecord,
+  RagContextItem,
   RelatedNote,
   SuggestedAction,
   SuggestedActionKind
@@ -299,8 +300,51 @@ function normalizeAnalysisRun(value: unknown): AnalysisRun | undefined {
           .map((id) => id.trim())
           .filter(Boolean)
           .slice(0, 8)
-      : []
+      : [],
+    ragContext: normalizeRagContext(source.ragContext)
   }
+}
+
+function normalizeRagContext(value: unknown): RagContextItem[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return undefined
+      }
+
+      const source = item as Partial<RagContextItem>
+      const noteId = typeof source.noteId === 'string' ? source.noteId.trim() : ''
+      const title = typeof source.title === 'string' && source.title.trim() ? source.title.trim().slice(0, 90) : ''
+
+      if (!noteId || !title) {
+        return undefined
+      }
+
+      return {
+        noteId,
+        title,
+        category:
+          typeof source.category === 'string' && source.category.trim()
+            ? source.category.trim().slice(0, 40)
+            : 'Inbox',
+        tags: normalizeTags(source.tags).slice(0, 8),
+        score: Math.max(0, Math.min(1, Number.isFinite(source.score) ? Number(source.score) : 0)),
+        reason:
+          typeof source.reason === 'string' && source.reason.trim()
+            ? source.reason.trim().slice(0, 140)
+            : 'Contexto recuperado por RAG local.',
+        excerpt:
+          typeof source.excerpt === 'string' && source.excerpt.trim()
+            ? source.excerpt.trim().replace(/\s+/g, ' ').slice(0, 550)
+            : ''
+      } satisfies RagContextItem
+    })
+    .filter((item): item is RagContextItem => Boolean(item))
+    .slice(0, 5)
 }
 
 function normalizeSuggestedActions(value: unknown): SuggestedAction[] {

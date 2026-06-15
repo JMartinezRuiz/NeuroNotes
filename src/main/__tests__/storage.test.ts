@@ -118,7 +118,22 @@ describe('normalizeDatabase', () => {
             model: ' qwen3.5:0.8b ',
             analyzedAt: '2026-06-15T00:00:00.000Z',
             durationMs: -20,
-            ragNoteIds: ['target', '', 14]
+            ragNoteIds: ['target', '', 14],
+            ragContext: [
+              {
+                noteId: 'target',
+                title: '  Contexto RAG  ',
+                category: ' Proyecto ',
+                tags: ['#Qwen', 'local'],
+                score: 5,
+                reason: '',
+                excerpt: '  Extracto   con   espacios  '
+              },
+              {
+                noteId: '',
+                title: 'No entra'
+              }
+            ]
           }
         },
         {
@@ -177,7 +192,18 @@ describe('normalizeDatabase', () => {
         model: 'qwen3.5:0.8b',
         analyzedAt: '2026-06-15T00:00:00.000Z',
         durationMs: 0,
-        ragNoteIds: ['target']
+        ragNoteIds: ['target'],
+        ragContext: [
+          {
+            noteId: 'target',
+            title: 'Contexto RAG',
+            category: 'Proyecto',
+            tags: ['qwen', 'local'],
+            score: 1,
+            reason: 'Contexto recuperado por RAG local.',
+            excerpt: 'Extracto con espacios'
+          }
+        ]
       },
       related: [
         {

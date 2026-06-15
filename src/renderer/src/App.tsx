@@ -217,6 +217,7 @@ export default function App(): JSX.Element {
       .map((id) => notesById.get(id))
       .filter((note): note is NoteRecord => Boolean(note))
   }, [notes, selectedNote])
+  const analysisContextItems = selectedNote?.analysisRun?.ragContext ?? []
   const networkNodes = useMemo(() => {
     const visibleConnections = selectedConnections.slice(0, 8)
 
@@ -1266,7 +1267,26 @@ export default function App(): JSX.Element {
                     <span>{selectedNote.analysisRun.model}</span>
                     <small>{formatDate(selectedNote.analysisRun.analyzedAt)}</small>
                   </div>
-                  {analysisContextNotes.length > 0 && (
+                  {analysisContextItems.length > 0 ? (
+                    <div className="rag-context-list">
+                      {analysisContextItems.map((item) => (
+                        <button
+                          type="button"
+                          key={item.noteId}
+                          onClick={() => setSelectedId(item.noteId)}
+                          title="Abrir nota de contexto"
+                        >
+                          <span>
+                            <strong>{item.title}</strong>
+                            <small>
+                              {item.category} - {Math.round(item.score * 100)}%
+                            </small>
+                          </span>
+                          <small>{item.excerpt || item.reason}</small>
+                        </button>
+                      ))}
+                    </div>
+                  ) : analysisContextNotes.length > 0 ? (
                     <div className="analysis-context">
                       {analysisContextNotes.map((note) => (
                         <button
@@ -1279,7 +1299,7 @@ export default function App(): JSX.Element {
                         </button>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </section>
               )}
 

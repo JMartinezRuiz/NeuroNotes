@@ -30,6 +30,24 @@ function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
       }
     ],
     analysisStatus: 'qwen',
+    analysisRun: {
+      provider: 'qwen',
+      model: 'qwen3.5:0.8b',
+      analyzedAt: now,
+      durationMs: 840,
+      ragNoteIds: ['note-2'],
+      ragContext: [
+        {
+          noteId: 'note-2',
+          title: 'Interfaz minimalista',
+          category: 'Ideas',
+          tags: ['ui', 'notas'],
+          score: 0.82,
+          reason: 'Comparte contexto de producto.',
+          excerpt: 'Direccion visual para una interfaz sobria y centrada en escritura.'
+        }
+      ]
+    },
     createdAt: now,
     updatedAt: now,
     ...overrides
@@ -66,16 +84,19 @@ describe('noteToMarkdown', () => {
     expect(markdown).toContain('- Crear tarea (task, 75%) [task\\.create]: Convertir esta nota en una tarea local\\.')
     expect(markdown).toContain('## Plan local')
     expect(markdown).toContain('- [ ] Crear tarea (task) [task\\.create]: Convertir esta nota en una tarea local\\.')
+    expect(markdown).toContain('## Contexto RAG')
+    expect(markdown).toContain('- Interfaz minimalista (82%, Ideas #ui #notas): Direccion visual para una interfaz sobria y centrada en escritura\\.')
   })
 
   it('uses stable fallbacks when summary, tags, or links are missing', () => {
-    const markdown = noteToMarkdown(note({ summary: '', tags: [], related: [], suggestedActions: [] }))
+    const markdown = noteToMarkdown(note({ summary: '', tags: [], related: [], suggestedActions: [], analysisRun: undefined }))
 
     expect(markdown).toContain('> Sin resumen')
     expect(markdown).toContain('- Etiquetas: Sin etiquetas')
     expect(markdown).toContain('- Sin notas enlazadas')
     expect(markdown).toContain('- Sin acciones sugeridas')
     expect(markdown).toContain('- Sin acciones guardadas')
+    expect(markdown).toContain('- Sin contexto RAG guardado')
   })
 })
 

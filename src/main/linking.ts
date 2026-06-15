@@ -1,4 +1,4 @@
-import { NoteRecord, RelatedNote } from './types'
+import { NoteRecord, RagContextItem, RelatedNote } from './types'
 
 const RECIPROCAL_REASON_PREFIX = 'Enlace reciproco:'
 
@@ -107,6 +107,7 @@ export function buildRagContextBundle(
   text: string
   related: RelatedNote[]
   noteIds: string[]
+  items: RagContextItem[]
 } {
   const related = rankRelatedNotes(note, notes).slice(0, 5)
 
@@ -114,22 +115,42 @@ export function buildRagContextBundle(
     return {
       text: 'No hay notas relacionadas todavia.',
       related,
-      noteIds: []
+      noteIds: [],
+      items: []
     }
   }
 
-  const text = related
-    .map((item) => {
+  const items = related
+    .map((item): RagContextItem | undefined => {
       const candidate = notes.find((noteItem) => noteItem.id === item.noteId)
-      const excerpt = candidate?.content.replace(/\s+/g, ' ').slice(0, 550) ?? ''
-      return `ID: ${item.noteId}\nTitulo: ${item.title}\nCategoria: ${candidate?.category ?? 'Inbox'}\nEtiquetas: ${(candidate?.tags ?? []).join(', ')}\nExtracto: ${excerpt}`
+
+      if (!candidate) {
+        return undefined
+      }
+
+      return {
+        noteId: item.noteId,
+        title: item.title,
+        category: candidate.category,
+        tags: candidate.tags,
+        score: item.score,
+        reason: item.reason,
+        excerpt: candidate.content.replace(/\s+/g, ' ').trim().slice(0, 550)
+      }
+    })
+    .filter((item): item is RagContextItem => Boolean(item))
+
+  const text = items
+    .map((item) => {
+      return `ID: ${item.noteId}\nTitulo: ${item.title}\nCategoria: ${item.category}\nEtiquetas: ${item.tags.join(', ')}\nPuntuacion: ${Math.round(item.score * 100)}%\nMotivo: ${item.reason}\nExtracto: ${item.excerpt}`
     })
     .join('\n\n')
 
   return {
     text,
     related,
-    noteIds: related.map((item) => item.noteId)
+    noteIds: items.map((item) => item.noteId),
+    items
   }
 }
 

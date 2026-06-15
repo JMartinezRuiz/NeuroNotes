@@ -153,7 +153,15 @@ describe('analyzeNote', () => {
       analysisRun: {
         provider: 'qwen',
         model: 'qwen3.5:0.8b',
-        ragNoteIds: ['context-note']
+        ragNoteIds: ['context-note'],
+        ragContext: [
+          expect.objectContaining({
+            noteId: 'context-note',
+            title: 'Roadmap RAG local',
+            category: 'Proyecto',
+            tags: ['qwen', 'rag']
+          })
+        ]
       },
       suggestedActions: [
         {
@@ -198,6 +206,8 @@ describe('analyzeNote', () => {
     expect(body.prompt).toContain('Contexto recuperado:')
     expect(body.prompt).toContain('ID: context-note')
     expect(body.prompt).toContain('Titulo: Roadmap RAG local')
+    expect(body.prompt).toContain('Puntuacion:')
+    expect(body.prompt).toContain('Motivo:')
     expect(body.prompt).toContain('No inventes IDs')
     expect(body.prompt).toContain('suggestedActions')
     expect(body.prompt).toContain('futura capa MCP')
@@ -268,7 +278,13 @@ describe('analyzeNote', () => {
       analysisRun: {
         provider: 'local',
         model: 'qwen3.5:0.8b',
-        ragNoteIds: ['related']
+        ragNoteIds: ['related'],
+        ragContext: [
+          expect.objectContaining({
+            noteId: 'related',
+            title: 'Roadmap de producto'
+          })
+        ]
       },
       suggestedActions: [
         expect.objectContaining({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRagContext, rankRelatedNotes, synchronizeRelatedGraph } from '../linking'
+import { buildRagContext, buildRagContextBundle, rankRelatedNotes, synchronizeRelatedGraph } from '../linking'
 import { NoteRecord } from '../types'
 
 function note(overrides: Partial<NoteRecord> & Pick<NoteRecord, 'id' | 'content'>): NoteRecord {
@@ -72,7 +72,20 @@ describe('buildRagContext', () => {
 
     expect(context).toContain('ID: candidate')
     expect(context).toContain('Titulo: RAG local')
+    expect(context).toContain('Puntuacion:')
+    expect(context).toContain('Motivo:')
     expect(context).toContain('Extracto:')
+
+    const bundle = buildRagContextBundle(source, [source, candidate])
+
+    expect(bundle.noteIds).toEqual(['candidate'])
+    expect(bundle.items[0]).toMatchObject({
+      noteId: 'candidate',
+      title: 'RAG local',
+      category: 'Proyecto',
+      tags: ['qwen']
+    })
+    expect(bundle.items[0].excerpt).toContain('El contexto recuperado')
   })
 })
 
