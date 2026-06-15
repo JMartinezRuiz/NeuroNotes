@@ -150,12 +150,15 @@ const previewMcpConfig = () => {
   const databasePath = 'C:\\Users\\you\\AppData\\Roaming\\Neuronotes\\neuronotes.json'
   const command = 'node'
   const args = [serverPath, '--db', databasePath]
+  const writeArgs = [...args, '--write']
 
   return {
     schema: 'neuronotes.mcp-config.v1',
     serverName: 'neuronotes',
+    writeServerName: 'neuronotes-capture',
     command,
     args,
+    writeArgs,
     databasePath,
     serverPath,
     hostConfigJson: `${JSON.stringify(
@@ -164,6 +167,18 @@ const previewMcpConfig = () => {
           neuronotes: {
             command,
             args
+          }
+        }
+      },
+      null,
+      2
+    )}\n`,
+    writeHostConfigJson: `${JSON.stringify(
+      {
+        mcpServers: {
+          'neuronotes-capture': {
+            command,
+            args: writeArgs
           }
         }
       },
@@ -619,6 +634,11 @@ export function createPreviewApi(): Api {
     copyMcpConfig: async () => {
       const config = previewMcpConfig()
       await navigator.clipboard?.writeText(config.hostConfigJson)
+      return config
+    },
+    copyMcpWriteConfig: async () => {
+      const config = previewMcpConfig()
+      await navigator.clipboard?.writeText(config.writeHostConfigJson)
       return config
     },
     exportMcpHandoff: async () => ({

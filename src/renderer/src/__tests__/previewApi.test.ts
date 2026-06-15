@@ -36,6 +36,40 @@ describe('createPreviewApi', () => {
     expect(result.command).toContain('Invoke-RestMethod -Uri $generateUrl')
   })
 
+  it('exposes separate read-only and write-enabled MCP host configs in preview', async () => {
+    const api = createPreviewApi()
+    const config = await api.getMcpConfig()
+
+    expect(JSON.parse(config.hostConfigJson)).toEqual({
+      mcpServers: {
+        neuronotes: {
+          command: 'node',
+          args: [
+            'C:\\Program Files\\Neuronotes\\resources\\mcp\\neuronotes-mcp.mjs',
+            '--db',
+            'C:\\Users\\you\\AppData\\Roaming\\Neuronotes\\neuronotes.json'
+          ]
+        }
+      }
+    })
+    expect(JSON.parse(config.writeHostConfigJson)).toEqual({
+      mcpServers: {
+        'neuronotes-capture': {
+          command: 'node',
+          args: [
+            'C:\\Program Files\\Neuronotes\\resources\\mcp\\neuronotes-mcp.mjs',
+            '--db',
+            'C:\\Users\\you\\AppData\\Roaming\\Neuronotes\\neuronotes.json',
+            '--write'
+          ]
+        }
+      }
+    })
+
+    const copied = await api.copyMcpWriteConfig()
+    expect(copied.writeArgs).toContain('--write')
+  })
+
   it('supports local and Qwen modes for single-note analysis', async () => {
     const api = createPreviewApi()
 

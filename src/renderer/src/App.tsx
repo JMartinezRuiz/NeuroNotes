@@ -442,7 +442,8 @@ export default function App(): JSX.Element {
     busy === 'import' ||
     busy === 'exportMcp' ||
     busy === 'exportDataset' ||
-    busy === 'copyMcpConfig'
+    busy === 'copyMcpConfig' ||
+    busy === 'copyMcpWriteConfig'
 
   const filteredNotes = useMemo(() => {
     const categoryFilteredNotes =
@@ -1165,9 +1166,22 @@ export default function App(): JSX.Element {
     try {
       const config = await api.copyMcpConfig()
       setMcpConfig(config)
-      setMcpMessage('Configuracion MCP copiada.')
+      setMcpMessage('Configuracion MCP read-only copiada.')
     } catch (error) {
       setMcpMessage(error instanceof Error ? error.message : 'No se pudo copiar la configuracion MCP')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function copyMcpWriteConfig(): Promise<void> {
+    setBusy('copyMcpWriteConfig')
+    try {
+      const config = await api.copyMcpWriteConfig()
+      setMcpConfig(config)
+      setMcpMessage('Configuracion MCP de captura copiada.')
+    } catch (error) {
+      setMcpMessage(error instanceof Error ? error.message : 'No se pudo copiar la configuracion MCP de captura')
     } finally {
       setBusy(null)
     }
@@ -1698,29 +1712,55 @@ export default function App(): JSX.Element {
               <div className="mcp-card-header">
                 <span>
                   <strong>MCP local</strong>
-                  <small>{mcpMessage || 'Servidor read-only para exponer notas, RAG y acciones guardadas.'}</small>
+                  <small>{mcpMessage || 'Configura lectura segura o captura opt-in desde hosts MCP locales.'}</small>
                 </span>
                 <button
                   type="button"
                   onClick={copyMcpConfig}
-                  disabled={busy === 'copyMcpConfig'}
-                  title="Copiar configuracion MCP"
+                  disabled={busy === 'copyMcpConfig' || busy === 'copyMcpWriteConfig'}
+                  title="Copiar configuracion MCP read-only"
                 >
                   {busy === 'copyMcpConfig' ? <Loader2 className="spin" size={16} /> : <Copy size={16} />}
-                  Copiar config
+                  Copiar lectura
+                </button>
+                <button
+                  type="button"
+                  onClick={copyMcpWriteConfig}
+                  disabled={busy === 'copyMcpConfig' || busy === 'copyMcpWriteConfig'}
+                  title="Copiar configuracion MCP para capturar notas"
+                >
+                  {busy === 'copyMcpWriteConfig' ? <Loader2 className="spin" size={16} /> : <Plus size={16} />}
+                  Copiar captura
                 </button>
               </div>
-              <div className="mcp-path-grid">
-                <span>
-                  <small>Comando</small>
+              <div className="mcp-mode-grid">
+                <section>
+                  <span>
+                    <strong>Lectura</strong>
+                    <small>Notas, RAG, acciones y handoff sin modificar la biblioteca.</small>
+                  </span>
                   <code>{mcpConfig ? `${mcpConfig.command} ${mcpConfig.args.map((arg) => `"${arg}"`).join(' ')}` : 'Cargando...'}</code>
-                </span>
+                  <pre>{mcpConfig?.hostConfigJson.trim() ?? '{ "mcpServers": {} }'}</pre>
+                </section>
+                <section>
+                  <span>
+                    <strong>Captura</strong>
+                    <small>Crea notas nuevas pendientes de analisis; no ejecuta herramientas externas.</small>
+                  </span>
+                  <code>{mcpConfig ? `${mcpConfig.command} ${mcpConfig.writeArgs.map((arg) => `"${arg}"`).join(' ')}` : 'Cargando...'}</code>
+                  <pre>{mcpConfig?.writeHostConfigJson.trim() ?? '{ "mcpServers": {} }'}</pre>
+                </section>
+              </div>
+              <div className="mcp-path-grid">
                 <span>
                   <small>Base local</small>
                   <code>{mcpConfig?.databasePath ?? 'Cargando...'}</code>
                 </span>
+                <span>
+                  <small>Servidor</small>
+                  <code>{mcpConfig?.serverPath ?? 'Cargando...'}</code>
+                </span>
               </div>
-              <pre>{mcpConfig?.hostConfigJson.trim() ?? '{ "mcpServers": {} }'}</pre>
             </div>
             <div className="library-card">
               <div>

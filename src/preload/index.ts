@@ -50,6 +50,7 @@ const api = {
   exportNoteMarkdown: (id: string): Promise<NoteMarkdownExportResult> => ipcRenderer.invoke('notes:exportMarkdown', id),
   getMcpConfig: (): Promise<McpConnectionConfig> => ipcRenderer.invoke('mcp:getConfig'),
   copyMcpConfig: (): Promise<McpConnectionConfig> => ipcRenderer.invoke('mcp:copyConfig'),
+  copyMcpWriteConfig: (): Promise<McpConnectionConfig> => ipcRenderer.invoke('mcp:copyWriteConfig'),
   exportMcpHandoff: (): Promise<McpHandoffExportResult> => ipcRenderer.invoke('mcp:exportHandoff'),
   exportFineTuneDataset: (): Promise<FineTuneDatasetExportResult> => ipcRenderer.invoke('finetune:exportDataset'),
   exportLibrary: (): Promise<LibraryExportResult> => ipcRenderer.invoke('library:export'),

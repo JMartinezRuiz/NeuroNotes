@@ -687,6 +687,16 @@ function registerIpcHandlers(): void {
     return config
   })
 
+  ipcMain.handle('mcp:copyWriteConfig', async () => {
+    const config = buildMcpConnectionConfig({
+      databasePath: databasePaths().data,
+      serverPath: resolveMcpServerPath()
+    })
+
+    clipboard.writeText(config.writeHostConfigJson)
+    return config
+  })
+
   ipcMain.handle('finetune:exportDataset', async () => {
     const database = await readDatabase()
     const exportedAt = new Date().toISOString()

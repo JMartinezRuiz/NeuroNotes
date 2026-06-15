@@ -65,7 +65,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - MCP handoff JSON export for open local actions, including tool summaries, action-kind summaries, tool hints, source-note context, and stored RAG snippets without executing external tools.
 - Read-only MCP stdio server for local hosts that need to search notes, read note context, inspect analysis queues, list open action intents, build MCP handoff packages, and inspect library/fine-tuning readiness.
 - Opt-in MCP write mode for trusted local hosts that need to capture new notes into Neuronotes without executing external tools.
-- MCP connection config is available from the app settings panel, including the stdio command, database path, and host-ready `mcpServers.neuronotes` JSON.
+- MCP connection config is available from the app settings panel, including separate host-ready JSON for read-only access and opt-in note capture.
 - Fine-tuning dataset JSONL export from user-reviewed analyzed notes, for future local Qwen tuning experiments without sending data outside the machine.
 - Fine-tuning readiness summary in settings, showing reviewed JSONL examples and analyzed notes still awaiting approval.
 - Reciprocal note graph synchronization, including review invalidation when automatic relationships change.
@@ -177,7 +177,9 @@ or:
 npm run mcp:stdio -- --db "$env:APPDATA\Neuronotes\neuronotes.json" --write
 ```
 
-The app settings panel can copy a host-ready MCP configuration snippet. It has this shape, with paths resolved for the current install and local database:
+The app settings panel can copy host-ready MCP configuration snippets with paths resolved for the current install and local database.
+
+Read-only context access:
 
 ```json
 {
@@ -188,6 +190,24 @@ The app settings panel can copy a host-ready MCP configuration snippet. It has t
         "<Neuronotes install dir>\\resources\\mcp\\neuronotes-mcp.mjs",
         "--db",
         "%APPDATA%\\Neuronotes\\neuronotes.json"
+      ]
+    }
+  }
+}
+```
+
+Opt-in note capture for trusted hosts:
+
+```json
+{
+  "mcpServers": {
+    "neuronotes-capture": {
+      "command": "node",
+      "args": [
+        "<Neuronotes install dir>\\resources\\mcp\\neuronotes-mcp.mjs",
+        "--db",
+        "%APPDATA%\\Neuronotes\\neuronotes.json",
+        "--write"
       ]
     }
   }

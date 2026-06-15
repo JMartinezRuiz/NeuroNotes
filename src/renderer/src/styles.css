@@ -907,6 +907,29 @@ button:disabled {
   min-width: 138px;
 }
 
+.mcp-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.mcp-mode-grid section {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(247, 245, 239, 0.58);
+}
+
+.mcp-mode-grid section > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
 .mcp-path-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -932,6 +955,8 @@ button:disabled {
 
 .mcp-card code {
   color: var(--ink);
+  overflow: auto;
+  white-space: nowrap;
 }
 
 .mcp-card pre {
@@ -2398,6 +2423,10 @@ button:disabled {
   }
 
   .mcp-path-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mcp-mode-grid {
     grid-template-columns: 1fr;
   }
 }

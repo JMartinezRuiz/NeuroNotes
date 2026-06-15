@@ -192,11 +192,14 @@ export interface McpHandoffExportResult {
 export interface McpConnectionConfig {
   schema: string
   serverName: string
+  writeServerName: string
   command: string
   args: string[]
+  writeArgs: string[]
   databasePath: string
   serverPath: string
   hostConfigJson: string
+  writeHostConfigJson: string
 }
 
 export interface FineTuneDatasetExportResult {
