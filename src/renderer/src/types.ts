@@ -6,6 +6,7 @@ export type AppCommand =
   | 'save-note'
   | 'analyze-note'
   | 'export-markdown'
+  | 'export-mcp-handoff'
   | 'import-library'
   | 'export-library'
   | 'toggle-settings'
@@ -171,6 +172,14 @@ export interface NoteMarkdownExportResult {
   message: string
   path?: string
   noteId: string
+}
+
+export interface McpHandoffExportResult {
+  ok: boolean
+  canceled: boolean
+  message: string
+  path?: string
+  actions: number
 }
 
 export const NOTE_CATEGORIES = [

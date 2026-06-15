@@ -32,6 +32,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Automatic summaries, categories, tags, and related-note suggestions.
 - Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
 - Local action plan: users can save suggested actions, mark them done, delete them, and carry them through library/Markdown export.
+- MCP handoff JSON export for open local actions, including tool hints and source-note context without executing external tools.
 - Reciprocal note graph synchronization.
 - Manual link and unlink controls.
 - Graph view for direct links, backlinks, and library connection counts.
@@ -51,8 +52,9 @@ The analysis flow is:
 5. The response is sanitized and merged with local related-note ranking.
 6. Suggested action intents are stored locally without executing external tools.
 7. The user can promote suggested actions into a local note plan before any future MCP tool execution is allowed.
-8. If Qwen is unavailable, the app uses local fallback categorization, summary, tags, links, and action hints.
-9. The note stores an audit record of the analysis run, including the retrieved RAG snippets.
+8. Open local actions can be exported as a Neuronotes MCP handoff JSON file for a future user-approved tool layer.
+9. If Qwen is unavailable, the app uses local fallback categorization, summary, tags, links, and action hints.
+10. The note stores an audit record of the analysis run, including the retrieved RAG snippets.
 
 Default model:
 
@@ -68,7 +70,7 @@ http://127.0.0.1:11434
 
 ## MCP Roadmap
 
-MCP is not wired into the shipped app yet. The intended direction is to let Neuronotes expose or consume MCP tools for advanced workflows such as:
+MCP tool execution is not wired into the shipped app yet. The intended direction is to let Neuronotes expose or consume MCP tools for advanced workflows such as:
 
 - Creating tasks, reminders, or calendar actions from notes.
 - Searching local documents and attaching findings to note context.
@@ -77,7 +79,7 @@ MCP is not wired into the shipped app yet. The intended direction is to let Neur
 
 When MCP lands, it should be added as a separate integration layer with clear permissions, tests, and UI indicators showing what data is being sent to a tool.
 
-The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. That field is intentionally inert today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
+The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, and manual-approval flags. That handoff is intentionally inert today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
 
 ## Local Setup
 

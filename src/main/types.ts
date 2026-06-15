@@ -161,6 +161,14 @@ export interface NoteMarkdownExportResult {
   noteId: string
 }
 
+export interface McpHandoffExportResult {
+  ok: boolean
+  canceled: boolean
+  message: string
+  path?: string
+  actions: number
+}
+
 export interface DatabaseFile {
   version: 1
   notes: NoteRecord[]

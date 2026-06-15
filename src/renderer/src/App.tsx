@@ -496,6 +496,11 @@ export default function App(): JSX.Element {
       return
     }
 
+    if (command === 'export-mcp-handoff') {
+      await exportMcpHandoff()
+      return
+    }
+
     if (command === 'toggle-settings') {
       setSettingsOpen((value) => !value)
       return
@@ -854,6 +859,16 @@ export default function App(): JSX.Element {
     }
   }
 
+  async function exportMcpHandoff(): Promise<void> {
+    setBusy('exportMcp')
+    try {
+      const result = await api.exportMcpHandoff()
+      setLibraryMessage(result.message)
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function exportSelectedMarkdown(): Promise<void> {
     if (!selectedNote) {
       return
@@ -1091,7 +1106,7 @@ export default function App(): JSX.Element {
                 <button
                   type="button"
                   onClick={exportLibrary}
-                  disabled={busy === 'export' || busy === 'import'}
+                  disabled={busy === 'export' || busy === 'import' || busy === 'exportMcp'}
                   title="Exportar biblioteca"
                 >
                   {busy === 'export' ? <Loader2 className="spin" size={16} /> : <FileDown size={16} />}
@@ -1100,11 +1115,20 @@ export default function App(): JSX.Element {
                 <button
                   type="button"
                   onClick={importLibrary}
-                  disabled={busy === 'export' || busy === 'import'}
+                  disabled={busy === 'export' || busy === 'import' || busy === 'exportMcp'}
                   title="Importar biblioteca"
                 >
                   {busy === 'import' ? <Loader2 className="spin" size={16} /> : <FileUp size={16} />}
                   Importar
+                </button>
+                <button
+                  type="button"
+                  onClick={exportMcpHandoff}
+                  disabled={busy === 'export' || busy === 'import' || busy === 'exportMcp'}
+                  title="Exportar handoff MCP"
+                >
+                  {busy === 'exportMcp' ? <Loader2 className="spin" size={16} /> : <Network size={16} />}
+                  MCP JSON
                 </button>
               </div>
             </div>

@@ -4,6 +4,7 @@ export type AppCommand =
   | 'save-note'
   | 'analyze-note'
   | 'export-markdown'
+  | 'export-mcp-handoff'
   | 'import-library'
   | 'export-library'
   | 'toggle-settings'

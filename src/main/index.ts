@@ -13,7 +13,7 @@ import {
   syncActionNoteTitle
 } from './actions'
 import { AppCommand } from './commands'
-import { noteToMarkdown, safeMarkdownFileName } from './export'
+import { buildMcpHandoffPayload, noteToMarkdown, safeMarkdownFileName } from './export'
 import { synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
@@ -27,6 +27,7 @@ import {
   DeleteNoteResult,
   LibraryExportResult,
   LibraryImportResult,
+  McpHandoffExportResult,
   NoteMarkdownExportResult,
   NoteRecord
 } from './types'
@@ -119,6 +120,10 @@ function createAppMenu(): void {
         {
           label: 'Exportar biblioteca',
           click: () => sendCommand('export-library')
+        },
+        {
+          label: 'Exportar handoff MCP',
+          click: () => sendCommand('export-mcp-handoff')
         },
         { type: 'separator' },
         {
@@ -503,6 +508,44 @@ function registerIpcHandlers(): void {
     } satisfies LibraryImportResult
   })
 
+  ipcMain.handle('mcp:exportHandoff', async () => {
+    const database = await readDatabase()
+    const defaultPath = path.join(
+      app.getPath('documents'),
+      `neuronotes-mcp-handoff-${new Date().toISOString().slice(0, 10)}.json`
+    )
+    const result = await dialog.showSaveDialog({
+      title: 'Exportar handoff MCP',
+      defaultPath,
+      filters: [
+        {
+          name: 'Neuronotes MCP JSON',
+          extensions: ['json']
+        }
+      ]
+    })
+    const handoffPayload = buildMcpHandoffPayload(database)
+
+    if (result.canceled || !result.filePath) {
+      return {
+        ok: false,
+        canceled: true,
+        message: 'Exportacion MCP cancelada',
+        actions: handoffPayload.actionCount
+      } satisfies McpHandoffExportResult
+    }
+
+    await writeFile(result.filePath, `${JSON.stringify(handoffPayload, null, 2)}\n`, 'utf8')
+
+    return {
+      ok: true,
+      canceled: false,
+      message: `Handoff MCP exportado (${formatActionCount(handoffPayload.actionCount)})`,
+      path: result.filePath,
+      actions: handoffPayload.actionCount
+    } satisfies McpHandoffExportResult
+  })
+
   ipcMain.handle('ai:health', async () => {
     const database = await readDatabase()
     return checkOllama(database.settings)
@@ -570,6 +613,10 @@ async function analyzeNoteSnapshot(note: NoteRecord, database: DatabaseFile): Pr
 
 function isPendingAnalysis(note: NoteRecord): boolean {
   return note.content.trim().length > 0 && note.analysisStatus !== 'qwen'
+}
+
+function formatActionCount(count: number): string {
+  return count === 1 ? '1 accion' : `${count} acciones`
 }
 
 async function mergeImportedDatabase(

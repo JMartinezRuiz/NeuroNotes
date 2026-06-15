@@ -131,6 +131,7 @@ const sortActions = (): ActionItem[] =>
 
     return b.updatedAt.localeCompare(a.updatedAt)
   })
+const formatActionCount = (count: number): string => (count === 1 ? '1 accion' : `${count} acciones`)
 
 const previewHealth = (): AiHealth => ({
   ok: false,
@@ -430,6 +431,13 @@ export function createPreviewApi(): Api {
       message: 'Nota exportada como Markdown',
       path: `preview/${id}.md`,
       noteId: id
+    }),
+    exportMcpHandoff: async () => ({
+      ok: true,
+      canceled: false,
+      message: `Handoff MCP exportado (${formatActionCount(actions.filter((action) => action.status === 'open').length)})`,
+      path: 'preview/neuronotes-mcp-handoff.json',
+      actions: actions.filter((action) => action.status === 'open').length
     }),
     exportLibrary: async () => ({
       ok: true,

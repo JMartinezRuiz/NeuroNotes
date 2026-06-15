@@ -10,6 +10,7 @@ import {
   DeleteNoteResult,
   LibraryExportResult,
   LibraryImportResult,
+  McpHandoffExportResult,
   NoteMarkdownExportResult,
   NoteRecord,
   PullModelResult
@@ -35,6 +36,7 @@ const api = {
     ipcRenderer.invoke('actions:setStatus', actionId, status),
   deleteAction: (actionId: string): Promise<void> => ipcRenderer.invoke('actions:delete', actionId),
   exportNoteMarkdown: (id: string): Promise<NoteMarkdownExportResult> => ipcRenderer.invoke('notes:exportMarkdown', id),
+  exportMcpHandoff: (): Promise<McpHandoffExportResult> => ipcRenderer.invoke('mcp:exportHandoff'),
   exportLibrary: (): Promise<LibraryExportResult> => ipcRenderer.invoke('library:export'),
   importLibrary: (): Promise<LibraryImportResult> => ipcRenderer.invoke('library:import'),
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),

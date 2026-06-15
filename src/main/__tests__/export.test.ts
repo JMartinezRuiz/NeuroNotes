@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { noteToMarkdown, safeMarkdownFileName } from '../export'
-import { ActionItem, NoteRecord } from '../types'
+import { buildMcpHandoffPayload, mcpHandoffToJson, noteToMarkdown, safeMarkdownFileName } from '../export'
+import { ActionItem, DatabaseFile, DEFAULT_SETTINGS, NoteRecord } from '../types'
 
 function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
   const now = '2026-06-15T00:00:00.000Z'
@@ -107,5 +107,100 @@ describe('safeMarkdownFileName', () => {
 
   it('uses a fallback for empty titles', () => {
     expect(safeMarkdownFileName(' *** ')).toBe('nota-neuronotes.md')
+  })
+})
+
+describe('buildMcpHandoffPayload', () => {
+  it('exports open local actions with source note context for MCP handoff', () => {
+    const now = '2026-06-15T00:00:00.000Z'
+    const sourceNote = note()
+    const database: DatabaseFile = {
+      version: 1,
+      notes: [sourceNote],
+      settings: { ...DEFAULT_SETTINGS },
+      actions: [
+        {
+          id: 'action-open',
+          noteId: sourceNote.id,
+          noteTitle: sourceNote.title,
+          kind: 'task',
+          title: 'Crear tarea',
+          detail: 'Convertir esta nota en una tarea local.',
+          toolHint: 'task.create',
+          confidence: 0.75,
+          status: 'open',
+          createdAt: now,
+          updatedAt: now
+        },
+        {
+          id: 'action-done',
+          noteId: sourceNote.id,
+          noteTitle: sourceNote.title,
+          kind: 'research',
+          title: 'Buscar referencia',
+          detail: 'Accion ya cerrada.',
+          confidence: 0.55,
+          status: 'done',
+          createdAt: now,
+          updatedAt: now
+        }
+      ]
+    }
+
+    const payload = buildMcpHandoffPayload(database, now)
+
+    expect(payload).toMatchObject({
+      schema: 'neuronotes.mcp-handoff.v1',
+      exportedAt: now,
+      execution: {
+        mode: 'manual-user-approved',
+        requiresUserApproval: true
+      },
+      model: DEFAULT_SETTINGS.model,
+      actionCount: 1,
+      doneActionCount: 1
+    })
+    expect(payload.actions).toEqual([
+      expect.objectContaining({
+        id: 'action-open',
+        kind: 'task',
+        status: 'open',
+        toolHint: 'task.create',
+        sourceNote: expect.objectContaining({
+          id: sourceNote.id,
+          title: sourceNote.title,
+          category: 'Proyecto',
+          tags: ['qwen', 'notas'],
+          relatedNoteIds: ['note-2'],
+          analysis: expect.objectContaining({
+            provider: 'qwen',
+            model: 'qwen3.5:0.8b',
+            ragNoteIds: ['note-2']
+          })
+        })
+      })
+    ])
+
+    expect(payload.actions[0].sourceNote.contentExcerpt).toContain('Crear una app de notas con Qwen local.')
+  })
+
+  it('serializes the MCP handoff as formatted JSON', () => {
+    const now = '2026-06-15T00:00:00.000Z'
+    const database: DatabaseFile = {
+      version: 1,
+      notes: [note()],
+      settings: { ...DEFAULT_SETTINGS },
+      actions: []
+    }
+
+    const json = mcpHandoffToJson(database, now)
+    const payload = JSON.parse(json) as ReturnType<typeof buildMcpHandoffPayload>
+
+    expect(json.endsWith('\n')).toBe(true)
+    expect(payload).toMatchObject({
+      schema: 'neuronotes.mcp-handoff.v1',
+      actionCount: 0,
+      actions: []
+    })
   })
 })

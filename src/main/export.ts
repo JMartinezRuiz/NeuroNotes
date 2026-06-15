@@ -1,4 +1,6 @@
-import { ActionItem, NoteRecord } from './types'
+import { ActionItem, DatabaseFile, NoteRecord } from './types'
+
+const MCP_HANDOFF_SCHEMA = 'neuronotes.mcp-handoff.v1'
 
 export function noteToMarkdown(note: NoteRecord, localActions: ActionItem[] = []): string {
   const tags = note.tags.length > 0 ? note.tags.map((tag) => `#${tag}`).join(' ') : 'Sin etiquetas'
@@ -79,6 +81,116 @@ export function safeMarkdownFileName(title: string): string {
   return `${sanitized || 'nota-neuronotes'}.md`
 }
 
+export function buildMcpHandoffPayload(database: DatabaseFile, exportedAt = new Date().toISOString()): {
+  schema: string
+  exportedAt: string
+  execution: {
+    mode: string
+    requiresUserApproval: boolean
+  }
+  model: string
+  ollamaUrl: string
+  actionCount: number
+  doneActionCount: number
+  actions: Array<{
+    id: string
+    kind: string
+    status: string
+    title: string
+    detail: string
+    toolHint: string | null
+    confidence: number
+    createdAt: string
+    updatedAt: string
+    sourceNote: {
+      id: string
+      title: string
+      summary: string
+      category: string
+      tags: string[]
+      contentExcerpt: string
+      relatedNoteIds: string[]
+      analysis: {
+        provider: string
+        model: string
+        analyzedAt: string
+        ragNoteIds: string[]
+      } | null
+    }
+  }>
+} {
+  const notesById = new Map(database.notes.map((note) => [note.id, note]))
+  const openActions = database.actions
+    .filter((action) => action.status === 'open' && notesById.has(action.noteId))
+    .sort(compareActionItems)
+
+  return {
+    schema: MCP_HANDOFF_SCHEMA,
+    exportedAt,
+    execution: {
+      mode: 'manual-user-approved',
+      requiresUserApproval: true
+    },
+    model: database.settings.model,
+    ollamaUrl: database.settings.ollamaUrl,
+    actionCount: openActions.length,
+    doneActionCount: database.actions.filter((action) => action.status === 'done').length,
+    actions: openActions.map((action) => {
+      const note = notesById.get(action.noteId)
+
+      if (!note) {
+        throw new Error('Accion sin nota fuente')
+      }
+
+      return {
+        id: action.id,
+        kind: action.kind,
+        status: action.status,
+        title: action.title,
+        detail: action.detail,
+        toolHint: action.toolHint ?? null,
+        confidence: action.confidence,
+        createdAt: action.createdAt,
+        updatedAt: action.updatedAt,
+        sourceNote: {
+          id: note.id,
+          title: note.title,
+          summary: note.summary,
+          category: note.category,
+          tags: note.tags,
+          contentExcerpt: excerpt(note.content, 1200),
+          relatedNoteIds: note.related.map((related) => related.noteId),
+          analysis: note.analysisRun
+            ? {
+                provider: note.analysisRun.provider,
+                model: note.analysisRun.model,
+                analyzedAt: note.analysisRun.analyzedAt,
+                ragNoteIds: note.analysisRun.ragNoteIds
+              }
+            : null
+        }
+      }
+    })
+  }
+}
+
+export function mcpHandoffToJson(database: DatabaseFile, exportedAt = new Date().toISOString()): string {
+  return `${JSON.stringify(buildMcpHandoffPayload(database, exportedAt), null, 2)}\n`
+}
+
 function escapeMarkdown(value: string): string {
   return value.replace(/([\\`*_{}\[\]()#+\-.!|>])/g, '\\$1')
+}
+
+function excerpt(value: string, maxLength: number): string {
+  const clean = value.replace(/\s+/g, ' ').trim()
+  return clean.length > maxLength ? `${clean.slice(0, maxLength - 3)}...` : clean
+}
+
+function compareActionItems(a: ActionItem, b: ActionItem): number {
+  if (a.status !== b.status) {
+    return a.status === 'open' ? -1 : 1
+  }
+
+  return b.updatedAt.localeCompare(a.updatedAt)
 }
