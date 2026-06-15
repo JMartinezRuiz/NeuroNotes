@@ -174,7 +174,8 @@ button:disabled {
 }
 
 .category-filter,
-.analysis-filter {
+.analysis-filter,
+.review-filter {
   display: flex;
   gap: 6px;
   overflow-x: auto;
@@ -186,11 +187,16 @@ button:disabled {
 }
 
 .analysis-filter {
+  padding: 0 16px 8px;
+}
+
+.review-filter {
   padding: 0 16px 12px;
 }
 
 .category-filter button,
-.analysis-filter button {
+.analysis-filter button,
+.review-filter button {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -210,14 +216,17 @@ button:disabled {
 .category-filter button:hover,
 .category-filter button.active,
 .analysis-filter button:hover,
-.analysis-filter button.active {
+.analysis-filter button.active,
+.review-filter button:hover,
+.review-filter button.active {
   color: var(--accent-strong);
   border-color: rgba(31, 122, 100, 0.28);
   background: #e5f4ec;
 }
 
 .category-filter strong,
-.analysis-filter strong {
+.analysis-filter strong,
+.review-filter strong {
   display: grid;
   min-width: 18px;
   height: 18px;
@@ -228,7 +237,8 @@ button:disabled {
   font-size: 11px;
 }
 
-.analysis-filter button {
+.analysis-filter button,
+.review-filter button {
   min-width: 56px;
   font-size: 11px;
 }
@@ -245,6 +255,20 @@ button:disabled {
   color: var(--danger);
   border-color: rgba(180, 61, 47, 0.28);
   background: #f9e4df;
+}
+
+.review-filter button[data-review='pending-review'].active,
+.review-filter button[data-review='pending-review']:hover {
+  color: #746126;
+  border-color: rgba(116, 97, 38, 0.32);
+  background: #f5edc8;
+}
+
+.review-filter button[data-review='reviewed'].active,
+.review-filter button[data-review='reviewed']:hover {
+  color: var(--accent-strong);
+  border-color: rgba(31, 122, 100, 0.28);
+  background: #e5f4ec;
 }
 
 .note-list {

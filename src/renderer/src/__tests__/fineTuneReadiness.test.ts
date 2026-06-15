@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { formatFineTuneExampleCount, isFineTuneReviewable, summarizeFineTuneReadiness } from '../fineTuneReadiness'
+import {
+  formatFineTuneExampleCount,
+  isFineTuneReviewable,
+  noteMatchesFineTuneReviewFilter,
+  summarizeFineTuneReadiness,
+  summarizeFineTuneReviewFilters
+} from '../fineTuneReadiness'
 import { NoteRecord } from '../types'
 
 function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
@@ -88,6 +94,37 @@ describe('summarizeFineTuneReadiness', () => {
       status: 'ready',
       message: '2 ejemplos listos para JSONL; 1 nota por aprobar.'
     })
+  })
+})
+
+describe('fine-tuning review filters', () => {
+  it('matches reviewable notes that still need approval', () => {
+    expect(noteMatchesFineTuneReviewFilter(note(), 'pending-review')).toBe(true)
+    expect(
+      noteMatchesFineTuneReviewFilter(note({ trainingReviewedAt: '2026-06-15T00:01:00.000Z' }), 'pending-review')
+    ).toBe(false)
+    expect(noteMatchesFineTuneReviewFilter(note({ analysisStatus: 'idle' }), 'pending-review')).toBe(false)
+  })
+
+  it('matches notes already approved for dataset export', () => {
+    expect(
+      noteMatchesFineTuneReviewFilter(note({ trainingReviewedAt: '2026-06-15T00:01:00.000Z' }), 'reviewed')
+    ).toBe(true)
+    expect(noteMatchesFineTuneReviewFilter(note(), 'reviewed')).toBe(false)
+  })
+
+  it('summarizes review filters for the note list', () => {
+    expect(
+      summarizeFineTuneReviewFilters([
+        note(),
+        note({ id: 'note-2', trainingReviewedAt: '2026-06-15T00:01:00.000Z' }),
+        note({ id: 'note-3', analysisStatus: 'idle' })
+      ])
+    ).toEqual([
+      { filter: 'all', label: 'FT todo', count: 3 },
+      { filter: 'pending-review', label: 'Por aprobar', count: 1 },
+      { filter: 'reviewed', label: 'Aprob.', count: 1 }
+    ])
   })
 })
 

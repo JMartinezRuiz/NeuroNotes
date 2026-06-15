@@ -44,7 +44,14 @@ import {
   quickCaptureResultMessage
 } from './analysisMessages'
 import { aiSetupSteps } from './aiSetupReadiness'
-import { formatFineTuneExampleCount, isFineTuneReviewable, summarizeFineTuneReadiness } from './fineTuneReadiness'
+import {
+  FineTuneReviewFilter,
+  formatFineTuneExampleCount,
+  isFineTuneReviewable,
+  noteMatchesFineTuneReviewFilter,
+  summarizeFineTuneReadiness,
+  summarizeFineTuneReviewFilters
+} from './fineTuneReadiness'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges } from './graph'
 import { mcpActionReadiness, summarizeMcpActionReadiness } from './mcpActionReadiness'
@@ -217,6 +224,7 @@ export default function App(): JSX.Element {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<string>('Todas')
   const [activeAnalysisFilter, setActiveAnalysisFilter] = useState<AnalysisStatusFilter>('all')
+  const [activeFineTuneFilter, setActiveFineTuneFilter] = useState<FineTuneReviewFilter>('all')
   const [settings, setSettings] = useState<AppSettings>(emptySettings)
   const [health, setHealth] = useState<AiHealth>(emptyHealth)
   const [busy, setBusy] = useState<string | null>(null)
@@ -332,6 +340,7 @@ export default function App(): JSX.Element {
     [categoryCounts]
   )
   const analysisStatusFilterOptions = useMemo(() => summarizeAnalysisStatusFilters(notes), [notes])
+  const fineTuneReviewFilterOptions = useMemo(() => summarizeFineTuneReviewFilters(notes), [notes])
   const linkableNotes = useMemo(() => {
     if (!selectedNote) {
       return []
@@ -353,9 +362,12 @@ export default function App(): JSX.Element {
     const analysisFilteredNotes = categoryFilteredNotes.filter((note) =>
       noteMatchesAnalysisStatusFilter(note, activeAnalysisFilter)
     )
+    const fineTuneFilteredNotes = analysisFilteredNotes.filter((note) =>
+      noteMatchesFineTuneReviewFilter(note, activeFineTuneFilter)
+    )
 
-    return analysisFilteredNotes.filter((note) => noteMatchesSearch(note, search))
-  }, [activeAnalysisFilter, activeCategory, notes, search])
+    return fineTuneFilteredNotes.filter((note) => noteMatchesSearch(note, search))
+  }, [activeAnalysisFilter, activeCategory, activeFineTuneFilter, notes, search])
 
   useEffect(() => {
     return api.onCommand((command) => {
@@ -1190,6 +1202,23 @@ export default function App(): JSX.Element {
               aria-pressed={option.filter === activeAnalysisFilter}
               onClick={() => setActiveAnalysisFilter(option.filter)}
               title={`Filtrar estado IA: ${option.label}`}
+            >
+              <span>{option.label}</span>
+              <strong>{option.count}</strong>
+            </button>
+          ))}
+        </div>
+
+        <div className="review-filter" aria-label="Revision fine-tuning">
+          {fineTuneReviewFilterOptions.map((option) => (
+            <button
+              key={option.filter}
+              type="button"
+              className={option.filter === activeFineTuneFilter ? 'active' : ''}
+              data-review={option.filter}
+              aria-pressed={option.filter === activeFineTuneFilter}
+              onClick={() => setActiveFineTuneFilter(option.filter)}
+              title={`Filtrar fine-tuning: ${option.label}`}
             >
               <span>{option.label}</span>
               <strong>{option.count}</strong>
