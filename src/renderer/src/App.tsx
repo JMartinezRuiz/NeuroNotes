@@ -17,7 +17,8 @@ import {
   Sparkles,
   Trash2
 } from 'lucide-react'
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { buildPendingAnalysisKey, shouldAutoAnalyzePending } from './analysisAutomation'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges } from './graph'
 import { AiHealth, AnalysisProvider, AppSettings, NoteRecord, NOTE_CATEGORIES } from './types'
@@ -137,6 +138,7 @@ function resolveApi(): NeuronotesApi {
 
 export default function App(): JSX.Element {
   const api = useMemo(() => resolveApi(), [])
+  const autoAnalyzeAttemptKey = useRef('')
   const [notes, setNotes] = useState<NoteRecord[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [quickNote, setQuickNote] = useState('')
@@ -190,9 +192,20 @@ export default function App(): JSX.Element {
       }
     })
   }, [selectedConnections])
-  const pendingAnalysisCount = useMemo(
-    () => notes.filter((note) => note.content.trim().length > 0 && note.analysisStatus !== 'qwen').length,
+  const pendingAnalysisNotes = useMemo(
+    () =>
+      notes
+        .filter((note) => note.content.trim().length > 0 && note.analysisStatus !== 'qwen')
+        .map((note) => ({
+          id: note.id,
+          content: note.content
+        })),
     [notes]
+  )
+  const pendingAnalysisCount = pendingAnalysisNotes.length
+  const pendingAnalysisKey = useMemo(
+    () => buildPendingAnalysisKey(settings.model, pendingAnalysisNotes),
+    [pendingAnalysisNotes, settings.model]
   )
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>()
@@ -253,6 +266,25 @@ export default function App(): JSX.Element {
       window.clearTimeout(timeout)
     }
   }, [bootstrapped, settings.model, settings.ollamaUrl])
+
+  useEffect(() => {
+    if (
+      !shouldAutoAnalyzePending({
+        autoAnalyze: settings.autoAnalyze,
+        bootstrapped,
+        busy,
+        healthOk: health.ok,
+        lastAttemptKey: autoAnalyzeAttemptKey.current,
+        pendingCount: pendingAnalysisCount,
+        pendingKey: pendingAnalysisKey
+      })
+    ) {
+      return
+    }
+
+    autoAnalyzeAttemptKey.current = pendingAnalysisKey
+    void runPendingAnalysis()
+  }, [bootstrapped, busy, health.ok, pendingAnalysisCount, pendingAnalysisKey, settings.autoAnalyze])
 
   useEffect(() => {
     if (selectedNote) {

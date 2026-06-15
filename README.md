@@ -47,6 +47,8 @@ Each analyzed note keeps a compact audit trail with the provider used, model nam
 
 If notes were created while Qwen was unavailable, the header shows a pending-analysis action once there are notes that have not been processed by the configured model.
 
+When automatic analysis is enabled, Neuronotes retries one pending batch automatically after Qwen becomes ready. It records the attempted batch so a failing local runtime does not create a retry loop.
+
 ## Build
 
 ```powershell
