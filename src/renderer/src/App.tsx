@@ -19,7 +19,14 @@ import {
   Trash2
 } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { buildPendingAnalysisKey, shouldAutoAnalyzePending } from './analysisAutomation'
+import {
+  buildPendingAnalysisKey,
+  pendingAnalysisButtonTitle,
+  pendingAnalysisEngine,
+  pendingAnalysisProgressMessage,
+  pendingAnalysisResultMessage,
+  shouldAutoAnalyzePending
+} from './analysisAutomation'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges } from './graph'
 import { commandFromKeyboardShortcut } from './shortcuts'
@@ -246,6 +253,7 @@ export default function App(): JSX.Element {
     [notes]
   )
   const pendingAnalysisCount = pendingAnalysisNotes.length
+  const pendingEngine = pendingAnalysisEngine(health.ok)
   const pendingAnalysisKey = useMemo(
     () => buildPendingAnalysisKey(settings.model, pendingAnalysisNotes),
     [pendingAnalysisNotes, settings.model]
@@ -740,12 +748,9 @@ export default function App(): JSX.Element {
       return
     }
 
+    const engine = pendingAnalysisEngine(health.ok)
     setBusy('analyzePending')
-    setAnalysisQueueMessage(
-      mode === 'auto'
-        ? `Qwen listo. Reanalizando ${pendingAnalysisCount} pendientes...`
-        : `Analizando ${pendingAnalysisCount} pendientes...`
-    )
+    setAnalysisQueueMessage(pendingAnalysisProgressMessage(mode, engine, pendingAnalysisCount))
     try {
       if (selectedNote && (editorContent !== selectedNote.content || editorTitle.trim() !== selectedNote.title)) {
         await saveSelected(true)
@@ -753,11 +758,7 @@ export default function App(): JSX.Element {
 
       const result = await api.analyzePending()
       await refreshNotes(result.lastUpdatedId ?? selectedId ?? undefined)
-      setAnalysisQueueMessage(
-        result.failed > 0
-          ? `Qwen proceso ${result.analyzed} de ${result.total}; ${result.failed} fallaron.`
-          : `Qwen actualizo ${result.analyzed} pendientes.`
-      )
+      setAnalysisQueueMessage(pendingAnalysisResultMessage(engine, result))
     } finally {
       setBusy(null)
     }
@@ -998,8 +999,8 @@ export default function App(): JSX.Element {
                 type="button"
                 className="batch-button"
                 onClick={() => runPendingAnalysis('manual')}
-                disabled={!health.ok || busy === 'analyzePending'}
-                title={health.ok ? 'Analizar pendientes con Qwen' : 'Qwen no esta listo'}
+                disabled={busy === 'analyzePending'}
+                title={pendingAnalysisButtonTitle(pendingEngine)}
               >
                 {busy === 'analyzePending' ? <Loader2 className="spin" size={16} /> : <Sparkles size={16} />}
                 Pendientes {pendingAnalysisCount}

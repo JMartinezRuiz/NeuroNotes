@@ -13,6 +13,14 @@ export interface AutoAnalyzeDecision {
   pendingKey: string
 }
 
+export type PendingAnalysisEngine = 'qwen' | 'local'
+
+export interface PendingAnalysisResultSummary {
+  analyzed: number
+  failed: number
+  total: number
+}
+
 export function buildPendingAnalysisKey(model: string, notes: PendingAnalysisNote[]): string {
   if (notes.length === 0) {
     return ''
@@ -20,6 +28,51 @@ export function buildPendingAnalysisKey(model: string, notes: PendingAnalysisNot
 
   const noteFingerprints = notes.map((note) => `${note.id}:${fingerprint(note.content)}`)
   return [model.trim().toLowerCase(), ...noteFingerprints].join('|')
+}
+
+export function pendingAnalysisEngine(healthOk: boolean): PendingAnalysisEngine {
+  return healthOk ? 'qwen' : 'local'
+}
+
+export function pendingAnalysisButtonTitle(engine: PendingAnalysisEngine): string {
+  return engine === 'qwen' ? 'Analizar pendientes con Qwen' : 'Analizar pendientes con analisis local'
+}
+
+export function pendingAnalysisProgressMessage(
+  mode: 'manual' | 'auto',
+  engine: PendingAnalysisEngine,
+  count: number
+): string {
+  const pending = formatPendingCount(count)
+
+  if (mode === 'auto') {
+    return `Qwen listo. Reanalizando ${pending}...`
+  }
+
+  return engine === 'qwen'
+    ? `Analizando ${pending} con Qwen...`
+    : `Analizando ${pending} localmente...`
+}
+
+export function pendingAnalysisResultMessage(
+  engine: PendingAnalysisEngine,
+  result: PendingAnalysisResultSummary
+): string {
+  const label = engine === 'qwen' ? 'Qwen' : 'Analisis local'
+
+  if (result.failed > 0) {
+    return `${label} proceso ${result.analyzed} de ${result.total}; ${formatFailureCount(result.failed)}.`
+  }
+
+  return `${label} actualizo ${formatPendingCount(result.analyzed)}.`
+}
+
+function formatPendingCount(count: number): string {
+  return count === 1 ? '1 pendiente' : `${count} pendientes`
+}
+
+function formatFailureCount(count: number): string {
+  return count === 1 ? '1 fallo' : `${count} fallaron`
 }
 
 export function shouldAutoAnalyzePending(decision: AutoAnalyzeDecision): boolean {

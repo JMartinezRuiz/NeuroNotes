@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { buildPendingAnalysisKey, shouldAutoAnalyzePending } from '../analysisAutomation'
+import {
+  buildPendingAnalysisKey,
+  pendingAnalysisButtonTitle,
+  pendingAnalysisEngine,
+  pendingAnalysisProgressMessage,
+  pendingAnalysisResultMessage,
+  shouldAutoAnalyzePending
+} from '../analysisAutomation'
 
 describe('buildPendingAnalysisKey', () => {
   it('returns an empty key when there are no pending notes', () => {
@@ -69,5 +76,33 @@ describe('shouldAutoAnalyzePending', () => {
     expect(shouldAutoAnalyzePending({ ...readyDecision, autoAnalyze: false })).toBe(false)
     expect(shouldAutoAnalyzePending({ ...readyDecision, healthOk: false })).toBe(false)
     expect(shouldAutoAnalyzePending({ ...readyDecision, pendingCount: 0, pendingKey: '' })).toBe(false)
+  })
+})
+
+describe('pending analysis labels', () => {
+  it('uses Qwen labels when the model is healthy', () => {
+    const engine = pendingAnalysisEngine(true)
+
+    expect(engine).toBe('qwen')
+    expect(pendingAnalysisButtonTitle(engine)).toBe('Analizar pendientes con Qwen')
+    expect(pendingAnalysisProgressMessage('manual', engine, 2)).toBe('Analizando 2 pendientes con Qwen...')
+    expect(pendingAnalysisResultMessage(engine, { analyzed: 2, failed: 0, total: 2 })).toBe(
+      'Qwen actualizo 2 pendientes.'
+    )
+  })
+
+  it('uses local labels when Qwen is unavailable', () => {
+    const engine = pendingAnalysisEngine(false)
+
+    expect(engine).toBe('local')
+    expect(pendingAnalysisButtonTitle(engine)).toBe('Analizar pendientes con analisis local')
+    expect(pendingAnalysisProgressMessage('manual', engine, 1)).toBe('Analizando 1 pendiente localmente...')
+    expect(pendingAnalysisResultMessage(engine, { analyzed: 1, failed: 1, total: 2 })).toBe(
+      'Analisis local proceso 1 de 2; 1 fallo.'
+    )
+  })
+
+  it('keeps auto retry labeled as Qwen because it only starts after health is ready', () => {
+    expect(pendingAnalysisProgressMessage('auto', 'qwen', 3)).toBe('Qwen listo. Reanalizando 3 pendientes...')
   })
 })
