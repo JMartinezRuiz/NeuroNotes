@@ -10,10 +10,15 @@ export function resetAnalysisAfterContentEdit(note: NoteRecord): void {
   note.analysisStatus = 'idle'
   note.analysisError = undefined
   note.analysisRun = undefined
+  clearTrainingReview(note)
 }
 
 export function isManualRelatedLink(link: RelatedNote): boolean {
   return link.reason === MANUAL_LINK_REASON || link.reason === MANUAL_RECIPROCAL_REASON
+}
+
+export function clearTrainingReview(note: NoteRecord): void {
+  note.trainingReviewedAt = undefined
 }
 
 export function canApplyAnalysisResult(current: NoteRecord, analyzedSource: NoteRecord): boolean {

@@ -227,6 +227,10 @@ function normalizeNote(value: unknown): NoteRecord | undefined {
     analysisStatus,
     analysisError: typeof source.analysisError === 'string' && source.analysisError.trim() ? source.analysisError : undefined,
     analysisRun: normalizeAnalysisRun(source.analysisRun),
+    trainingReviewedAt:
+      typeof source.trainingReviewedAt === 'string' && source.trainingReviewedAt.trim()
+        ? source.trainingReviewedAt.trim()
+        : undefined,
     createdAt: typeof source.createdAt === 'string' && source.createdAt ? source.createdAt : now,
     updatedAt: typeof source.updatedAt === 'string' && source.updatedAt ? source.updatedAt : now
   }

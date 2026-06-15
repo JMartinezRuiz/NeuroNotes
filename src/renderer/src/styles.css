@@ -1040,6 +1040,65 @@ button:disabled {
   flex: 0 0 auto;
 }
 
+.training-review-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.training-review-card[data-reviewed='true'] {
+  border-color: rgba(31, 122, 100, 0.24);
+  background: rgba(232, 247, 240, 0.58);
+}
+
+.training-review-card > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.training-review-card strong,
+.training-review-card small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.training-review-card strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.training-review-card small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.training-review-card button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 82px;
+  min-height: 30px;
+  padding: 0 9px;
+  color: var(--accent-strong);
+  border: 1px solid rgba(31, 122, 100, 0.22);
+  border-radius: 7px;
+  background: #e5f4ec;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.training-review-card button:hover:not(:disabled) {
+  color: #fff;
+  background: var(--accent-strong);
+}
+
 .analysis-context {
   display: flex;
   flex-wrap: wrap;

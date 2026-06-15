@@ -17,7 +17,7 @@ import { buildFineTuneExamples, buildMcpHandoffPayload, fineTuneDatasetToJsonl, 
 import { synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
-import { canApplyAnalysisResult, resetAnalysisAfterContentEdit } from './noteLifecycle'
+import { canApplyAnalysisResult, clearTrainingReview, resetAnalysisAfterContentEdit } from './noteLifecycle'
 import { createNoteDraft, listNotes, mutateDatabase, normalizeDatabase, readDatabase } from './storage'
 import { captureWindowState, readWindowState, writeWindowState } from './windowState'
 import {
@@ -268,19 +268,44 @@ function registerIpcHandlers(): void {
 
       if (typeof updates.title === 'string' && updates.title.trim()) {
         note.title = updates.title.trim()
+        clearTrainingReview(note)
       }
 
       if (typeof updates.category === 'string' && updates.category.trim()) {
         note.category = normalizeNoteCategory(updates.category)
+        clearTrainingReview(note)
       }
 
       if (Array.isArray(updates.tags)) {
         note.tags = normalizeNoteTags(updates.tags)
+        clearTrainingReview(note)
       }
 
       note.updatedAt = new Date().toISOString()
       syncActionNoteTitle(database, note)
       synchronizeRelatedGraph(database.notes, note.id)
+      return note
+    })
+  })
+
+  ipcMain.handle('notes:setTrainingReview', async (_, id: string, reviewed: unknown) => {
+    return mutateDatabase((database) => {
+      const note = database.notes.find((item) => item.id === id)
+
+      if (!note) {
+        throw new Error('Nota no encontrada')
+      }
+
+      if (reviewed === true) {
+        if (!isFineTuneReviewable(note)) {
+          throw new Error('Analiza la nota antes de aprobarla para fine-tuning')
+        }
+
+        note.trainingReviewedAt = new Date().toISOString()
+        return note
+      }
+
+      clearTrainingReview(note)
       return note
     })
   })
@@ -366,13 +391,29 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('notes:addManualLink', async (_, sourceId: string, targetId: string) => {
     return mutateDatabase((database) => {
-      return addManualLink(database.notes, sourceId, targetId)
+      const updated = addManualLink(database.notes, sourceId, targetId)
+      const target = database.notes.find((note) => note.id === targetId)
+      clearTrainingReview(updated)
+
+      if (target) {
+        clearTrainingReview(target)
+      }
+
+      return updated
     })
   })
 
   ipcMain.handle('notes:removeLink', async (_, sourceId: string, targetId: string) => {
     return mutateDatabase((database) => {
-      return removeManualLink(database.notes, sourceId, targetId)
+      const updated = removeManualLink(database.notes, sourceId, targetId)
+      const target = database.notes.find((note) => note.id === targetId)
+      clearTrainingReview(updated)
+
+      if (target) {
+        clearTrainingReview(target)
+      }
+
+      return updated
     })
   })
 
@@ -591,6 +632,16 @@ function registerIpcHandlers(): void {
     const database = await readDatabase()
     const exportedAt = new Date().toISOString()
     const examples = buildFineTuneExamples(database, exportedAt)
+
+    if (examples.length === 0) {
+      return {
+        ok: false,
+        canceled: false,
+        message: 'No hay notas revisadas para fine-tuning',
+        examples: 0
+      } satisfies FineTuneDatasetExportResult
+    }
+
     const defaultPath = path.join(
       app.getPath('documents'),
       `neuronotes-finetune-dataset-${exportedAt.slice(0, 10)}.jsonl`
@@ -695,6 +746,7 @@ async function analyzeNoteSnapshot(note: NoteRecord, database: DatabaseFile, mod
     analysisStatus: analysis.status,
     analysisError: analysis.error,
     analysisRun: analysis.analysisRun,
+    trainingReviewedAt: undefined,
     updatedAt: new Date().toISOString()
   }
 }
@@ -709,6 +761,14 @@ function isPendingAnalysis(note: NoteRecord, mode: AnalyzePendingMode): boolean 
   }
 
   return note.analysisStatus !== 'qwen'
+}
+
+function isFineTuneReviewable(note: NoteRecord): boolean {
+  if (!note.content.trim() || (note.analysisStatus !== 'qwen' && note.analysisStatus !== 'fallback')) {
+    return false
+  }
+
+  return Boolean(note.summary.trim() || note.tags.length > 0 || note.related.length > 0 || note.suggestedActions.length > 0)
 }
 
 function normalizeAnalysisMode(value: unknown): AnalysisMode {

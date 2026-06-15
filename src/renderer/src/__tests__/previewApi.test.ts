@@ -19,4 +19,24 @@ describe('createPreviewApi', () => {
       provider: 'qwen'
     })
   })
+
+  it('marks reviewed notes for fine-tuning export', async () => {
+    const api = createPreviewApi()
+    const analyzed = await api.analyzeNote('preview-roadmap', 'qwen')
+
+    expect(analyzed.trainingReviewedAt).toBeUndefined()
+
+    const reviewed = await api.setTrainingReview(analyzed.id, true)
+    expect(reviewed.trainingReviewedAt).toBeTruthy()
+
+    const result = await api.exportFineTuneDataset()
+    expect(result).toMatchObject({
+      ok: true,
+      examples: expect.any(Number)
+    })
+    expect(result.examples).toBeGreaterThan(0)
+
+    const removed = await api.setTrainingReview(analyzed.id, false)
+    expect(removed.trainingReviewedAt).toBeUndefined()
+  })
 })

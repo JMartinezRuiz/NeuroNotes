@@ -25,6 +25,8 @@ const api = {
   createNote: (content: string): Promise<NoteRecord> => ipcRenderer.invoke('notes:create', content),
   updateNote: (id: string, updates: Partial<Pick<NoteRecord, 'content' | 'title' | 'category' | 'tags'>>): Promise<NoteRecord> =>
     ipcRenderer.invoke('notes:update', id, updates),
+  setTrainingReview: (id: string, reviewed: boolean): Promise<NoteRecord> =>
+    ipcRenderer.invoke('notes:setTrainingReview', id, reviewed),
   deleteNote: (id: string): Promise<DeleteNoteResult> => ipcRenderer.invoke('notes:delete', id),
   addManualLink: (sourceId: string, targetId: string): Promise<NoteRecord> =>
     ipcRenderer.invoke('notes:addManualLink', sourceId, targetId),

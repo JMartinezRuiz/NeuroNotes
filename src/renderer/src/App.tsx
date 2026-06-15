@@ -158,6 +158,14 @@ function analysisResultMessage(note: NoteRecord, requestedEngine: 'qwen' | 'loca
   return 'La nota cambio durante el analisis. Vuelve a analizarla para actualizar la IA.'
 }
 
+function canReviewForFineTune(note: NoteRecord): boolean {
+  if (!note.content.trim() || (note.analysisStatus !== 'qwen' && note.analysisStatus !== 'fallback')) {
+    return false
+  }
+
+  return Boolean(note.summary.trim() || note.tags.length > 0 || note.related.length > 0 || note.suggestedActions.length > 0)
+}
+
 function directionLabel(direction: GraphConnection['direction']): string {
   if (direction === 'both') {
     return 'Mutua'
@@ -225,6 +233,8 @@ export default function App(): JSX.Element {
   const [bootstrapped, setBootstrapped] = useState(false)
 
   const selectedNote = notes.find((note) => note.id === selectedId) ?? notes[0] ?? null
+  const fineTuneReviewable = selectedNote ? canReviewForFineTune(selectedNote) : false
+  const fineTuneReviewBusy = selectedNote ? busy === `trainingReview:${selectedNote.id}` : false
   const selectedActionItems = useMemo(
     () => (selectedNote ? actions.filter((action) => action.noteId === selectedNote.id) : []),
     [actions, selectedNote?.id]
@@ -838,6 +848,23 @@ export default function App(): JSX.Element {
     try {
       await api.deleteAction(actionId)
       await refreshActions()
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function toggleTrainingReview(): Promise<void> {
+    if (!selectedNote) {
+      return
+    }
+
+    const nextReviewed = !selectedNote.trainingReviewedAt
+    setBusy(`trainingReview:${selectedNote.id}`)
+
+    try {
+      const updated = await api.setTrainingReview(selectedNote.id, nextReviewed)
+      await refreshNotes(updated.id)
+      setEditorMessage(nextReviewed ? 'Nota aprobada para fine-tuning.' : 'Nota retirada del dataset fine-tuning.')
     } finally {
       setBusy(null)
     }
@@ -1461,6 +1488,46 @@ export default function App(): JSX.Element {
                   ) : null}
                 </section>
               )}
+
+              <section>
+                <div className="section-title">
+                  <h3>Fine-tuning</h3>
+                  <span>{selectedNote.trainingReviewedAt ? 'OK' : '0'}</span>
+                </div>
+                <div className="training-review-card" data-reviewed={selectedNote.trainingReviewedAt ? 'true' : 'false'}>
+                  <span>
+                    <strong>
+                      {selectedNote.trainingReviewedAt
+                        ? 'Revisada'
+                        : fineTuneReviewable
+                          ? 'Lista para revisar'
+                          : 'Pendiente de analisis'}
+                    </strong>
+                    <small>
+                      {selectedNote.trainingReviewedAt
+                        ? formatDate(selectedNote.trainingReviewedAt)
+                        : selectedNote.analysisStatus === 'idle'
+                          ? 'Sin ejemplo'
+                          : 'Dataset Qwen'}
+                    </small>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={toggleTrainingReview}
+                    disabled={fineTuneReviewBusy || (!fineTuneReviewable && !selectedNote.trainingReviewedAt)}
+                    title={selectedNote.trainingReviewedAt ? 'Retirar del dataset fine-tuning' : 'Aprobar para fine-tuning'}
+                  >
+                    {fineTuneReviewBusy ? (
+                      <Loader2 className="spin" size={14} />
+                    ) : selectedNote.trainingReviewedAt ? (
+                      <CheckCircle2 size={14} />
+                    ) : (
+                      <Circle size={14} />
+                    )}
+                    {selectedNote.trainingReviewedAt ? 'Quitar' : 'Aprobar'}
+                  </button>
+                </div>
+              </section>
 
               <section>
                 <div className="section-title">

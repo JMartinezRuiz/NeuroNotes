@@ -54,6 +54,7 @@ let notes: NoteRecord[] = [
         }
       ]
     },
+    trainingReviewedAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
     updatedAt: new Date(Date.now() - 1000 * 60 * 40).toISOString()
   },
@@ -132,6 +133,7 @@ const sortActions = (): ActionItem[] =>
     return b.updatedAt.localeCompare(a.updatedAt)
   })
 const formatActionCount = (count: number): string => (count === 1 ? '1 accion' : `${count} acciones`)
+const formatExampleCount = (count: number): string => (count === 1 ? '1 ejemplo' : `${count} ejemplos`)
 const isPreviewPending = (note: NoteRecord, mode: 'qwen' | 'local'): boolean => {
   if (note.content.trim().length === 0) {
     return false
@@ -143,6 +145,15 @@ const isPreviewPending = (note: NoteRecord, mode: 'qwen' | 'local'): boolean => 
 
   return note.analysisStatus !== 'qwen'
 }
+const isFineTuneReviewable = (note: NoteRecord): boolean => {
+  if (!note.content.trim() || (note.analysisStatus !== 'qwen' && note.analysisStatus !== 'fallback')) {
+    return false
+  }
+
+  return Boolean(note.summary.trim() || note.tags.length > 0 || note.related.length > 0 || note.suggestedActions.length > 0)
+}
+const fineTuneExampleCount = (): number =>
+  notes.filter((note) => Boolean(note.trainingReviewedAt) && isFineTuneReviewable(note)).length
 
 const previewHealth = (): AiHealth => ({
   ok: false,
@@ -194,10 +205,12 @@ export function createPreviewApi(): Api {
 
       if (updates.content) {
         note.content = updates.content
+        note.trainingReviewedAt = undefined
       }
 
       if (updates.title) {
         note.title = updates.title
+        note.trainingReviewedAt = undefined
         for (const action of actions) {
           if (action.noteId === note.id) {
             action.noteTitle = note.title
@@ -208,6 +221,7 @@ export function createPreviewApi(): Api {
 
       if (updates.category) {
         note.category = updates.category
+        note.trainingReviewedAt = undefined
       }
 
       if (updates.tags) {
@@ -216,11 +230,31 @@ export function createPreviewApi(): Api {
             updates.tags
               .map((tag) => tag.trim().toLowerCase().replace(/^#/, ''))
               .filter(Boolean)
-          )
+            )
         )
+        note.trainingReviewedAt = undefined
       }
 
       note.updatedAt = new Date().toISOString()
+      return note
+    },
+    setTrainingReview: async (id, reviewed) => {
+      const note = notes.find((item) => item.id === id)
+
+      if (!note) {
+        throw new Error('Nota no encontrada')
+      }
+
+      if (reviewed) {
+        if (!isFineTuneReviewable(note)) {
+          throw new Error('Analiza la nota antes de aprobarla para fine-tuning')
+        }
+
+        note.trainingReviewedAt = new Date().toISOString()
+        return note
+      }
+
+      note.trainingReviewedAt = undefined
       return note
     },
     deleteNote: async (id) => {
@@ -262,6 +296,8 @@ export function createPreviewApi(): Api {
       ]
       source.updatedAt = new Date().toISOString()
       target.updatedAt = source.updatedAt
+      source.trainingReviewedAt = undefined
+      target.trainingReviewedAt = undefined
       return source
     },
     removeLink: async (sourceId, targetId) => {
@@ -276,6 +312,8 @@ export function createPreviewApi(): Api {
       target.related = target.related.filter((related) => related.noteId !== source.id)
       source.updatedAt = new Date().toISOString()
       target.updatedAt = source.updatedAt
+      source.trainingReviewedAt = undefined
+      target.trainingReviewedAt = undefined
       return source
     },
     analyzeNote: async (id, mode = 'qwen') => {
@@ -328,6 +366,7 @@ export function createPreviewApi(): Api {
           }
         })
       }
+      note.trainingReviewedAt = undefined
       note.updatedAt = new Date().toISOString()
       return note
     },
@@ -371,6 +410,7 @@ export function createPreviewApi(): Api {
               excerpt: candidate.content.replace(/\s+/g, ' ').slice(0, 180)
             }))
         }
+        note.trainingReviewedAt = undefined
         note.updatedAt = new Date().toISOString()
         lastUpdatedId = note.id
         if (note.analysisStatus === 'qwen') {
@@ -461,11 +501,14 @@ export function createPreviewApi(): Api {
       actions: actions.filter((action) => action.status === 'open').length
     }),
     exportFineTuneDataset: async () => ({
-      ok: true,
+      ok: fineTuneExampleCount() > 0,
       canceled: false,
-      message: `Dataset fine-tuning exportado (${notes.filter((note) => note.analysisStatus === 'qwen' || note.analysisStatus === 'fallback').length} ejemplos)`,
-      path: 'preview/neuronotes-finetune-dataset.jsonl',
-      examples: notes.filter((note) => note.analysisStatus === 'qwen' || note.analysisStatus === 'fallback').length
+      message:
+        fineTuneExampleCount() > 0
+          ? `Dataset fine-tuning exportado (${formatExampleCount(fineTuneExampleCount())})`
+          : 'No hay notas revisadas para fine-tuning',
+      path: fineTuneExampleCount() > 0 ? 'preview/neuronotes-finetune-dataset.jsonl' : undefined,
+      examples: fineTuneExampleCount()
     }),
     exportLibrary: async () => ({
       ok: true,

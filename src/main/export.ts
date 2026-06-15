@@ -24,6 +24,8 @@ export interface FineTuneExample {
     relatedCount: number
     suggestedActionCount: number
     ragNoteIds: string[]
+    reviewedForTraining: boolean
+    reviewedAt: string | null
   }
 }
 
@@ -224,7 +226,7 @@ export function buildFineTuneExamples(database: DatabaseFile, exportedAt = new D
   const notesById = new Map(database.notes.map((note) => [note.id, note]))
 
   return database.notes
-    .filter(isFineTuneCandidate)
+    .filter((note) => isFineTuneCandidate(note) && Boolean(note.trainingReviewedAt))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .map((note) => {
       const assistantPayload = buildFineTuneAssistantPayload(note, notesById)
@@ -257,7 +259,9 @@ export function buildFineTuneExamples(database: DatabaseFile, exportedAt = new D
           tagCount: note.tags.length,
           relatedCount: assistantPayload.related.length,
           suggestedActionCount: assistantPayload.suggestedActions.length,
-          ragNoteIds: note.analysisRun?.ragNoteIds ?? []
+          ragNoteIds: note.analysisRun?.ragNoteIds ?? [],
+          reviewedForTraining: true,
+          reviewedAt: note.trainingReviewedAt ?? null
         }
       }
     })

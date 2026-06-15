@@ -134,7 +134,8 @@ describe('normalizeDatabase', () => {
                 title: 'No entra'
               }
             ]
-          }
+          },
+          trainingReviewedAt: ' 2026-06-15T00:02:00.000Z '
         },
         {
           content: 'sin id'
@@ -205,6 +206,7 @@ describe('normalizeDatabase', () => {
           }
         ]
       },
+      trainingReviewedAt: '2026-06-15T00:02:00.000Z',
       related: [
         {
           noteId: 'target',

@@ -260,11 +260,20 @@ describe('buildMcpHandoffPayload', () => {
 describe('fine-tune dataset export', () => {
   it('builds local supervised JSONL examples from analyzed notes', () => {
     const now = '2026-06-15T00:00:00.000Z'
-    const sourceNote = note()
+    const sourceNote = note({ trainingReviewedAt: now })
     const database: DatabaseFile = {
       version: 1,
       notes: [
         sourceNote,
+        note({
+          id: 'unreviewed-note',
+          title: 'Nota no revisada',
+          content: 'Analisis correcto pero todavia no aprobado para entrenamiento.',
+          summary: 'Ejemplo no revisado.',
+          related: [],
+          suggestedActions: [],
+          analysisStatus: 'qwen'
+        }),
         note({
           id: 'note-2',
           title: 'Interfaz minimalista',
@@ -307,7 +316,9 @@ describe('fine-tune dataset export', () => {
         tagCount: 2,
         relatedCount: 1,
         suggestedActionCount: 1,
-        ragNoteIds: ['note-2']
+        ragNoteIds: ['note-2'],
+        reviewedForTraining: true,
+        reviewedAt: now
       }
     })
     expect(examples[0].messages.map((message) => message.role)).toEqual(['system', 'user', 'assistant'])
@@ -346,7 +357,7 @@ describe('fine-tune dataset export', () => {
     const now = '2026-06-15T00:00:00.000Z'
     const database: DatabaseFile = {
       version: 1,
-      notes: [note()],
+      notes: [note({ trainingReviewedAt: now })],
       settings: { ...DEFAULT_SETTINGS },
       actions: []
     }
@@ -360,5 +371,18 @@ describe('fine-tune dataset export', () => {
       schema: 'neuronotes.finetune-example.v1',
       targetModel: 'qwen3.5:0.8b'
     })
+  })
+
+  it('does not export unreviewed analyzed notes for fine-tuning', () => {
+    const now = '2026-06-15T00:00:00.000Z'
+    const database: DatabaseFile = {
+      version: 1,
+      notes: [note()],
+      settings: { ...DEFAULT_SETTINGS },
+      actions: []
+    }
+
+    expect(buildFineTuneExamples(database, now)).toEqual([])
+    expect(fineTuneDatasetToJsonl(database, now)).toBe('')
   })
 })

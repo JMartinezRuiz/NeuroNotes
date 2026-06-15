@@ -54,6 +54,7 @@ function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
       durationMs: 1000,
       ragNoteIds: ['automatic']
     },
+    trainingReviewedAt: now,
     createdAt: now,
     updatedAt: now,
     ...overrides
@@ -71,7 +72,8 @@ describe('resetAnalysisAfterContentEdit', () => {
       suggestedActions: [],
       analysisStatus: 'idle',
       analysisError: undefined,
-      analysisRun: undefined
+      analysisRun: undefined,
+      trainingReviewedAt: undefined
     })
     expect(source.related.map((related) => related.noteId)).toEqual(['manual', 'manual-backlink'])
     expect(source.category).toBe('Proyecto')

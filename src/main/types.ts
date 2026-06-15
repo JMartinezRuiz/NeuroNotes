@@ -67,6 +67,7 @@ export interface NoteRecord {
   analysisStatus: AnalysisStatus
   analysisError?: string
   analysisRun?: AnalysisRun
+  trainingReviewedAt?: string
   createdAt: string
   updatedAt: string
 }
