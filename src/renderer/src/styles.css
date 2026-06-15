@@ -146,6 +146,15 @@ button:disabled {
   background: var(--accent-strong);
 }
 
+.capture-message {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .search-box {
   display: flex;
   align-items: center;

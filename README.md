@@ -23,6 +23,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Single-instance desktop guard: launching Neuronotes again focuses the existing window instead of opening a second writer.
 - Main window size, position, and maximized state are restored between launches.
 - Quick note capture, auto-save editor, search, category filters, and metadata editing.
+- Quick capture reports creation and automatic analysis status, including local fallback when Qwen is not ready.
 - Accent-insensitive search and tag normalization for Spanish notes.
 - Native desktop menu with keyboard shortcuts for capture, search, save, analysis, export, settings, and note/network views.
 - Native confirmation before deleting notes.

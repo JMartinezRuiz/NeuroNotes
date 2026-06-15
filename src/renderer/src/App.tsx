@@ -30,6 +30,7 @@ import {
   pendingAnalysisResultMessage,
   shouldAutoAnalyzePending
 } from './analysisAutomation'
+import { analysisResultMessage, quickCaptureProgressMessage, quickCaptureResultMessage } from './analysisMessages'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges } from './graph'
 import { normalizeSearchText, noteMatchesSearch } from './search'
@@ -145,24 +146,6 @@ function saveStateLabel(saveState: SaveState): string {
   return 'Guardado'
 }
 
-function analysisResultMessage(note: NoteRecord, requestedEngine: 'qwen' | 'local'): string {
-  if (note.analysisStatus === 'qwen') {
-    return 'Analisis Qwen listo.'
-  }
-
-  if (note.analysisStatus === 'fallback') {
-    return requestedEngine === 'local'
-      ? 'Analisis local listo. Qwen puede actualizar esta nota cuando el modelo este disponible.'
-      : 'Qwen no respondio; analisis local listo.'
-  }
-
-  if (note.analysisStatus === 'error') {
-    return 'No se pudo analizar la nota.'
-  }
-
-  return 'La nota cambio durante el analisis. Vuelve a analizarla para actualizar la IA.'
-}
-
 function canReviewForFineTune(note: NoteRecord): boolean {
   if (!note.content.trim() || (note.analysisStatus !== 'qwen' && note.analysisStatus !== 'fallback')) {
     return false
@@ -229,6 +212,7 @@ export default function App(): JSX.Element {
   const [health, setHealth] = useState<AiHealth>(emptyHealth)
   const [busy, setBusy] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('saved')
+  const [captureMessage, setCaptureMessage] = useState<string>('')
   const [editorMessage, setEditorMessage] = useState<string>('')
   const [libraryMessage, setLibraryMessage] = useState<string>('')
   const [mcpConfig, setMcpConfig] = useState<McpConnectionConfig | null>(null)
@@ -684,13 +668,22 @@ export default function App(): JSX.Element {
 
     setBusy('create')
     try {
+      const engine = pendingAnalysisEngine(health.ok)
       const created = await api.createNote(content)
       setQuickNote('')
       setSelectedId(created.id)
       await refreshNotes(created.id)
+      setCaptureMessage(quickCaptureProgressMessage(settings.autoAnalyze, engine))
 
       if (settings.autoAnalyze) {
-        await runAnalysis(created.id)
+        setBusy('analyzeQuick')
+        const analyzed = await api.analyzeNote(created.id, engine)
+        await refreshNotes(analyzed.id)
+        const message = quickCaptureResultMessage(analyzed, engine)
+        setCaptureMessage(message)
+        setEditorMessage(analysisResultMessage(analyzed, engine))
+      } else {
+        setEditorMessage('Nota creada.')
       }
     } finally {
       setBusy(null)
@@ -1113,14 +1106,20 @@ export default function App(): JSX.Element {
           <textarea
             ref={quickCaptureRef}
             value={quickNote}
-            onChange={(event) => setQuickNote(event.target.value)}
+            onChange={(event) => {
+              setQuickNote(event.target.value)
+              if (captureMessage) {
+                setCaptureMessage('')
+              }
+            }}
             placeholder="Nota rapida"
             rows={4}
           />
-          <button type="submit" disabled={busy === 'create'} title="Crear nota">
-            {busy === 'create' ? <Loader2 className="spin" size={17} /> : <Plus size={17} />}
-            Crear
+          <button type="submit" disabled={busy === 'create' || busy === 'analyzeQuick'} title="Crear nota">
+            {busy === 'create' || busy === 'analyzeQuick' ? <Loader2 className="spin" size={17} /> : <Plus size={17} />}
+            {busy === 'analyzeQuick' ? 'Analizando' : 'Crear'}
           </button>
+          {captureMessage && <small className="capture-message">{captureMessage}</small>}
         </form>
 
         <label className="search-box">
