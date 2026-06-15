@@ -461,6 +461,25 @@ describe('analyzeNote', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('keeps existing tags and infers local Qwen, RAG, and MCP topic tags', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const source = note({
+      id: 'source',
+      tags: ['cliente'],
+      content: 'Cliente pide revisar MCP y RAG para Qwen, preparar automatizacion y enlaces de notas.'
+    })
+
+    const analysis = await analyzeNote(source, [source], settings, 'local')
+
+    expect(analysis).toMatchObject({
+      status: 'fallback',
+      tags: expect.arrayContaining(['cliente', 'qwen', 'rag', 'mcp', 'tarea'])
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('normalizes Spanish accents in local fallback analysis', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)

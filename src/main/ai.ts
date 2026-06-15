@@ -474,15 +474,7 @@ function fallbackAnalysis(note: NoteRecord, related: RelatedNote[]): Omit<Analys
   const summary = words.slice(0, 34).join(' ') + (words.length > 34 ? '...' : '')
   const text = normalizeAnalyzerText(note.content)
   const category = guessCategory(text)
-  const tags = Array.from(
-    new Set(
-      text
-        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-        .split(/\s+/)
-        .filter((token) => token.length > 4)
-        .slice(0, 12)
-    )
-  ).slice(0, 5)
+  const tags = inferFallbackTags(note, text)
 
   return {
     title,
@@ -492,6 +484,69 @@ function fallbackAnalysis(note: NoteRecord, related: RelatedNote[]): Omit<Analys
     related,
     suggestedActions: inferSuggestedActions(note.content)
   }
+}
+
+const LOCAL_TAG_PATTERNS: Array<{ tag: string; pattern: RegExp }> = [
+  { tag: 'qwen', pattern: /\b(qwen|ollama|llm|modelo|modelos)\b/ },
+  { tag: 'ia-local', pattern: /\b(ia|local|offline)\b/ },
+  { tag: 'rag', pattern: /\b(rag|retrieval|contexto|contextual|enlazar|enlace|enlaces|relacionad[ao]s?)\b/ },
+  { tag: 'mcp', pattern: /\b(mcp|herramienta|herramientas|tool|tools|handoff|automatizacion|workflow)\b/ },
+  { tag: 'roadmap', pattern: /\b(roadmap|plan|planes|hito|hitos|lanzamiento)\b/ },
+  { tag: 'producto', pattern: /\b(producto|feature|funcion|app|aplicacion)\b/ },
+  { tag: 'tarea', pattern: /\b(tarea|pendiente|hacer|preparar|crear|revisar|enviar|llamar)\b/ },
+  { tag: 'recordatorio', pattern: /\b(recordar|manana|cita|reunion|fecha|deadline|vencimiento)\b/ },
+  { tag: 'salud', pattern: /\b(salud|medico|medica|ejercicio|dormir|cita)\b/ },
+  { tag: 'finanzas', pattern: /\b(pago|factura|presupuesto|gasto|dinero|finanzas)\b/ },
+  { tag: 'aprendizaje', pattern: /\b(curso|libro|aprender|estudiar|investigar|paper|fuente)\b/ }
+]
+
+const LOCAL_TAG_STOPWORDS = new Set([
+  'ahora',
+  'cada',
+  'desde',
+  'donde',
+  'entre',
+  'hacer',
+  'hasta',
+  'notas',
+  'nueva',
+  'nuevo',
+  'puede',
+  'sobre',
+  'tener',
+  'tiene',
+  'todas',
+  'todos',
+  'usando',
+  'vamos'
+])
+
+function inferFallbackTags(note: NoteRecord, normalizedText: string): string[] {
+  const topicTags = LOCAL_TAG_PATTERNS.filter((item) => item.pattern.test(normalizedText)).map((item) => item.tag)
+  const tokenTags = frequentContentTags(normalizedText)
+
+  return normalizeNoteTags([...note.tags, ...topicTags, ...tokenTags]).slice(0, 6)
+}
+
+function frequentContentTags(normalizedText: string): string[] {
+  const frequencies = new Map<string, { count: number; firstIndex: number }>()
+  const tokens = normalizedText
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length > 4 && !LOCAL_TAG_STOPWORDS.has(token))
+
+  tokens.forEach((token, index) => {
+    const current = frequencies.get(token)
+    frequencies.set(token, {
+      count: (current?.count ?? 0) + 1,
+      firstIndex: current?.firstIndex ?? index
+    })
+  })
+
+  return [...frequencies.entries()]
+    .sort((left, right) => right[1].count - left[1].count || left[1].firstIndex - right[1].firstIndex)
+    .map(([token]) => token)
+    .slice(0, 8)
 }
 
 function guessCategory(text: string): string {
