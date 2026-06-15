@@ -209,6 +209,12 @@ const PROMPTS = [
     ]
   },
   {
+    name: 'neuronotes_review_mcp_handoff',
+    title: 'Review MCP Handoff',
+    description: 'Review the generated Neuronotes MCP handoff package before any user-approved tool execution.',
+    arguments: []
+  },
+  {
     name: 'neuronotes_library_brief',
     title: 'Neuronotes Library Brief',
     description: 'Summarize the local library, AI readiness, categories, and open action workload.',
@@ -590,6 +596,28 @@ function getPrompt(name, args, database, dbPath) {
             'Marca claramente que cualquier ejecucion futura requiere aprobacion del usuario.',
             '',
             JSON.stringify(actionsPayload, null, 2)
+          ].join('\n')
+        )
+      ]
+    }
+  }
+
+  if (name === 'neuronotes_review_mcp_handoff') {
+    return {
+      description: 'Review the read-only MCP handoff package before any future tool routing.',
+      messages: [
+        textPromptMessage(
+          [
+            'Revisa este paquete de handoff MCP de Neuronotes antes de cualquier ejecucion futura.',
+            'No ejecutes herramientas ni transformes estos drafts en llamadas reales. Trata el paquete como una propuesta que requiere aprobacion explicita del usuario.',
+            '',
+            'Criterios:',
+            '- Verifica que cada accion tenga sourceNote, toolHint y argumentos suficientes.',
+            '- Separa acciones aprobadas de las que todavia necesitan revision.',
+            '- Senala riesgos de privacidad, contexto RAG insuficiente o herramienta MCP ambigua.',
+            '- Propone el orden de revision humana, sin enviar datos a herramientas externas.',
+            '',
+            JSON.stringify(mcpHandoff(database), null, 2)
           ].join('\n')
         )
       ]

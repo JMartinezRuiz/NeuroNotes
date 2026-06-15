@@ -131,6 +131,7 @@ And user-controlled prompt templates:
 
 - `neuronotes_review_rag_analysis`
 - `neuronotes_prepare_action_plan`
+- `neuronotes_review_mcp_handoff`
 - `neuronotes_library_brief`
 
 Run it from the repo with an explicit database path:
@@ -179,7 +180,7 @@ MCP tool execution is not wired into the shipped app yet. The intended direction
 
 When MCP tool execution lands, it should be added as a separate integration layer with clear permissions, tests, and UI indicators showing what data is being sent to a tool.
 
-The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. Users can mark saved actions as approved for MCP handoff, and exports include approval state plus tool-call drafts for external review. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, manual-approval flags, stored RAG snippets, tool summaries, and action-kind summaries. The stdio server exposes the same handoff shape through `neuronotes_mcp_handoff` and `neuronotes://actions/handoff`, so MCP hosts can inspect ready drafts without executing tools. The stdio server can also report Qwen/Ollama setup guidance and the latest stored JSON/RAG diagnostic through `neuronotes_qwen_setup`, but it does not install Ollama, pull models, or run diagnostics. The stdio server is intentionally read-only today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
+The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. Users can mark saved actions as approved for MCP handoff, and exports include approval state plus tool-call drafts for external review. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, manual-approval flags, stored RAG snippets, tool summaries, and action-kind summaries. The stdio server exposes the same handoff shape through `neuronotes_mcp_handoff` and `neuronotes://actions/handoff`, plus a `neuronotes_review_mcp_handoff` prompt that asks the host to review risks and missing approvals without executing tools. The stdio server can also report Qwen/Ollama setup guidance and the latest stored JSON/RAG diagnostic through `neuronotes_qwen_setup`, but it does not install Ollama, pull models, or run diagnostics. The stdio server is intentionally read-only today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
 
 ## Fine-Tuning Dataset
 

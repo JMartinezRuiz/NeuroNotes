@@ -258,6 +258,7 @@ describe('neuronotes MCP server', () => {
     expect(listResponse.result.prompts.map((prompt) => prompt.name)).toEqual([
       'neuronotes_review_rag_analysis',
       'neuronotes_prepare_action_plan',
+      'neuronotes_review_mcp_handoff',
       'neuronotes_library_brief'
     ])
 
@@ -296,6 +297,23 @@ describe('neuronotes MCP server', () => {
 
     expect(actionPlanResponse.result.messages[0].content.text).toContain('action-reminder')
     expect(actionPlanResponse.result.messages[0].content.text).not.toContain('action-done')
+
+    const handoffReviewResponse = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 'prompts-4',
+        method: 'prompts/get',
+        params: {
+          name: 'neuronotes_review_mcp_handoff',
+          arguments: {}
+        }
+      },
+      { dbPath }
+    )
+
+    expect(handoffReviewResponse.result.messages[0].content.text).toContain('neuronotes.mcp-handoff.v1')
+    expect(handoffReviewResponse.result.messages[0].content.text).toContain('No ejecutes herramientas')
+    expect(handoffReviewResponse.result.messages[0].content.text).toContain('action-reminder')
   })
 
   it('searches local notes with normalized Spanish text', async () => {
