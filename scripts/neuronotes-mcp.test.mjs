@@ -278,6 +278,21 @@ describe('neuronotes MCP server', () => {
     })
   })
 
+  it('searches saved local actions attached to source notes', async () => {
+    const result = await callTool(
+      'neuronotes_search_notes',
+      {
+        query: 'cerrar tarea antigua'
+      },
+      { dbPath }
+    )
+
+    expect(result.notes[0]).toMatchObject({
+      id: 'note-project',
+      suggestedActionCount: 0
+    })
+  })
+
   it('returns a full note with saved actions and RAG audit context', async () => {
     const response = await handleMcpMessage(
       {

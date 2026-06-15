@@ -27,7 +27,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Note list rows show compact AI status badges for Qwen, local fallback, pending, and error states.
 - Sidebar filters can narrow notes by AI status to find Qwen-ready notes, local fallback notes, pending notes, and errors.
 - Sidebar filters can also isolate notes pending fine-tuning approval and notes already approved for JSONL export.
-- Search covers note text plus AI-generated actions, related-note titles, tool hints, and stored RAG audit context.
+- Search covers note text plus AI-generated and saved actions, related-note titles, tool hints, and stored RAG audit context.
 - Accent-insensitive search and tag normalization for Spanish notes.
 - Native desktop menu with keyboard shortcuts for capture, search, save, analysis, export, settings, and note/network views.
 - Native confirmation before deleting notes.

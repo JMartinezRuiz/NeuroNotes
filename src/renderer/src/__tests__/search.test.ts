@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { normalizeSearchText, noteMatchesSearch } from '../search'
-import { NoteRecord } from '../types'
+import { ActionItem, NoteRecord } from '../types'
 
 function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
   const now = '2026-06-15T00:00:00.000Z'
@@ -15,6 +15,25 @@ function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
     related: [],
     suggestedActions: [],
     analysisStatus: 'fallback',
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  }
+}
+
+function action(overrides: Partial<ActionItem> = {}): ActionItem {
+  const now = '2026-06-15T00:00:00.000Z'
+
+  return {
+    id: 'action-1',
+    noteId: 'note-1',
+    noteTitle: 'Cita medica',
+    kind: 'task',
+    title: 'Preparar agenda',
+    detail: 'Convertir la nota en una tarea de seguimiento.',
+    toolHint: 'task.create',
+    confidence: 0.72,
+    status: 'open',
     createdAt: now,
     updatedAt: now,
     ...overrides
@@ -82,6 +101,22 @@ describe('noteMatchesSearch', () => {
     expect(noteMatchesSearch(source, 'reminder.create')).toBe(true)
     expect(noteMatchesSearch(source, 'roadmap mcp')).toBe(true)
     expect(noteMatchesSearch(source, 'contexto rag qwen')).toBe(true)
+  })
+
+  it('matches saved local actions attached to a note', () => {
+    const source = note({ suggestedActions: [] })
+
+    expect(noteMatchesSearch(source, 'calendar.create_event')).toBe(false)
+    expect(
+      noteMatchesSearch(source, 'calendar.create_event', [
+        action({
+          kind: 'reminder',
+          title: 'Agendar cita',
+          detail: 'Crear evento de calendario desde la nota.',
+          toolHint: 'calendar.create_event'
+        })
+      ])
+    ).toBe(true)
   })
 
   it('returns false when the query is not present', () => {

@@ -32,7 +32,7 @@ const TOOLS = [
       properties: {
         query: {
           type: 'string',
-          description: 'Optional text to search in title, summary, content, category, and tags.'
+          description: 'Optional text to search in notes, tags, related context, suggested actions, saved actions, and RAG audit data.'
         },
         category: {
           type: 'string',
@@ -598,11 +598,12 @@ function searchNotes(database, args) {
   const tags = arrayArg(args.tags).map(normalizeTag).filter(Boolean)
   const analysisStatus = stringArg(args.analysisStatus)
   const limit = limitArg(args.limit)
+  const actionsByNoteId = groupActionsByNoteId(database.actions)
 
   const matches = database.notes
     .map((note) => ({
       note,
-      score: scoreNote(note, query, tags)
+      score: scoreNote(note, query, tags, actionsByNoteId.get(note.id) ?? [])
     }))
     .filter(({ note, score }) => {
       if (query && score <= 0) {
@@ -628,6 +629,16 @@ function searchNotes(database, args) {
     count: matches.length,
     notes: matches
   }
+}
+
+function groupActionsByNoteId(actions) {
+  const grouped = new Map()
+
+  for (const action of actions) {
+    grouped.set(action.noteId, [...(grouped.get(action.noteId) ?? []), action])
+  }
+
+  return grouped
 }
 
 function getNote(database, args) {
@@ -910,7 +921,7 @@ function noteSummary(note, score = 0) {
   }
 }
 
-function scoreNote(note, query, tags) {
+function scoreNote(note, query, tags, savedActions = []) {
   let score = tags.length > 0 ? tags.length * 0.3 : 0
 
   if (!query) {
@@ -926,6 +937,11 @@ function scoreNote(note, query, tags) {
   const actions = normalizeText(
     note.suggestedActions
       .map((action) => `${action.kind} ${action.title} ${action.detail} ${action.toolHint ?? ''}`)
+      .join(' ')
+  )
+  const savedActionsText = normalizeText(
+    savedActions
+      .map((action) => `${action.status} ${action.kind} ${action.title} ${action.detail} ${action.toolHint ?? ''}`)
       .join(' ')
   )
   const rag = normalizeText(
@@ -955,6 +971,9 @@ function scoreNote(note, query, tags) {
   if (actions.includes(query)) {
     score += 2.4
   }
+  if (savedActionsText.includes(query)) {
+    score += 2.2
+  }
   if (related.includes(query) || rag.includes(query)) {
     score += 1.8
   }
@@ -974,6 +993,9 @@ function scoreNote(note, query, tags) {
     }
     if (actions.includes(term)) {
       score += 1.1
+    }
+    if (savedActionsText.includes(term)) {
+      score += 1
     }
     if (related.includes(term) || rag.includes(term)) {
       score += 0.8

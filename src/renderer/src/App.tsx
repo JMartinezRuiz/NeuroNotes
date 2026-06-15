@@ -359,6 +359,15 @@ export default function App(): JSX.Element {
   )
   const analysisStatusFilterOptions = useMemo(() => summarizeAnalysisStatusFilters(notes), [notes])
   const fineTuneReviewFilterOptions = useMemo(() => summarizeFineTuneReviewFilters(notes), [notes])
+  const savedActionsByNoteId = useMemo(() => {
+    const grouped = new Map<string, ActionItem[]>()
+
+    for (const action of actions) {
+      grouped.set(action.noteId, [...(grouped.get(action.noteId) ?? []), action])
+    }
+
+    return grouped
+  }, [actions])
   const linkableNotes = useMemo(() => {
     if (!selectedNote) {
       return []
@@ -384,8 +393,10 @@ export default function App(): JSX.Element {
       noteMatchesFineTuneReviewFilter(note, activeFineTuneFilter)
     )
 
-    return fineTuneFilteredNotes.filter((note) => noteMatchesSearch(note, search))
-  }, [activeAnalysisFilter, activeCategory, activeFineTuneFilter, notes, search])
+    return fineTuneFilteredNotes.filter((note) =>
+      noteMatchesSearch(note, search, savedActionsByNoteId.get(note.id) ?? [])
+    )
+  }, [activeAnalysisFilter, activeCategory, activeFineTuneFilter, notes, savedActionsByNoteId, search])
 
   useEffect(() => {
     return api.onCommand((command) => {
