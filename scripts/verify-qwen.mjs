@@ -286,7 +286,14 @@ async function verifyQwen(options) {
     }
   }
 
-  const installedModels = await getInstalledModels(options.endpoint, options.timeoutMs)
+  let installedModels
+
+  try {
+    installedModels = await getInstalledModels(options.endpoint, options.timeoutMs)
+  } catch (error) {
+    return buildOllamaConnectionFailureResult(options, error)
+  }
+
   const modelInstalled = installedModels.some((model) => model.toLowerCase() === options.model.toLowerCase())
 
   if (!modelInstalled) {
@@ -335,9 +342,9 @@ function withRecoveryHints(result) {
 function recoveryNextSteps(stage, model = DEFAULT_MODEL) {
   if (stage === 'ollama-not-installed') {
     return [
-      'Install Ollama on Windows.',
+      'Install Ollama locally.',
       `Pull the configured Qwen model: ${model}.`,
-      'Run npm run verify:qwen:start:pull to start Ollama, pull the model if needed, and verify JSON generation.'
+      'Run npm run setup:qwen:win:install on Windows to install Ollama, pull Qwen, and verify JSON generation.'
     ]
   }
 
@@ -362,6 +369,7 @@ function recoveryNextSteps(stage, model = DEFAULT_MODEL) {
 function recoverySetupCommands(stage, model = DEFAULT_MODEL) {
   if (stage === 'ollama-not-installed') {
     return [
+      'npm run setup:qwen:win:install',
       'irm https://ollama.com/install.ps1 | iex',
       `ollama pull ${model}`,
       'npm run verify:qwen:start:json'
@@ -377,6 +385,41 @@ function recoverySetupCommands(stage, model = DEFAULT_MODEL) {
   }
 
   return ['npm run verify:qwen:start:json']
+}
+
+async function buildOllamaConnectionFailureResult(options, error) {
+  const executablePath = await findOllamaExecutable()
+  const stage = classifyOllamaConnectionFailure(options.endpoint, executablePath)
+  const fallbackMessage = error instanceof Error ? error.message : 'Ollama verification failed'
+
+  return withRecoveryHints({
+    ok: false,
+    stage,
+    message:
+      stage === 'ollama-not-installed'
+        ? 'Ollama executable not found. Install Ollama or add it to PATH.'
+        : fallbackMessage,
+    endpoint: options.endpoint,
+    model: options.model,
+    runtimeExecutablePath: executablePath
+  })
+}
+
+function classifyOllamaConnectionFailure(endpoint, executablePath) {
+  if (executablePath) {
+    return 'ollama-unavailable'
+  }
+
+  return isLocalEndpoint(endpoint) ? 'ollama-not-installed' : 'ollama-unavailable'
+}
+
+function isLocalEndpoint(endpoint) {
+  try {
+    const url = new URL(endpoint)
+    return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname)
+  } catch {
+    return false
+  }
 }
 
 async function ensureOllamaAvailable(options) {
@@ -616,6 +659,7 @@ export {
   parseArgs,
   parseJson,
   validateProbeAnalysis,
+  classifyOllamaConnectionFailure,
   recoveryNextSteps,
   recoverySetupCommands,
   resolveOllamaHostEnv,

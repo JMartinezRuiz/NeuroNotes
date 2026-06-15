@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { parseArgs, parseJson, recoveryNextSteps, recoverySetupCommands, resolveOllamaHostEnv } from './verify-qwen.mjs'
+import {
+  classifyOllamaConnectionFailure,
+  parseArgs,
+  parseJson,
+  recoveryNextSteps,
+  recoverySetupCommands,
+  resolveOllamaHostEnv
+} from './verify-qwen.mjs'
 
 describe('verify-qwen script options', () => {
   it('parses start and pull options with sane defaults', () => {
@@ -35,15 +42,25 @@ describe('verify-qwen script options', () => {
 
   it('suggests Windows setup commands when Ollama is missing', () => {
     expect(recoveryNextSteps('ollama-not-installed', 'qwen3.5:0.8b')).toEqual([
-      'Install Ollama on Windows.',
+      'Install Ollama locally.',
       'Pull the configured Qwen model: qwen3.5:0.8b.',
-      'Run npm run verify:qwen:start:pull to start Ollama, pull the model if needed, and verify JSON generation.'
+      'Run npm run setup:qwen:win:install on Windows to install Ollama, pull Qwen, and verify JSON generation.'
     ])
     expect(recoverySetupCommands('ollama-not-installed', 'qwen3.5:0.8b')).toEqual([
+      'npm run setup:qwen:win:install',
       'irm https://ollama.com/install.ps1 | iex',
       'ollama pull qwen3.5:0.8b',
       'npm run verify:qwen:start:json'
     ])
+  })
+
+  it('distinguishes a missing local executable from an unavailable runtime', () => {
+    expect(classifyOllamaConnectionFailure('http://127.0.0.1:11434')).toBe('ollama-not-installed')
+    expect(classifyOllamaConnectionFailure('http://localhost:11434')).toBe('ollama-not-installed')
+    expect(classifyOllamaConnectionFailure('http://127.0.0.1:11434', 'C:\\Ollama\\ollama.exe')).toBe(
+      'ollama-unavailable'
+    )
+    expect(classifyOllamaConnectionFailure('http://192.168.1.8:11434')).toBe('ollama-unavailable')
   })
 
   it('suggests a model pull when Ollama is available but Qwen is missing', () => {
