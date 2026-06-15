@@ -40,6 +40,7 @@ export interface McpHandoffPayload {
   model: string
   ollamaUrl: string
   actionCount: number
+  approvedActionCount: number
   doneActionCount: number
   toolSummary: Array<{
     toolHint: string
@@ -59,6 +60,28 @@ export interface McpHandoffPayload {
     detail: string
     toolHint: string | null
     confidence: number
+    approval: {
+      required: boolean
+      state: 'approved' | 'needs-review'
+      approvedAt: string | null
+    }
+    toolCallDraft: {
+      status: 'ready-for-review' | 'needs-tool-selection'
+      toolName: string | null
+      arguments: {
+        kind: string
+        title: string
+        detail: string
+        confidence: number
+        sourceNoteId: string
+        sourceNoteTitle: string
+        sourceNoteSummary: string
+        sourceNoteCategory: string
+        sourceNoteTags: string[]
+        relatedNoteIds: string[]
+        ragContext: RagContextItem[]
+      }
+    }
     createdAt: string
     updatedAt: string
     sourceNote: {
@@ -171,6 +194,8 @@ export function buildMcpHandoffPayload(database: DatabaseFile, exportedAt = new 
       throw new Error('Accion sin nota fuente')
     }
 
+    const approvalState: 'approved' | 'needs-review' = action.mcpApprovedAt ? 'approved' : 'needs-review'
+
     return {
       id: action.id,
       kind: action.kind,
@@ -179,6 +204,12 @@ export function buildMcpHandoffPayload(database: DatabaseFile, exportedAt = new 
       detail: action.detail,
       toolHint: action.toolHint ?? null,
       confidence: action.confidence,
+      approval: {
+        required: true,
+        state: approvalState,
+        approvedAt: action.mcpApprovedAt ?? null
+      },
+      toolCallDraft: buildToolCallDraft(action, note),
       createdAt: action.createdAt,
       updatedAt: action.updatedAt,
       sourceNote: {
@@ -213,6 +244,7 @@ export function buildMcpHandoffPayload(database: DatabaseFile, exportedAt = new 
     model: database.settings.model,
     ollamaUrl: database.settings.ollamaUrl,
     actionCount: actions.length,
+    approvedActionCount: actions.filter((action) => action.approval.state === 'approved').length,
     doneActionCount: database.actions.filter((action) => action.status === 'done').length,
     toolSummary: buildToolSummary(actions),
     kindSummary: buildKindSummary(actions),
@@ -327,6 +359,28 @@ function buildKindSummary(actions: McpHandoffPayload['actions']): McpHandoffPayl
   return [...summary.entries()]
     .map(([kind, actionCount]) => ({ kind, actionCount }))
     .sort((a, b) => b.actionCount - a.actionCount || a.kind.localeCompare(b.kind))
+}
+
+function buildToolCallDraft(action: ActionItem, note: NoteRecord): McpHandoffPayload['actions'][number]['toolCallDraft'] {
+  const ragContext = note.analysisRun?.ragContext ?? []
+
+  return {
+    status: action.toolHint ? 'ready-for-review' : 'needs-tool-selection',
+    toolName: action.toolHint ?? null,
+    arguments: {
+      kind: action.kind,
+      title: action.title,
+      detail: action.detail,
+      confidence: action.confidence,
+      sourceNoteId: note.id,
+      sourceNoteTitle: note.title,
+      sourceNoteSummary: note.summary,
+      sourceNoteCategory: note.category,
+      sourceNoteTags: note.tags,
+      relatedNoteIds: note.related.map((related) => related.noteId),
+      ragContext
+    }
+  }
 }
 
 function isFineTuneCandidate(note: NoteRecord): boolean {

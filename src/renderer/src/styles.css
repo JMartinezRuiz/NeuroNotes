@@ -1172,6 +1172,16 @@ button:disabled {
   font-size: 11px;
 }
 
+.plan-action-row code[data-approval='pending'] {
+  color: var(--amber);
+  background: #fff0d8;
+}
+
+.plan-action-row code[data-approval='approved'] {
+  color: var(--accent-strong);
+  background: #dff4ea;
+}
+
 .plan-action-buttons {
   display: flex;
   gap: 6px;
@@ -1583,6 +1593,16 @@ button:disabled {
   border-radius: 6px;
   background: #e5f4ec;
   font-size: 11px;
+}
+
+.saved-action-row code[data-approval='pending'] {
+  color: var(--amber);
+  background: #fff0d8;
+}
+
+.saved-action-row code[data-approval='approved'] {
+  color: var(--accent-strong);
+  background: #dff4ea;
 }
 
 .saved-action-actions {

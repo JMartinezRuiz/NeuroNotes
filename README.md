@@ -44,6 +44,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Late AI results are ignored if the note changed while analysis was running, preventing stale Qwen/local output from overwriting user edits.
 - Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
 - Local action plan: users can save suggested actions, review them in a global Plan view, mark them done, delete them, and carry them through library/Markdown export.
+- Saved actions can be explicitly approved or revoked for MCP handoff review before any future external tool execution exists.
 - MCP handoff JSON export for open local actions, including tool summaries, action-kind summaries, tool hints, source-note context, and stored RAG snippets without executing external tools.
 - Read-only MCP stdio server for local hosts that need to search notes, read note context, list open action intents, and inspect library readiness.
 - MCP connection config is available from the app settings panel, including the stdio command, database path, and host-ready `mcpServers.neuronotes` JSON.
@@ -66,8 +67,8 @@ The analysis flow is:
 4. Qwen 0.8B is called through Ollama with a strict JSON prompt.
 5. The response is sanitized and merged with local related-note ranking.
 6. Suggested action intents are stored locally without executing external tools.
-7. The user can promote suggested actions into a local note plan before any future MCP tool execution is allowed.
-8. Open local actions can be exported as a Neuronotes MCP handoff JSON file for a future user-approved tool layer.
+7. The user can promote suggested actions into a local note plan and explicitly approve selected actions for MCP handoff review.
+8. Open local actions can be exported as a Neuronotes MCP handoff JSON file with approval state and tool-call drafts for a future user-approved tool layer.
 9. Reviewed analyzed notes can be exported as local supervised JSONL examples for future Qwen fine-tuning if RAG alone is not enough.
 10. If Qwen is unavailable or does not answer in time, the app uses local fallback categorization, summary, tags, links, and action hints.
 11. The note stores an audit record of the analysis run, including the retrieved RAG snippets.
@@ -151,7 +152,7 @@ MCP tool execution is not wired into the shipped app yet. The intended direction
 
 When MCP tool execution lands, it should be added as a separate integration layer with clear permissions, tests, and UI indicators showing what data is being sent to a tool.
 
-The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, manual-approval flags, stored RAG snippets, tool summaries, and action-kind summaries. The stdio server is also intentionally read-only today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
+The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. Users can mark saved actions as approved for MCP handoff, and exports include approval state plus tool-call drafts for external review. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, manual-approval flags, stored RAG snippets, tool summaries, and action-kind summaries. The stdio server is also intentionally read-only today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
 
 ## Fine-Tuning Dataset
 

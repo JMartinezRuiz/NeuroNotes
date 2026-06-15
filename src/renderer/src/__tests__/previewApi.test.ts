@@ -119,4 +119,19 @@ describe('createPreviewApi', () => {
     expect(updated?.related.some((related) => related.noteId === target.id)).toBe(false)
     expect(updated?.trainingReviewedAt).toBeUndefined()
   })
+
+  it('toggles MCP approval on saved preview actions', async () => {
+    const api = createPreviewApi()
+    const note = await api.createNote('Preparar accion MCP desde una nota nueva')
+    await api.analyzeNote(note.id, 'qwen')
+
+    const action = await api.createActionFromSuggestion(note.id, 0)
+    const approved = await api.setActionMcpApproval(action.id, true)
+
+    expect(approved.mcpApprovedAt).toBeTruthy()
+
+    const revoked = await api.setActionMcpApproval(action.id, false)
+
+    expect(revoked.mcpApprovedAt).toBeUndefined()
+  })
 })

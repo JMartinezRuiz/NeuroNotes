@@ -70,6 +70,19 @@ export function setActionItemStatus(database: DatabaseFile, actionId: string, st
   return action
 }
 
+export function setActionItemMcpApproval(database: DatabaseFile, actionId: string, approved: boolean): ActionItem {
+  const action = database.actions.find((item) => item.id === actionId)
+
+  if (!action) {
+    throw new Error('Accion no encontrada')
+  }
+
+  const now = new Date().toISOString()
+  action.mcpApprovedAt = approved ? now : undefined
+  action.updatedAt = now
+  return action
+}
+
 export function deleteActionItem(database: DatabaseFile, actionId: string): void {
   const initialLength = database.actions.length
   database.actions = database.actions.filter((item) => item.id !== actionId)

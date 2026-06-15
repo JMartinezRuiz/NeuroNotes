@@ -600,6 +600,8 @@ function listOpenActions(database, args) {
 
       return {
         ...action,
+        approval: mcpApproval(action),
+        toolCallDraft: note ? buildToolCallDraft(action, note) : null,
         sourceNote: note
           ? {
               id: note.id,
@@ -616,7 +618,36 @@ function listOpenActions(database, args) {
   return {
     schema: 'neuronotes.mcp.actions.v1',
     count: actions.length,
+    approvedCount: actions.filter((action) => action.approval.state === 'approved').length,
     actions
+  }
+}
+
+function mcpApproval(action) {
+  return {
+    required: true,
+    state: action.mcpApprovedAt ? 'approved' : 'needs-review',
+    approvedAt: action.mcpApprovedAt ?? null
+  }
+}
+
+function buildToolCallDraft(action, note) {
+  return {
+    status: action.toolHint ? 'ready-for-review' : 'needs-tool-selection',
+    toolName: action.toolHint ?? null,
+    arguments: {
+      kind: action.kind,
+      title: action.title,
+      detail: action.detail,
+      confidence: action.confidence,
+      sourceNoteId: note.id,
+      sourceNoteTitle: note.title,
+      sourceNoteSummary: note.summary,
+      sourceNoteCategory: note.category,
+      sourceNoteTags: note.tags,
+      relatedNoteIds: note.related.map((related) => related.noteId),
+      ragContext: note.analysisRun?.ragContext ?? []
+    }
   }
 }
 
@@ -624,6 +655,7 @@ function librarySummary(database, dbPath) {
   const categoryCounts = countBy(database.notes, (note) => note.category)
   const statusCounts = countBy(database.notes, (note) => note.analysisStatus)
   const actionCounts = countBy(database.actions, (action) => action.status)
+  const approvedActionCount = database.actions.filter((action) => action.status === 'open' && action.mcpApprovedAt).length
 
   return {
     schema: 'neuronotes.mcp.summary.v1',
@@ -632,6 +664,7 @@ function librarySummary(database, dbPath) {
     noteCount: database.notes.length,
     actionCount: database.actions.length,
     openActionCount: actionCounts.open ?? 0,
+    mcpApprovedActionCount: approvedActionCount,
     reviewedFineTuneCount: database.notes.filter((note) => Boolean(note.trainingReviewedAt)).length,
     qwenAnalyzedCount: statusCounts.qwen ?? 0,
     fallbackAnalyzedCount: statusCounts.fallback ?? 0,
@@ -876,6 +909,11 @@ function normalizeAction(value) {
   const toolHint = stringArg(value.toolHint)
   if (toolHint) {
     action.toolHint = toolHint
+  }
+
+  const mcpApprovedAt = stringArg(value.mcpApprovedAt)
+  if (mcpApprovedAt) {
+    action.mcpApprovedAt = mcpApprovedAt
   }
 
   return action

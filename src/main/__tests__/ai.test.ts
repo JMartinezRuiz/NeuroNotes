@@ -81,6 +81,7 @@ describe('checkOllama', () => {
     await expect(checkOllama(settings)).resolves.toMatchObject({
       ok: false,
       status: 'ollama-missing',
+      message: 'Ollama no disponible en http://127.0.0.1:11434',
       ollamaAvailable: false
     })
   })

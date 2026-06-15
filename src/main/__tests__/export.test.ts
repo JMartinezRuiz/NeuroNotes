@@ -134,6 +134,7 @@ describe('buildMcpHandoffPayload', () => {
           title: 'Crear tarea',
           detail: 'Convertir esta nota en una tarea local.',
           toolHint: 'task.create',
+          mcpApprovedAt: now,
           confidence: 0.75,
           status: 'open',
           createdAt: now,
@@ -178,6 +179,7 @@ describe('buildMcpHandoffPayload', () => {
       },
       model: DEFAULT_SETTINGS.model,
       actionCount: 2,
+      approvedActionCount: 1,
       doneActionCount: 1
     })
     expect(payload.toolSummary).toEqual([
@@ -211,6 +213,32 @@ describe('buildMcpHandoffPayload', () => {
           kind: 'task',
           status: 'open',
           toolHint: 'task.create',
+          approval: {
+            required: true,
+            state: 'approved',
+            approvedAt: now
+          },
+          toolCallDraft: expect.objectContaining({
+            status: 'ready-for-review',
+            toolName: 'task.create',
+            arguments: expect.objectContaining({
+              kind: 'task',
+              title: 'Crear tarea',
+              sourceNoteId: sourceNote.id,
+              relatedNoteIds: ['note-2'],
+              ragContext: [
+                {
+                  noteId: 'note-2',
+                  title: 'Interfaz minimalista',
+                  category: 'Ideas',
+                  tags: ['ui', 'notas'],
+                  score: 0.82,
+                  reason: 'Comparte contexto de producto.',
+                  excerpt: 'Direccion visual para una interfaz sobria y centrada en escritura.'
+                }
+              ]
+            })
+          }),
           sourceNote: expect.objectContaining({
             id: sourceNote.id,
             title: sourceNote.title,
@@ -239,7 +267,16 @@ describe('buildMcpHandoffPayload', () => {
           id: 'action-open-unassigned',
           kind: 'mcp',
           status: 'open',
-          toolHint: null
+          toolHint: null,
+          approval: {
+            required: true,
+            state: 'needs-review',
+            approvedAt: null
+          },
+          toolCallDraft: expect.objectContaining({
+            status: 'needs-tool-selection',
+            toolName: null
+          })
         })
       ])
     )

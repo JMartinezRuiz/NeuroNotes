@@ -9,6 +9,7 @@ import {
   deleteActionItem,
   listActionItems,
   removeActionItemsForNote,
+  setActionItemMcpApproval,
   setActionItemStatus,
   syncActionNoteTitle
 } from './actions'
@@ -18,6 +19,7 @@ import { synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
 import { buildMcpConnectionConfig, resolveMcpServerPath } from './mcpConfig'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
+import { resolvePreloadPath } from './preloadPath'
 import {
   canApplyAnalysisResult,
   clearTrainingReview,
@@ -61,7 +63,7 @@ function createWindow(): void {
     icon: path.join(__dirname, '../../build/icon.ico'),
     backgroundColor: '#f7f5ef',
     webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
+      preload: resolvePreloadPath(__dirname),
       sandbox: false,
       contextIsolation: true
     }
@@ -394,6 +396,12 @@ function registerIpcHandlers(): void {
 
     return mutateDatabase((database) => {
       return setActionItemStatus(database, actionId, status)
+    })
+  })
+
+  ipcMain.handle('actions:setMcpApproval', async (_, actionId: string, approved: unknown) => {
+    return mutateDatabase((database) => {
+      return setActionItemMcpApproval(database, actionId, approved === true)
     })
   })
 

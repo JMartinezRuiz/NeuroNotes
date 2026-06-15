@@ -121,6 +121,7 @@ let actions: ActionItem[] = [
     title: 'Definir plan MCP',
     detail: 'Convertir el roadmap en una lista de tareas para la integracion MCP.',
     toolHint: 'task.create',
+    mcpApprovedAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
     confidence: 0.78,
     status: 'open',
     createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
@@ -577,6 +578,18 @@ export function createPreviewApi(): Api {
 
       action.status = status
       action.updatedAt = new Date().toISOString()
+      return action
+    },
+    setActionMcpApproval: async (actionId, approved) => {
+      const action = actions.find((item) => item.id === actionId)
+
+      if (!action) {
+        throw new Error('Accion no encontrada')
+      }
+
+      const now = new Date().toISOString()
+      action.mcpApprovedAt = approved ? now : undefined
+      action.updatedAt = now
       return action
     },
     deleteAction: async (actionId) => {

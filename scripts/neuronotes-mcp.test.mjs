@@ -307,11 +307,27 @@ describe('neuronotes MCP server', () => {
     expect(result).toMatchObject({
       schema: 'neuronotes.mcp.actions.v1',
       count: 1,
+      approvedCount: 1,
       actions: [
         {
           id: 'action-reminder',
           status: 'open',
           toolHint: 'reminder.create',
+          approval: {
+            required: true,
+            state: 'approved',
+            approvedAt: '2026-06-15T00:01:30.000Z'
+          },
+          toolCallDraft: {
+            status: 'ready-for-review',
+            toolName: 'reminder.create',
+            arguments: expect.objectContaining({
+              kind: 'reminder',
+              title: 'Crear recordatorio',
+              sourceNoteId: 'note-health',
+              relatedNoteIds: ['note-project']
+            })
+          },
           sourceNote: {
             id: 'note-health',
             category: 'Salud'
@@ -372,6 +388,7 @@ describe('neuronotes MCP server', () => {
       noteCount: 2,
       actionCount: 2,
       openActionCount: 1,
+      mcpApprovedActionCount: 1,
       qwenAnalyzedCount: 1,
       fallbackAnalyzedCount: 1,
       execution: {
@@ -464,6 +481,7 @@ function sampleDatabase() {
         title: 'Crear recordatorio',
         detail: 'La nota menciona manana.',
         toolHint: 'reminder.create',
+        mcpApprovedAt: '2026-06-15T00:01:30.000Z',
         confidence: 0.8,
         status: 'open',
         createdAt: '2026-06-15T00:01:00.000Z',

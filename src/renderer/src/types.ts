@@ -52,6 +52,7 @@ export interface ActionItem {
   title: string
   detail: string
   toolHint?: string
+  mcpApprovedAt?: string
   confidence: number
   status: ActionItemStatus
   createdAt: string

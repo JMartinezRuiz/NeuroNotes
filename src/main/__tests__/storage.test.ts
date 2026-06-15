@@ -83,6 +83,17 @@ describe('readDatabase', () => {
     expect(restored.notes.map((item) => item.id)).toEqual(['recoverable'])
     expect(repairedMain.notes.map((item) => item.id)).toEqual(['recoverable'])
   })
+
+  it('serializes initial database creation across concurrent reads', async () => {
+    const [first, second, third] = await Promise.all([readDatabase(), readDatabase(), readDatabase()])
+    const paths = databasePaths(mockState.userDataPath)
+    const created = JSON.parse(await readFile(paths.data, 'utf8')) as DatabaseFile
+
+    expect(first).toMatchObject({ version: 1, notes: [], actions: [] })
+    expect(second).toMatchObject({ version: 1, notes: [], actions: [] })
+    expect(third).toMatchObject({ version: 1, notes: [], actions: [] })
+    expect(created).toMatchObject({ version: 1, notes: [], actions: [] })
+  })
 })
 
 describe('normalizeDatabase', () => {
@@ -163,6 +174,7 @@ describe('normalizeDatabase', () => {
           title: '  Revisar despues  ',
           detail: '',
           toolHint: ' reminder.create ',
+          mcpApprovedAt: ' 2026-06-15T00:02:00.000Z ',
           confidence: 4,
           status: 'unknown',
           createdAt: '',
@@ -234,6 +246,7 @@ describe('normalizeDatabase', () => {
       title: 'Revisar despues',
       detail: 'Accion guardada en Neuronotes.',
       toolHint: 'reminder.create',
+      mcpApprovedAt: '2026-06-15T00:02:00.000Z',
       confidence: 1,
       status: 'open',
       updatedAt: '2026-06-15T00:01:00.000Z'

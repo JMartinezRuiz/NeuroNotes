@@ -5,6 +5,7 @@ import {
   listActionItems,
   makeActionItem,
   removeActionItemsForNote,
+  setActionItemMcpApproval,
   setActionItemStatus,
   syncActionNoteTitle
 } from '../actions'
@@ -119,5 +120,20 @@ describe('action item lifecycle', () => {
 
     removeActionItemsForNote(stored, 'note-1')
     expect(stored.actions).toEqual([])
+  })
+
+  it('marks and revokes actions approved for MCP handoff review', () => {
+    const stored = database()
+    const action = createActionItemFromSuggestion(stored, 'note-1', 0)
+
+    const approved = setActionItemMcpApproval(stored, action.id, true)
+
+    expect(approved.mcpApprovedAt).toBeTruthy()
+    expect(approved.updatedAt).toBe(approved.mcpApprovedAt)
+
+    const revoked = setActionItemMcpApproval(stored, action.id, false)
+
+    expect(revoked.mcpApprovedAt).toBeUndefined()
+    expect(revoked.updatedAt).toBeTruthy()
   })
 })

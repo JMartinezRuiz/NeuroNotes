@@ -251,7 +251,7 @@ export default function App(): JSX.Element {
   const doneActions = useMemo(() => actions.filter((action) => action.status === 'done'), [actions])
   const openActionCount = openActions.length
   const doneActionCount = doneActions.length
-  const mcpReadyActionCount = actions.filter((action) => action.toolHint || action.kind === 'mcp').length
+  const mcpApprovedActionCount = openActions.filter((action) => Boolean(action.mcpApprovedAt)).length
   const actionNotesById = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes])
   const savedSuggestedActionKeys = useMemo(
     () => new Set(selectedActionItems.map((action) => actionIdentity(action))),
@@ -886,6 +886,16 @@ export default function App(): JSX.Element {
     }
   }
 
+  async function toggleActionMcpApproval(action: ActionItem): Promise<void> {
+    setBusy(`mcpApproval:${action.id}`)
+    try {
+      await api.setActionMcpApproval(action.id, !action.mcpApprovedAt)
+      await refreshActions()
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function removeActionItem(actionId: string): Promise<void> {
     setBusy(`deleteAction:${actionId}`)
     try {
@@ -1017,6 +1027,7 @@ export default function App(): JSX.Element {
   function renderPlanAction(action: ActionItem): JSX.Element {
     const sourceNote = actionNotesById.get(action.noteId)
     const isDone = action.status === 'done'
+    const isMcpApproved = Boolean(action.mcpApprovedAt)
 
     return (
       <div className="plan-action-row" data-status={action.status} key={action.id}>
@@ -1028,6 +1039,9 @@ export default function App(): JSX.Element {
             {sourceNote ? ` - ${sourceNote.title}` : ` - ${action.noteTitle}`}
           </small>
           {action.toolHint && <code>{action.toolHint}</code>}
+          <code data-approval={isMcpApproved ? 'approved' : 'pending'}>
+            {isMcpApproved ? 'MCP aprobado' : 'MCP por revisar'}
+          </code>
         </span>
         <div className="plan-action-buttons">
           <button
@@ -1039,6 +1053,20 @@ export default function App(): JSX.Element {
             title="Abrir nota fuente"
           >
             <FileText size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleActionMcpApproval(action)}
+            disabled={busy === `mcpApproval:${action.id}` || isDone}
+            title={isMcpApproved ? 'Revocar aprobacion MCP' : 'Aprobar para handoff MCP'}
+          >
+            {busy === `mcpApproval:${action.id}` ? (
+              <Loader2 className="spin" size={14} />
+            ) : isMcpApproved ? (
+              <CheckCircle2 size={14} />
+            ) : (
+              <CircleAlert size={14} />
+            )}
           </button>
           <button
             type="button"
@@ -1420,8 +1448,8 @@ export default function App(): JSX.Element {
                   Hechas
                 </span>
                 <span>
-                  <strong>{mcpReadyActionCount}</strong>
-                  MCP
+                  <strong>{mcpApprovedActionCount}</strong>
+                  MCP OK
                 </span>
               </div>
 
@@ -1460,7 +1488,7 @@ export default function App(): JSX.Element {
               <section>
                 <h3>Handoff MCP</h3>
                 <p className="summary-text">
-                  Las acciones abiertas se exportan con nota fuente, contexto RAG y pista de herramienta para seguimiento aprobado por el usuario.
+                  Las acciones abiertas se exportan con nota fuente, contexto RAG, aprobacion MCP y un borrador de tool-call para revision externa.
                 </p>
                 <button
                   type="button"
@@ -1690,8 +1718,25 @@ export default function App(): JSX.Element {
                           <strong>{action.title}</strong>
                           <small>{action.detail}</small>
                           {action.toolHint && <code>{action.toolHint}</code>}
+                          <code data-approval={action.mcpApprovedAt ? 'approved' : 'pending'}>
+                            {action.mcpApprovedAt ? 'MCP aprobado' : 'MCP por revisar'}
+                          </code>
                         </span>
                         <div className="saved-action-actions">
+                          <button
+                            type="button"
+                            onClick={() => toggleActionMcpApproval(action)}
+                            disabled={busy === `mcpApproval:${action.id}` || action.status === 'done'}
+                            title={action.mcpApprovedAt ? 'Revocar aprobacion MCP' : 'Aprobar para handoff MCP'}
+                          >
+                            {busy === `mcpApproval:${action.id}` ? (
+                              <Loader2 className="spin" size={14} />
+                            ) : action.mcpApprovedAt ? (
+                              <CheckCircle2 size={14} />
+                            ) : (
+                              <CircleAlert size={14} />
+                            )}
+                          </button>
                           <button
                             type="button"
                             onClick={() => toggleActionStatus(action)}

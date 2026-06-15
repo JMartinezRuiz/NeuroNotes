@@ -109,7 +109,7 @@ export async function checkOllama(settings: AppSettings): Promise<AiHealth> {
     return {
       ok: false,
       status: 'ollama-missing',
-      message: error instanceof Error ? error.message : 'Ollama no disponible',
+      message: formatOllamaConnectionError(error, settings.ollamaUrl),
       model: settings.model,
       ollamaUrl: settings.ollamaUrl,
       ollamaAvailable: false,
@@ -542,6 +542,22 @@ async function fetchWithTimeout(
 function formatSeconds(milliseconds: number): string {
   const seconds = milliseconds / 1000
   return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)} s`
+}
+
+function formatOllamaConnectionError(error: unknown, ollamaUrl: string): string {
+  if (!(error instanceof Error)) {
+    return `Ollama no disponible en ${ollamaUrl}`
+  }
+
+  if (error.message.startsWith('Ollama no respondio')) {
+    return error.message
+  }
+
+  if (/fetch failed|failed to fetch|ECONNREFUSED|ECONNRESET|ENOTFOUND/i.test(error.message)) {
+    return `Ollama no disponible en ${ollamaUrl}`
+  }
+
+  return error.message || `Ollama no disponible en ${ollamaUrl}`
 }
 
 function normalizeSuggestedActions(value: unknown): SuggestedAction[] {

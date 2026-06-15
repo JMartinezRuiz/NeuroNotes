@@ -42,6 +42,8 @@ const api = {
     ipcRenderer.invoke('actions:createFromSuggestion', noteId, suggestionIndex),
   setActionStatus: (actionId: string, status: ActionItemStatus): Promise<ActionItem> =>
     ipcRenderer.invoke('actions:setStatus', actionId, status),
+  setActionMcpApproval: (actionId: string, approved: boolean): Promise<ActionItem> =>
+    ipcRenderer.invoke('actions:setMcpApproval', actionId, approved),
   deleteAction: (actionId: string): Promise<void> => ipcRenderer.invoke('actions:delete', actionId),
   exportNoteMarkdown: (id: string): Promise<NoteMarkdownExportResult> => ipcRenderer.invoke('notes:exportMarkdown', id),
   getMcpConfig: (): Promise<McpConnectionConfig> => ipcRenderer.invoke('mcp:getConfig'),

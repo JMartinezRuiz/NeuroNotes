@@ -25,6 +25,7 @@ const ANALYSIS_STATUSES = new Set<AnalysisStatus>(['idle', 'qwen', 'fallback', '
 const ACTION_STATUSES = new Set<ActionItemStatus>(['open', 'done'])
 
 let mutationQueue: Promise<void> = Promise.resolve()
+let ensureDatabaseQueue: Promise<void> | undefined
 
 const emptyDatabase = (): DatabaseFile => ({
   version: 1,
@@ -46,6 +47,14 @@ export function databasePaths(userDataPath = app.getPath('userData')): {
 }
 
 async function ensureDatabase(): Promise<void> {
+  ensureDatabaseQueue ??= ensureDatabaseFile().finally(() => {
+    ensureDatabaseQueue = undefined
+  })
+
+  return ensureDatabaseQueue
+}
+
+async function ensureDatabaseFile(): Promise<void> {
   const userDataPath = app.getPath('userData')
   const paths = databasePaths(userDataPath)
 
@@ -555,6 +564,10 @@ function normalizeActionItem(value: unknown): ActionItem | undefined {
 
   if (toolHint) {
     action.toolHint = toolHint
+  }
+
+  if (typeof source.mcpApprovedAt === 'string' && source.mcpApprovedAt.trim()) {
+    action.mcpApprovedAt = source.mcpApprovedAt.trim()
   }
 
   return action
