@@ -7,6 +7,7 @@ export type AppCommand =
   | 'analyze-note'
   | 'export-markdown'
   | 'export-mcp-handoff'
+  | 'export-finetune-dataset'
   | 'import-library'
   | 'export-library'
   | 'toggle-settings'
@@ -182,6 +183,14 @@ export interface McpHandoffExportResult {
   message: string
   path?: string
   actions: number
+}
+
+export interface FineTuneDatasetExportResult {
+  ok: boolean
+  canceled: boolean
+  message: string
+  path?: string
+  examples: number
 }
 
 export const NOTE_CATEGORIES = [

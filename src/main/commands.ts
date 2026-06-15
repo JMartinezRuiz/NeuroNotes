@@ -5,6 +5,7 @@ export type AppCommand =
   | 'analyze-note'
   | 'export-markdown'
   | 'export-mcp-handoff'
+  | 'export-finetune-dataset'
   | 'import-library'
   | 'export-library'
   | 'toggle-settings'

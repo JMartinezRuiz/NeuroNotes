@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { buildMcpHandoffPayload, mcpHandoffToJson, noteToMarkdown, safeMarkdownFileName } from '../export'
+import {
+  buildFineTuneExamples,
+  buildMcpHandoffPayload,
+  fineTuneDatasetToJsonl,
+  mcpHandoffToJson,
+  noteToMarkdown,
+  safeMarkdownFileName
+} from '../export'
 import { ActionItem, DatabaseFile, DEFAULT_SETTINGS, NoteRecord } from '../types'
 
 function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
@@ -201,6 +208,112 @@ describe('buildMcpHandoffPayload', () => {
       schema: 'neuronotes.mcp-handoff.v1',
       actionCount: 0,
       actions: []
+    })
+  })
+})
+
+describe('fine-tune dataset export', () => {
+  it('builds local supervised JSONL examples from analyzed notes', () => {
+    const now = '2026-06-15T00:00:00.000Z'
+    const sourceNote = note()
+    const database: DatabaseFile = {
+      version: 1,
+      notes: [
+        sourceNote,
+        note({
+          id: 'note-2',
+          title: 'Interfaz minimalista',
+          content: 'Contexto de UI para Neuronotes.',
+          summary: '',
+          tags: [],
+          related: [],
+          suggestedActions: [],
+          analysisStatus: 'idle',
+          analysisRun: undefined
+        }),
+        note({
+          id: 'draft-note',
+          content: 'Borrador sin analisis.',
+          summary: '',
+          tags: [],
+          related: [],
+          suggestedActions: [],
+          analysisStatus: 'idle',
+          analysisRun: undefined
+        })
+      ],
+      settings: { ...DEFAULT_SETTINGS },
+      actions: []
+    }
+
+    const examples = buildFineTuneExamples(database, now)
+
+    expect(examples).toHaveLength(1)
+    expect(examples[0]).toMatchObject({
+      schema: 'neuronotes.finetune-example.v1',
+      exportedAt: now,
+      source: 'neuronotes',
+      targetModel: 'qwen3.5:0.8b',
+      metadata: {
+        noteId: sourceNote.id,
+        analysisStatus: 'qwen',
+        analysisProvider: 'qwen',
+        category: 'Proyecto',
+        tagCount: 2,
+        relatedCount: 1,
+        suggestedActionCount: 1,
+        ragNoteIds: ['note-2']
+      }
+    })
+    expect(examples[0].messages.map((message) => message.role)).toEqual(['system', 'user', 'assistant'])
+    expect(examples[0].messages[1].content).toContain('Nota nueva:')
+    expect(examples[0].messages[1].content).toContain('Contexto recuperado:')
+    expect(examples[0].messages[1].content).toContain('ID: note-2')
+
+    const assistantPayload = JSON.parse(examples[0].messages[2].content) as {
+      title: string
+      category: string
+      tags: string[]
+      related: Array<{ noteId: string; reason: string }>
+      suggestedActions: Array<{ kind: string; toolHint?: string }>
+    }
+
+    expect(assistantPayload).toMatchObject({
+      title: 'Roadmap Neuronotes',
+      category: 'Proyecto',
+      tags: ['qwen', 'notas'],
+      related: [
+        {
+          noteId: 'note-2',
+          reason: 'Comparte contexto de producto.'
+        }
+      ],
+      suggestedActions: [
+        {
+          kind: 'task',
+          toolHint: 'task.create'
+        }
+      ]
+    })
+  })
+
+  it('serializes the fine-tune dataset as newline-delimited JSON', () => {
+    const now = '2026-06-15T00:00:00.000Z'
+    const database: DatabaseFile = {
+      version: 1,
+      notes: [note()],
+      settings: { ...DEFAULT_SETTINGS },
+      actions: []
+    }
+
+    const jsonl = fineTuneDatasetToJsonl(database, now)
+    const lines = jsonl.trim().split('\n')
+
+    expect(jsonl.endsWith('\n')).toBe(true)
+    expect(lines).toHaveLength(1)
+    expect(JSON.parse(lines[0])).toMatchObject({
+      schema: 'neuronotes.finetune-example.v1',
+      targetModel: 'qwen3.5:0.8b'
     })
   })
 })

@@ -450,6 +450,13 @@ export function createPreviewApi(): Api {
       path: 'preview/neuronotes-mcp-handoff.json',
       actions: actions.filter((action) => action.status === 'open').length
     }),
+    exportFineTuneDataset: async () => ({
+      ok: true,
+      canceled: false,
+      message: `Dataset fine-tuning exportado (${notes.filter((note) => note.analysisStatus === 'qwen' || note.analysisStatus === 'fallback').length} ejemplos)`,
+      path: 'preview/neuronotes-finetune-dataset.jsonl',
+      examples: notes.filter((note) => note.analysisStatus === 'qwen' || note.analysisStatus === 'fallback').length
+    }),
     exportLibrary: async () => ({
       ok: true,
       canceled: false,

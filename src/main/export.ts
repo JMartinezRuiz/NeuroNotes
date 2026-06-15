@@ -1,6 +1,31 @@
-import { ActionItem, DatabaseFile, NoteRecord } from './types'
+import { ActionItem, DatabaseFile, NoteRecord, RagContextItem, SuggestedAction } from './types'
 
 const MCP_HANDOFF_SCHEMA = 'neuronotes.mcp-handoff.v1'
+const FINE_TUNE_EXAMPLE_SCHEMA = 'neuronotes.finetune-example.v1'
+const FINE_TUNE_SYSTEM_PROMPT =
+  'Eres el motor local de Neuronotes. Devuelve exclusivamente JSON valido con title, summary, category, tags, related y suggestedActions para una nota nueva.'
+
+export interface FineTuneExample {
+  schema: string
+  exportedAt: string
+  source: string
+  targetModel: string
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant'
+    content: string
+  }>
+  metadata: {
+    noteId: string
+    analysisStatus: string
+    analysisProvider: string | null
+    analyzedAt: string | null
+    category: string
+    tagCount: number
+    relatedCount: number
+    suggestedActionCount: number
+    ragNoteIds: string[]
+  }
+}
 
 export function noteToMarkdown(note: NoteRecord, localActions: ActionItem[] = []): string {
   const tags = note.tags.length > 0 ? note.tags.map((tag) => `#${tag}`).join(' ') : 'Sin etiquetas'
@@ -178,6 +203,54 @@ export function mcpHandoffToJson(database: DatabaseFile, exportedAt = new Date()
   return `${JSON.stringify(buildMcpHandoffPayload(database, exportedAt), null, 2)}\n`
 }
 
+export function buildFineTuneExamples(database: DatabaseFile, exportedAt = new Date().toISOString()): FineTuneExample[] {
+  const notesById = new Map(database.notes.map((note) => [note.id, note]))
+
+  return database.notes
+    .filter(isFineTuneCandidate)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .map((note) => {
+      const assistantPayload = buildFineTuneAssistantPayload(note, notesById)
+
+      return {
+        schema: FINE_TUNE_EXAMPLE_SCHEMA,
+        exportedAt,
+        source: 'neuronotes',
+        targetModel: database.settings.model,
+        messages: [
+          {
+            role: 'system',
+            content: FINE_TUNE_SYSTEM_PROMPT
+          },
+          {
+            role: 'user',
+            content: buildFineTuneUserPrompt(note, notesById)
+          },
+          {
+            role: 'assistant',
+            content: JSON.stringify(assistantPayload)
+          }
+        ],
+        metadata: {
+          noteId: note.id,
+          analysisStatus: note.analysisStatus,
+          analysisProvider: note.analysisRun?.provider ?? null,
+          analyzedAt: note.analysisRun?.analyzedAt ?? null,
+          category: note.category,
+          tagCount: note.tags.length,
+          relatedCount: assistantPayload.related.length,
+          suggestedActionCount: assistantPayload.suggestedActions.length,
+          ragNoteIds: note.analysisRun?.ragNoteIds ?? []
+        }
+      }
+    })
+}
+
+export function fineTuneDatasetToJsonl(database: DatabaseFile, exportedAt = new Date().toISOString()): string {
+  const lines = buildFineTuneExamples(database, exportedAt).map((example) => JSON.stringify(example))
+  return lines.length > 0 ? `${lines.join('\n')}\n` : ''
+}
+
 function escapeMarkdown(value: string): string {
   return value.replace(/([\\`*_{}\[\]()#+\-.!|>])/g, '\\$1')
 }
@@ -193,4 +266,99 @@ function compareActionItems(a: ActionItem, b: ActionItem): number {
   }
 
   return b.updatedAt.localeCompare(a.updatedAt)
+}
+
+function isFineTuneCandidate(note: NoteRecord): boolean {
+  if (!note.content.trim() || (note.analysisStatus !== 'qwen' && note.analysisStatus !== 'fallback')) {
+    return false
+  }
+
+  return Boolean(note.summary.trim() || note.tags.length > 0 || note.related.length > 0 || note.suggestedActions.length > 0)
+}
+
+function buildFineTuneAssistantPayload(
+  note: NoteRecord,
+  notesById: Map<string, NoteRecord>
+): {
+  title: string
+  summary: string
+  category: string
+  tags: string[]
+  related: Array<{
+    noteId: string
+    reason: string
+  }>
+  suggestedActions: SuggestedAction[]
+} {
+  return {
+    title: note.title,
+    summary: note.summary,
+    category: note.category,
+    tags: note.tags.slice(0, 6),
+    related: note.related
+      .filter((related) => notesById.has(related.noteId))
+      .slice(0, 6)
+      .map((related) => ({
+        noteId: related.noteId,
+        reason: related.reason
+      })),
+    suggestedActions: note.suggestedActions
+      .slice(0, 4)
+      .map((action) => ({
+        kind: action.kind,
+        title: action.title,
+        detail: action.detail,
+        toolHint: action.toolHint,
+        confidence: action.confidence
+      }))
+  }
+}
+
+function buildFineTuneUserPrompt(note: NoteRecord, notesById: Map<string, NoteRecord>): string {
+  return [
+    'Nota nueva:',
+    note.content.trim(),
+    '',
+    'Contexto recuperado:',
+    buildFineTuneContext(note, notesById) || 'Sin contexto recuperado.'
+  ].join('\n')
+}
+
+function buildFineTuneContext(note: NoteRecord, notesById: Map<string, NoteRecord>): string {
+  const contextItems = note.analysisRun?.ragContext?.length
+    ? note.analysisRun.ragContext
+    : note.related
+        .map((related) => {
+          const target = notesById.get(related.noteId)
+
+          if (!target) {
+            return undefined
+          }
+
+          return {
+            noteId: target.id,
+            title: target.title,
+            category: target.category,
+            tags: target.tags,
+            score: related.score,
+            reason: related.reason,
+            excerpt: excerpt(target.content, 500)
+          } satisfies RagContextItem
+        })
+        .filter((item): item is RagContextItem => Boolean(item))
+
+  return contextItems
+    .slice(0, 5)
+    .map((item) =>
+      [
+        `ID: ${item.noteId}`,
+        `Titulo: ${item.title}`,
+        `Categoria: ${item.category}`,
+        `Etiquetas: ${item.tags.join(', ') || 'sin etiquetas'}`,
+        `Puntuacion: ${item.score.toFixed(3)}`,
+        `Motivo: ${item.reason}`,
+        `Extracto: ${item.excerpt}`
+      ].join('\n')
+    )
+    .join('\n\n')
 }

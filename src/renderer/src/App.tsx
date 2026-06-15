@@ -285,6 +285,7 @@ export default function App(): JSX.Element {
     const linkedIds = new Set(selectedNote.related.map((related) => related.noteId))
     return notes.filter((note) => note.id !== selectedNote.id && !linkedIds.has(note.id))
   }, [notes, selectedNote])
+  const libraryBusy = busy === 'export' || busy === 'import' || busy === 'exportMcp' || busy === 'exportDataset'
 
   const filteredNotes = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -507,6 +508,11 @@ export default function App(): JSX.Element {
 
     if (command === 'export-mcp-handoff') {
       await exportMcpHandoff()
+      return
+    }
+
+    if (command === 'export-finetune-dataset') {
+      await exportFineTuneDataset()
       return
     }
 
@@ -871,6 +877,16 @@ export default function App(): JSX.Element {
     }
   }
 
+  async function exportFineTuneDataset(): Promise<void> {
+    setBusy('exportDataset')
+    try {
+      const result = await api.exportFineTuneDataset()
+      setLibraryMessage(result.message)
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function exportSelectedMarkdown(): Promise<void> {
     if (!selectedNote) {
       return
@@ -1108,7 +1124,7 @@ export default function App(): JSX.Element {
                 <button
                   type="button"
                   onClick={exportLibrary}
-                  disabled={busy === 'export' || busy === 'import' || busy === 'exportMcp'}
+                  disabled={libraryBusy}
                   title="Exportar biblioteca"
                 >
                   {busy === 'export' ? <Loader2 className="spin" size={16} /> : <FileDown size={16} />}
@@ -1117,7 +1133,7 @@ export default function App(): JSX.Element {
                 <button
                   type="button"
                   onClick={importLibrary}
-                  disabled={busy === 'export' || busy === 'import' || busy === 'exportMcp'}
+                  disabled={libraryBusy}
                   title="Importar biblioteca"
                 >
                   {busy === 'import' ? <Loader2 className="spin" size={16} /> : <FileUp size={16} />}
@@ -1126,11 +1142,20 @@ export default function App(): JSX.Element {
                 <button
                   type="button"
                   onClick={exportMcpHandoff}
-                  disabled={busy === 'export' || busy === 'import' || busy === 'exportMcp'}
+                  disabled={libraryBusy}
                   title="Exportar handoff MCP"
                 >
                   {busy === 'exportMcp' ? <Loader2 className="spin" size={16} /> : <Network size={16} />}
                   MCP JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={exportFineTuneDataset}
+                  disabled={libraryBusy}
+                  title="Exportar dataset fine-tuning"
+                >
+                  {busy === 'exportDataset' ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
+                  Dataset
                 </button>
               </div>
             </div>

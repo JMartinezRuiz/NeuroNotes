@@ -172,6 +172,14 @@ export interface McpHandoffExportResult {
   actions: number
 }
 
+export interface FineTuneDatasetExportResult {
+  ok: boolean
+  canceled: boolean
+  message: string
+  path?: string
+  examples: number
+}
+
 export interface DatabaseFile {
   version: 1
   notes: NoteRecord[]

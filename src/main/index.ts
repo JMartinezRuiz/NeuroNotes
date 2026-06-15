@@ -13,7 +13,7 @@ import {
   syncActionNoteTitle
 } from './actions'
 import { AppCommand } from './commands'
-import { buildMcpHandoffPayload, noteToMarkdown, safeMarkdownFileName } from './export'
+import { buildFineTuneExamples, buildMcpHandoffPayload, fineTuneDatasetToJsonl, noteToMarkdown, safeMarkdownFileName } from './export'
 import { synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
@@ -27,6 +27,7 @@ import {
   ActionItemStatus,
   DatabaseFile,
   DeleteNoteResult,
+  FineTuneDatasetExportResult,
   LibraryExportResult,
   LibraryImportResult,
   McpHandoffExportResult,
@@ -144,6 +145,10 @@ function createAppMenu(): void {
         {
           label: 'Exportar handoff MCP',
           click: () => sendCommand('export-mcp-handoff')
+        },
+        {
+          label: 'Exportar dataset fine-tuning',
+          click: () => sendCommand('export-finetune-dataset')
         },
         { type: 'separator' },
         {
@@ -580,6 +585,45 @@ function registerIpcHandlers(): void {
     } satisfies McpHandoffExportResult
   })
 
+  ipcMain.handle('finetune:exportDataset', async () => {
+    const database = await readDatabase()
+    const exportedAt = new Date().toISOString()
+    const examples = buildFineTuneExamples(database, exportedAt)
+    const defaultPath = path.join(
+      app.getPath('documents'),
+      `neuronotes-finetune-dataset-${exportedAt.slice(0, 10)}.jsonl`
+    )
+    const result = await dialog.showSaveDialog({
+      title: 'Exportar dataset fine-tuning',
+      defaultPath,
+      filters: [
+        {
+          name: 'JSONL',
+          extensions: ['jsonl']
+        }
+      ]
+    })
+
+    if (result.canceled || !result.filePath) {
+      return {
+        ok: false,
+        canceled: true,
+        message: 'Exportacion de dataset cancelada',
+        examples: examples.length
+      } satisfies FineTuneDatasetExportResult
+    }
+
+    await writeFile(result.filePath, fineTuneDatasetToJsonl(database, exportedAt), 'utf8')
+
+    return {
+      ok: true,
+      canceled: false,
+      message: `Dataset fine-tuning exportado (${formatExampleCount(examples.length)})`,
+      path: result.filePath,
+      examples: examples.length
+    } satisfies FineTuneDatasetExportResult
+  })
+
   ipcMain.handle('ai:health', async () => {
     const database = await readDatabase()
     return checkOllama(database.settings)
@@ -663,6 +707,10 @@ function normalizeAnalyzePendingMode(value: unknown): AnalyzePendingMode {
 
 function formatActionCount(count: number): string {
   return count === 1 ? '1 accion' : `${count} acciones`
+}
+
+function formatExampleCount(count: number): string {
+  return count === 1 ? '1 ejemplo' : `${count} ejemplos`
 }
 
 async function mergeImportedDatabase(
