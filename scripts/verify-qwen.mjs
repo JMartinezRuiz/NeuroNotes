@@ -261,7 +261,7 @@ async function verifyQwen(options) {
     runtime = await ensureOllamaAvailable(options)
 
     if (!runtime.ok) {
-      return {
+      return withRecoveryHints({
         ok: false,
         stage: runtime.stage,
         message: runtime.message,
@@ -269,7 +269,7 @@ async function verifyQwen(options) {
         model: options.model,
         runtimeStarted: runtime.started,
         runtimeExecutablePath: runtime.executablePath
-      }
+      })
     }
   }
 
@@ -278,14 +278,14 @@ async function verifyQwen(options) {
 
   if (!modelInstalled) {
     if (!options.pull) {
-      return {
+      return withRecoveryHints({
         ok: false,
         stage: 'model-missing',
         message: `Model ${options.model} is not installed. Run: ollama pull ${options.model}`,
         endpoint: options.endpoint,
         model: options.model,
         installedModels
-      }
+      })
     }
 
     await pullModel(options.endpoint, options.model, options.timeoutMs)
@@ -305,6 +305,65 @@ async function verifyQwen(options) {
     durationMs: probe.durationMs,
     analysis: probe.analysis
   }
+}
+
+function withRecoveryHints(result) {
+  if (result.ok) {
+    return result
+  }
+
+  return {
+    ...result,
+    nextSteps: recoveryNextSteps(result.stage, result.model),
+    setupCommands: recoverySetupCommands(result.stage, result.model)
+  }
+}
+
+function recoveryNextSteps(stage, model = DEFAULT_MODEL) {
+  if (stage === 'ollama-not-installed') {
+    return [
+      'Install Ollama on Windows.',
+      `Pull the configured Qwen model: ${model}.`,
+      'Run npm run verify:qwen:start:pull to start Ollama, pull the model if needed, and verify JSON generation.'
+    ]
+  }
+
+  if (stage === 'model-missing') {
+    return [
+      `Pull the configured Qwen model: ${model}.`,
+      'Run npm run verify:qwen:start:json to confirm Neuronotes can generate valid JSON.'
+    ]
+  }
+
+  if (stage === 'ollama-unavailable' || stage === 'ollama-start-failed') {
+    return [
+      'Start Ollama locally.',
+      `Ensure the configured model is installed: ${model}.`,
+      'Run npm run verify:qwen:start:json again.'
+    ]
+  }
+
+  return ['Review the verifier message, then run npm run verify:qwen:start:json again.']
+}
+
+function recoverySetupCommands(stage, model = DEFAULT_MODEL) {
+  if (stage === 'ollama-not-installed') {
+    return [
+      'irm https://ollama.com/install.ps1 | iex',
+      `ollama pull ${model}`,
+      'npm run verify:qwen:start:json'
+    ]
+  }
+
+  if (stage === 'model-missing') {
+    return [`ollama pull ${model}`, 'npm run verify:qwen:start:json']
+  }
+
+  if (stage === 'ollama-unavailable' || stage === 'ollama-start-failed') {
+    return ['npm run verify:qwen:start:json']
+  }
+
+  return ['npm run verify:qwen:start:json']
 }
 
 async function ensureOllamaAvailable(options) {
@@ -464,6 +523,18 @@ function printHuman(result) {
     if (result.installedModels?.length) {
       console.log(`Installed models: ${result.installedModels.join(', ')}`)
     }
+    if (result.nextSteps?.length) {
+      console.log('Next steps:')
+      for (const step of result.nextSteps) {
+        console.log(`- ${step}`)
+      }
+    }
+    if (result.setupCommands?.length) {
+      console.log('Commands:')
+      for (const command of result.setupCommands) {
+        console.log(`  ${command}`)
+      }
+    }
     return
   }
 
@@ -505,23 +576,18 @@ async function main() {
 
     process.exitCode = result.ok ? 0 : 1
   } catch (error) {
-    const result = {
+    const result = withRecoveryHints({
       ok: false,
       stage: 'ollama-unavailable',
       message: error instanceof Error ? error.message : 'Ollama verification failed',
       endpoint: options.endpoint,
       model: options.model
-    }
+    })
 
     if (options.json) {
       console.log(JSON.stringify(result, null, 2))
     } else {
-      console.error('Neuronotes Qwen verification')
-      console.error(`Endpoint: ${result.endpoint}`)
-      console.error(`Model: ${result.model}`)
-      console.error('Status: ollama-unavailable')
-      console.error(result.message)
-      console.error(`Install/start Ollama, then run: ollama pull ${result.model}`)
+      printHuman(result)
     }
 
     process.exitCode = 1
@@ -537,6 +603,8 @@ export {
   parseArgs,
   parseJson,
   validateProbeAnalysis,
+  recoveryNextSteps,
+  recoverySetupCommands,
   resolveOllamaHostEnv,
   verifyQwen
 }

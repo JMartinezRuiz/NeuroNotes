@@ -33,6 +33,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Auto-analysis covers new and pending edited notes: it uses local fallback when Qwen is unavailable and can upgrade those notes once Qwen becomes ready.
 - Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
 - Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.
+- Qwen verifier output includes actionable next steps and setup commands when Ollama or the model is missing.
 - Local AI setup checklist in settings for Ollama, model availability, and fallback/Qwen analysis mode.
 - Settings can copy PowerShell setup commands for installing Ollama, starting the local runtime, pulling the configured Qwen model, and running a JSON probe on Windows.
 - Configurable RAG context limits for Qwen: number of retrieved notes and excerpt length.
