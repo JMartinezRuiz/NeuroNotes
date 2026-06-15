@@ -134,6 +134,15 @@ export function noteToMarkdown(note: NoteRecord, localActions: ActionItem[] = []
         })
         .join('\n')
     : '- Sin contexto RAG guardado'
+  const analysisAudit = note.analysisRun
+    ? [
+        `- Proveedor IA: ${escapeMarkdown(note.analysisRun.provider)}`,
+        `- Modelo IA: ${escapeMarkdown(note.analysisRun.model)}`,
+        `- Analizado: ${note.analysisRun.analyzedAt}`,
+        `- Duracion: ${formatDuration(note.analysisRun.durationMs)}`,
+        `- RAG IDs: ${note.analysisRun.ragNoteIds.length > 0 ? note.analysisRun.ragNoteIds.map(escapeMarkdown).join(', ') : 'Sin contexto'}`
+      ].join('\n')
+    : '- Proveedor IA: Sin auditoria'
 
   return [
     `# ${escapeMarkdown(note.title)}`,
@@ -145,6 +154,10 @@ export function noteToMarkdown(note: NoteRecord, localActions: ActionItem[] = []
     `- Analisis: ${note.analysisStatus}`,
     `- Creada: ${note.createdAt}`,
     `- Actualizada: ${note.updatedAt}`,
+    '',
+    '## Auditoria IA',
+    '',
+    analysisAudit,
     '',
     '## Nota',
     '',
@@ -308,6 +321,10 @@ export function fineTuneDatasetToJsonl(database: DatabaseFile, exportedAt = new 
 
 function escapeMarkdown(value: string): string {
   return value.replace(/([\\`*_{}\[\]()#+\-.!|>])/g, '\\$1')
+}
+
+function formatDuration(durationMs: number): string {
+  return durationMs >= 1000 ? `${(durationMs / 1000).toFixed(1)} s` : `${Math.max(0, Math.round(durationMs))} ms`
 }
 
 function excerpt(value: string, maxLength: number): string {
