@@ -43,7 +43,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Configurable RAG context limits for Qwen: number of retrieved notes and excerpt length.
 - RAG budget indicator in settings to keep context compact enough for Qwen 0.8B.
 - Bounded Ollama health and Qwen generation requests, so stalled local AI calls fall back instead of blocking notes.
-- Qwen generation requests explicitly disable visible thinking output for a cleaner JSON/RAG contract.
+- Qwen chat requests explicitly disable visible thinking output for a cleaner JSON/RAG contract.
 - Qwen JSON responses are sanitized and lightly repaired for common model output issues such as Markdown fences and trailing commas.
 - MCP library summary includes the latest matching Qwen JSON/RAG diagnostic result so external hosts can see whether local AI was actually verified.
 - Qwen prompts include the note reference date and current title/category/tags, improving time-sensitive actions and metadata-aware categorization.
@@ -88,7 +88,7 @@ The analysis flow is:
 1. A note is created or selected for analysis.
 2. Neuronotes ranks nearby notes locally using manual links first, then TF-IDF-style lexical similarity, phrase overlap, tag overlap, title matches, and category signals.
 3. The strongest manual and ranked matches are serialized as RAG context with score, reason, tags, and excerpt, bounded by the local RAG settings.
-4. Qwen 0.8B is called through Ollama with a strict JSON prompt.
+4. Qwen 0.8B is called through Ollama's chat API with a strict JSON prompt.
 5. The response is sanitized and merged with local related-note ranking.
 6. Suggested action intents are stored locally without executing external tools.
 7. The user can promote suggested actions into a local note plan and explicitly approve selected actions for MCP handoff review.

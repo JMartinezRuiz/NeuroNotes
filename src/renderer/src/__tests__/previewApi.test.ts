@@ -34,7 +34,7 @@ describe('createPreviewApi', () => {
     expect(result.command).toContain("Start-Process -FilePath $ollama -ArgumentList 'serve' -WindowStyle Hidden")
     expect(result.command).toContain('& $ollama pull $model')
     expect(result.command).toContain('think = $false')
-    expect(result.command).toContain('Invoke-RestMethod -Uri $generateUrl')
+    expect(result.command).toContain('Invoke-RestMethod -Uri $chatUrl')
   })
 
   it('exposes separate read-only and write-enabled MCP host configs in preview', async () => {

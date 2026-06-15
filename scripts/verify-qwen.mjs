@@ -162,13 +162,13 @@ async function pullModel(endpoint, model, timeoutMs) {
 async function generateProbe(endpoint, model, timeoutMs) {
   const startedAt = Date.now()
   const payload = await requestJson(
-    `${endpoint}/api/generate`,
+    `${endpoint}/api/chat`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(buildGeneratePayload(model))
+      body: JSON.stringify(buildChatPayload(model))
     },
     timeoutMs
   )
@@ -177,17 +177,19 @@ async function generateProbe(endpoint, model, timeoutMs) {
     throw new Error(payload.error)
   }
 
-  if (!payload.response) {
+  const content = payload.message?.content?.trim()
+
+  if (!content) {
     throw new Error('Ollama returned no response content')
   }
 
   return {
     durationMs: Date.now() - startedAt,
-    analysis: validateProbeAnalysis(parseJson(payload.response))
+    analysis: validateProbeAnalysis(parseJson(content))
   }
 }
 
-function buildGeneratePayload(model) {
+function buildChatPayload(model) {
   return {
     model,
     stream: false,
@@ -197,7 +199,12 @@ function buildGeneratePayload(model) {
       temperature: 0.2,
       num_predict: 320
     },
-    prompt: buildProbePrompt()
+    messages: [
+      {
+        role: 'user',
+        content: buildProbePrompt()
+      }
+    ]
   }
 }
 
@@ -661,7 +668,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
 }
 
 export {
-  buildGeneratePayload,
+  buildChatPayload,
   buildProbePrompt,
   parseArgs,
   parseJson,

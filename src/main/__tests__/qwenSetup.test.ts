@@ -18,8 +18,9 @@ describe('buildQwenWindowsSetupCommand', () => {
     expect(command).toContain('Invoke-RestMethod -Uri $tagsUrl')
     expect(command).toContain('& $ollama pull $model')
     expect(command).toContain('think = $false')
+    expect(command).toContain('$chatUrl = "$endpoint/api/chat"')
     expect(command).toContain('sin razonamiento ni bloques <think>')
-    expect(command).toContain('Invoke-RestMethod -Uri $generateUrl')
+    expect(command).toContain('Invoke-RestMethod -Uri $chatUrl')
   })
 
   it('falls back to the default Qwen 0.8B model when the setting is blank', () => {

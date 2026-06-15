@@ -22,8 +22,11 @@ import {
 import { buildRagContextBundle, rankRelatedNotes } from './linking'
 import { normalizeNoteTags } from './metadata'
 
-interface OllamaGenerateResponse {
-  response?: string
+interface OllamaChatResponse {
+  message?: {
+    content?: string
+    thinking?: string
+  }
   error?: string
 }
 
@@ -328,7 +331,7 @@ async function analyzeWithQwen(
   ragContext: string
 ): Promise<Omit<AnalysisResult, 'status' | 'error' | 'analysisRun'>> {
   const response = await fetchWithTimeout(
-    `${settings.ollamaUrl}/api/generate`,
+    `${settings.ollamaUrl}/api/chat`,
     {
       method: 'POST',
       headers: {
@@ -339,11 +342,16 @@ async function analyzeWithQwen(
         stream: false,
         think: false,
         format: 'json',
+        messages: [
+          {
+            role: 'user',
+            content: buildPrompt(note, ragContext)
+          }
+        ],
         options: {
           temperature: 0.2,
           num_predict: 550
         },
-        prompt: buildPrompt(note, ragContext)
       })
     },
     QWEN_GENERATE_TIMEOUT_MS,
@@ -354,17 +362,19 @@ async function analyzeWithQwen(
     throw new Error(`Ollama respondio ${response.status}. Revisa que ${settings.model} este instalado.`)
   }
 
-  const payload = (await response.json()) as OllamaGenerateResponse
+  const payload = (await response.json()) as OllamaChatResponse
 
   if (payload.error) {
     throw new Error(payload.error)
   }
 
-  if (!payload.response) {
+  const content = payload.message?.content?.trim()
+
+  if (!content) {
     throw new Error('Ollama no devolvio contenido')
   }
 
-  return sanitizeAiPayload(parseJson(payload.response), allNotes)
+  return sanitizeAiPayload(parseJson(content), allNotes)
 }
 
 function buildPrompt(note: NoteRecord, context: string): string {

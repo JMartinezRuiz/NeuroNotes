@@ -154,7 +154,9 @@ describe('analyzeNote', () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          response: `<think>razonamiento interno</think>
+          message: {
+            role: 'assistant',
+            content: `<think>razonamiento interno</think>
 {
   "title": "Mapa de notas",
   "summary": "Convierte notas rapidas en una base enlazada.",
@@ -174,6 +176,7 @@ describe('analyzeNote', () => {
     }
   ]
 }`
+          }
         }),
         { status: 200 }
       )
@@ -235,7 +238,7 @@ describe('analyzeNote', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:11434/api/generate',
+      'http://127.0.0.1:11434/api/chat',
       expect.objectContaining({
         method: 'POST'
       })
@@ -244,10 +247,10 @@ describe('analyzeNote', () => {
     const [, request] = fetchMock.mock.calls[0] as [string, RequestInit]
     const body = JSON.parse(String(request.body)) as {
       format: string
+      messages: Array<{ content: string; role: string }>
       model: string
-      think: boolean
-      prompt: string
       stream: boolean
+      think: boolean
     }
 
     expect(body).toMatchObject({
@@ -256,20 +259,21 @@ describe('analyzeNote', () => {
       think: false,
       format: 'json'
     })
-    expect(body.prompt).toContain('Contexto recuperado:')
-    expect(body.prompt).toContain('ID: context-note')
-    expect(body.prompt).toContain('Titulo: Roadmap RAG local')
-    expect(body.prompt).toContain('Puntuacion:')
-    expect(body.prompt).toContain('Motivo:')
-    expect(body.prompt).toContain('No inventes IDs')
-    expect(body.prompt).toContain('suggestedActions')
-    expect(body.prompt).toContain('futura capa MCP')
-    expect(body.prompt).toContain('No incluyas razonamiento')
-    expect(body.prompt).toContain('Fecha de referencia:\n2026-06-15')
-    expect(body.prompt).toContain('Metadatos actuales:')
-    expect(body.prompt).toContain('Titulo: Nota fuente Qwen')
-    expect(body.prompt).toContain('Categoria actual: Proyecto')
-    expect(body.prompt).toContain('Etiquetas actuales: producto')
+    expect(body.messages).toEqual([expect.objectContaining({ role: 'user', content: expect.any(String) })])
+    expect(body.messages[0].content).toContain('Contexto recuperado:')
+    expect(body.messages[0].content).toContain('ID: context-note')
+    expect(body.messages[0].content).toContain('Titulo: Roadmap RAG local')
+    expect(body.messages[0].content).toContain('Puntuacion:')
+    expect(body.messages[0].content).toContain('Motivo:')
+    expect(body.messages[0].content).toContain('No inventes IDs')
+    expect(body.messages[0].content).toContain('suggestedActions')
+    expect(body.messages[0].content).toContain('futura capa MCP')
+    expect(body.messages[0].content).toContain('No incluyas razonamiento')
+    expect(body.messages[0].content).toContain('Fecha de referencia:\n2026-06-15')
+    expect(body.messages[0].content).toContain('Metadatos actuales:')
+    expect(body.messages[0].content).toContain('Titulo: Nota fuente Qwen')
+    expect(body.messages[0].content).toContain('Categoria actual: Proyecto')
+    expect(body.messages[0].content).toContain('Etiquetas actuales: producto')
   })
 
   it('keeps local related-note ranking when Qwen returns no links', async () => {
@@ -278,13 +282,16 @@ describe('analyzeNote', () => {
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
-            response: JSON.stringify({
-              title: 'Resumen local',
-              summary: 'Nota analizada con Qwen.',
-              category: 'Proyecto',
-              tags: ['qwen'],
-              related: []
-            })
+            message: {
+              role: 'assistant',
+              content: JSON.stringify({
+                title: 'Resumen local',
+                summary: 'Nota analizada con Qwen.',
+                category: 'Proyecto',
+                tags: ['qwen'],
+                related: []
+              })
+            }
           }),
           { status: 200 }
         )
@@ -322,7 +329,9 @@ describe('analyzeNote', () => {
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
-            response: `\`\`\`json
+            message: {
+              role: 'assistant',
+              content: `\`\`\`json
 {
   "title": "Respuesta reparada",
   "summary": "Qwen devolvio JSON con formato tolerable.",
@@ -340,6 +349,7 @@ describe('analyzeNote', () => {
   ],
 }
 \`\`\``
+            }
           }),
           { status: 200 }
         )
@@ -542,18 +552,21 @@ describe('runAiDiagnostics', () => {
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
-            response: JSON.stringify({
-              title: 'Diagnostico listo',
-              summary: 'Qwen analizo la prueba de Neuronotes.',
-              category: 'Proyecto',
-              tags: ['qwen', 'rag'],
-              related: [
-                {
-                  noteId: 'diagnostic-context',
-                  reason: 'Usa el contexto RAG local.'
-                }
-              ]
-            })
+            message: {
+              role: 'assistant',
+              content: JSON.stringify({
+                title: 'Diagnostico listo',
+                summary: 'Qwen analizo la prueba de Neuronotes.',
+                category: 'Proyecto',
+                tags: ['qwen', 'rag'],
+                related: [
+                  {
+                    noteId: 'diagnostic-context',
+                    reason: 'Usa el contexto RAG local.'
+                  }
+                ]
+              })
+            }
           }),
           { status: 200 }
         )
