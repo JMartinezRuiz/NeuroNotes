@@ -1,0 +1,174 @@
+import { describe, expect, it } from 'vitest'
+import { buildRagContext, rankRelatedNotes, synchronizeRelatedGraph } from '../linking'
+import { NoteRecord } from '../types'
+
+function note(overrides: Partial<NoteRecord> & Pick<NoteRecord, 'id' | 'content'>): NoteRecord {
+  const now = '2026-06-15T00:00:00.000Z'
+
+  return {
+    title: overrides.id,
+    summary: '',
+    category: 'Inbox',
+    tags: [],
+    related: [],
+    analysisStatus: 'idle',
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  }
+}
+
+describe('rankRelatedNotes', () => {
+  it('prioritizes notes with matching tags, category, and vocabulary', () => {
+    const source = note({
+      id: 'source',
+      category: 'Proyecto',
+      tags: ['qwen', 'notas'],
+      content: 'Qwen resume notas y enlaza ideas dentro de Neuronotes.'
+    })
+    const related = note({
+      id: 'related',
+      title: 'Motor Qwen',
+      category: 'Proyecto',
+      tags: ['qwen', 'notas'],
+      content: 'El modelo Qwen ayuda a categorizar notas y encontrar ideas relacionadas.'
+    })
+    const unrelated = note({
+      id: 'unrelated',
+      title: 'Compra mensual',
+      category: 'Finanzas',
+      tags: ['factura'],
+      content: 'Pagar la factura del proveedor y revisar el presupuesto mensual.'
+    })
+
+    const ranked = rankRelatedNotes(source, [source, unrelated, related])
+
+    expect(ranked[0]).toMatchObject({
+      noteId: 'related',
+      title: 'Motor Qwen'
+    })
+    expect(ranked.some((item) => item.noteId === 'source')).toBe(false)
+  })
+})
+
+describe('buildRagContext', () => {
+  it('builds focused context from the strongest related notes', () => {
+    const source = note({
+      id: 'source',
+      category: 'Proyecto',
+      tags: ['qwen'],
+      content: 'Analizar notas con Qwen y construir contexto recuperado.'
+    })
+    const candidate = note({
+      id: 'candidate',
+      title: 'RAG local',
+      category: 'Proyecto',
+      tags: ['qwen'],
+      content: 'El contexto recuperado debe incluir extractos cortos de notas relacionadas.'
+    })
+
+    const context = buildRagContext(source, [source, candidate])
+
+    expect(context).toContain('ID: candidate')
+    expect(context).toContain('Titulo: RAG local')
+    expect(context).toContain('Extracto:')
+  })
+})
+
+describe('synchronizeRelatedGraph', () => {
+  it('normalizes direct links and creates reciprocal links', () => {
+    const source = note({
+      id: 'source',
+      title: 'Nota nueva',
+      content: 'Resumen y enlaces automaticos',
+      related: [
+        {
+          noteId: 'target',
+          title: 'Titulo viejo',
+          score: 0.2,
+          reason: 'Relacion detectada por Qwen.'
+        },
+        {
+          noteId: 'target',
+          title: 'Titulo duplicado',
+          score: 0.8,
+          reason: 'Relacion mas fuerte.'
+        },
+        {
+          noteId: 'missing',
+          title: 'No existe',
+          score: 0.9,
+          reason: 'Debe eliminarse.'
+        }
+      ]
+    })
+    const target = note({
+      id: 'target',
+      title: 'Nota destino',
+      content: 'Debe recibir backlink automatico'
+    })
+    const notes = [source, target]
+
+    synchronizeRelatedGraph(notes, source.id)
+
+    expect(source.related).toEqual([
+      {
+        noteId: 'target',
+        title: 'Nota destino',
+        score: 0.8,
+        reason: 'Relacion mas fuerte.'
+      }
+    ])
+    expect(target.related).toHaveLength(1)
+    expect(target.related[0]).toMatchObject({
+      noteId: 'source',
+      title: 'Nota nueva',
+      reason: 'Enlace reciproco: Relacion mas fuerte.'
+    })
+  })
+
+  it('removes stale automatic backlinks without deleting manual direct links', () => {
+    const source = note({
+      id: 'source',
+      title: 'Nota fuente',
+      content: 'Sin enlaces directos ahora',
+      related: []
+    })
+    const target = note({
+      id: 'target',
+      title: 'Nota destino',
+      content: 'Tiene un backlink anterior',
+      related: [
+        {
+          noteId: 'source',
+          title: 'Nota fuente',
+          score: 0.6,
+          reason: 'Enlace reciproco: relacion anterior'
+        },
+        {
+          noteId: 'manual',
+          title: 'Nota manual',
+          score: 0.7,
+          reason: 'Relacion manual o directa.'
+        }
+      ]
+    })
+    const manual = note({
+      id: 'manual',
+      title: 'Nota manual',
+      content: 'Debe conservarse'
+    })
+    const notes = [source, target, manual]
+
+    synchronizeRelatedGraph(notes, source.id)
+
+    expect(target.related).toEqual([
+      {
+        noteId: 'manual',
+        title: 'Nota manual',
+        score: 0.7,
+        reason: 'Relacion manual o directa.'
+      }
+    ])
+  })
+})

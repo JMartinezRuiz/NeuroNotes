@@ -1,81 +1,129 @@
-# NotasApp
+# Neuronotes
 
-Una aplicación moderna y minimalista de notas creada con Flask.
+Neuronotes is a Windows-first desktop notes app for capturing quick thoughts and turning them into a connected local knowledge base. The product direction is a minimal Notion/OneNote-like workspace powered by local AI: notes are summarized, categorized, tagged, and linked to related notes automatically.
 
-## Características
+This repository is now centered on the Codex-built Electron desktop app. The previous PWA/Flask prototype remains in Git history, but `main` is intended to track the desktop product going forward.
 
-- Interfaz moderna y minimalista
-- Crear, leer, actualizar y eliminar notas
-- Base de datos SQLite temporal (fácilmente escalable)
-- Estructura modular y escalable
+## Product Direction
 
-## Estructura del Proyecto
+Neuronotes is being built as:
 
+- A local-first notes app with fast capture and a quiet, minimal interface.
+- A local AI workspace using Qwen 0.8B as the default model through Ollama.
+- A RAG-assisted note graph that retrieves nearby notes before asking the model to summarize, categorize, tag, and suggest links.
+- A future MCP-capable assistant surface for advanced local automations over notes, files, tools, and connected workflows.
+
+The current code uses a lightweight in-app retrieval/ranking layer for RAG context. It does not currently use LangChain; if LangChain or another orchestration layer is added later, it should be documented here and wired into tests.
+
+## Current App
+
+- Electron + React + TypeScript desktop app.
+- Windows installer via Electron Builder, with macOS packaging configured for later.
+- Local JSON database in Electron `userData`, written atomically with a backup file.
+- Quick note capture, auto-save editor, search, category filters, and metadata editing.
+- Automatic and manual note analysis.
+- Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
+- Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.
+- Local fallback analyzer when Ollama/Qwen is unavailable.
+- RAG context generation from locally related notes before Qwen analysis.
+- Automatic summaries, categories, tags, and related-note suggestions.
+- Reciprocal note graph synchronization.
+- Manual link and unlink controls.
+- Graph view for direct links, backlinks, and library connection counts.
+- Analysis audit metadata: provider, model, elapsed time, timestamp, and retrieved RAG note IDs.
+- Auto retry of pending notes once Qwen becomes ready, guarded to avoid retry loops.
+- JSON library export/import and per-note Markdown export.
+
+## AI Architecture
+
+The analysis flow is:
+
+1. A note is created or selected for analysis.
+2. Neuronotes ranks nearby notes locally using lexical similarity, tag overlap, and category signals.
+3. The strongest matches are serialized as RAG context.
+4. Qwen 0.8B is called through Ollama with a strict JSON prompt.
+5. The response is sanitized and merged with local related-note ranking.
+6. If Qwen is unavailable, the app uses local fallback categorization, summary, tags, and links.
+7. The note stores an audit record of the analysis run.
+
+Default model:
+
+```text
+qwen3.5:0.8b
 ```
-notas_app/
-├── app/
-│   ├── __init__.py          # Inicialización de la aplicación Flask
-│   ├── config.py            # Configuraciones de la aplicación
-│   ├── models/              # Modelos de base de datos
-│   ├── routes/              # Rutas y controladores
-│   ├── services/            # Lógica de negocio
-│   ├── static/              # Archivos estáticos (CSS, JS, imágenes)
-│   └── templates/           # Plantillas HTML
-├── migrations/              # Migraciones de base de datos
-├── tests/                   # Archivos de prueba
-├── .gitignore               # Archivos a ignorar por Git
-├── README.md                # Documentación del proyecto
-├── requirements.txt         # Dependencias del proyecto
-└── run.py                   # Punto de entrada de la aplicación
+
+Default Ollama endpoint:
+
+```text
+http://127.0.0.1:11434
 ```
 
-## Instalación y Configuración
+## MCP Roadmap
 
-1. Clonar el repositorio:
-   ```
-   git clone https://github.com/tu-usuario/notas-app.git
-   cd notas-app
-   ```
+MCP is not wired into the shipped app yet. The intended direction is to let Neuronotes expose or consume MCP tools for advanced workflows such as:
 
-2. Crear y activar un entorno virtual:
-   ```
-   python -m venv venv
-   
-   # En Windows
-   venv\Scripts\activate
-   
-   # En macOS/Linux
-   source venv/bin/activate
-   ```
+- Creating tasks, reminders, or calendar actions from notes.
+- Searching local documents and attaching findings to note context.
+- Running structured automations over selected notes.
+- Connecting a local assistant to user-approved tools while keeping note data local-first.
 
-3. Instalar dependencias:
-   ```
-   pip install -r requirements.txt
-   ```
+When MCP lands, it should be added as a separate integration layer with clear permissions, tests, and UI indicators showing what data is being sent to a tool.
 
-4. Ejecutar la aplicación:
-   ```
-   python run.py
-   ```
+## Local Setup
 
-5. Abrir en el navegador: `http://127.0.0.1:5000`
+Install dependencies:
 
-## Escalabilidad
+```powershell
+npm install
+```
 
-Este proyecto está diseñado para escalar fácilmente:
+Install Ollama and pull the model:
 
-- **Estructura Modular**: Organizada en componentes independientes (modelos, rutas, servicios)
-- **Capa de Servicios**: Separa la lógica de negocio de las rutas
-- **Blueprint de Flask**: Facilita la adición de nuevas funcionalidades
-- **Base de Datos**: Fácilmente intercambiable por PostgreSQL, MySQL, etc.
+```powershell
+ollama pull qwen3.5:0.8b
+```
 
-## Próximas Funcionalidades
+Run the desktop app:
 
-- Autenticación de usuarios
-- Categorías para notas
-- Búsqueda y filtrado
-- API RESTful
+```powershell
+npm run dev
+```
 
-## Licencia
+Install Ollama first if the `ollama` command is not available: <https://ollama.com/download>.
 
-MIT
+If Ollama is not running, Neuronotes still saves notes and uses the local fallback analyzer. When Ollama and the configured model are ready, analysis status shows `Qwen`.
+
+## Build And Test
+
+Run tests:
+
+```powershell
+npm test
+```
+
+Run type checks:
+
+```powershell
+npm run typecheck
+```
+
+Build the app:
+
+```powershell
+npm run build
+```
+
+Build the Windows installer:
+
+```powershell
+npm run dist:win
+```
+
+The Windows installer is emitted under `release/`.
+
+## Development Notes
+
+- The app icon source is `build/icon.svg`; `npm run icons` regenerates `build/icon.ico`.
+- The development build is currently unsigned.
+- For public Windows distribution, add a signing certificate and remove `signExecutable: false` from the Electron Builder config.
+- Real Qwen inference requires Ollama installed locally and the `qwen3.5:0.8b` model pulled.
