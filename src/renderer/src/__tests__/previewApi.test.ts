@@ -19,6 +19,23 @@ describe('createPreviewApi', () => {
     })
   })
 
+  it('copies the same complete Qwen setup flow shown by the desktop app', async () => {
+    const api = createPreviewApi()
+    const result = await api.copyAiSetupCommand()
+
+    expect(result).toMatchObject({
+      ok: true,
+      message: 'Comandos de setup Qwen copiados.'
+    })
+    expect(result.command).toContain("$ErrorActionPreference = 'Stop'")
+    expect(result.command).toContain('irm https://ollama.com/install.ps1 | iex')
+    expect(result.command).toContain("$model = 'qwen3.5:0.8b'")
+    expect(result.command).toContain("$endpoint = 'http://127.0.0.1:11434'")
+    expect(result.command).toContain("Start-Process -FilePath $ollama -ArgumentList 'serve' -WindowStyle Hidden")
+    expect(result.command).toContain('& $ollama pull $model')
+    expect(result.command).toContain('Invoke-RestMethod -Uri $generateUrl')
+  })
+
   it('supports local and Qwen modes for single-note analysis', async () => {
     const api = createPreviewApi()
 
