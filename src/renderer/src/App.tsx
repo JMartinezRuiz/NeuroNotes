@@ -32,6 +32,7 @@ import {
   shouldAutoAnalyzePending
 } from './analysisAutomation'
 import { analysisResultMessage, quickCaptureProgressMessage, quickCaptureResultMessage } from './analysisMessages'
+import { formatFineTuneExampleCount, isFineTuneReviewable, summarizeFineTuneReadiness } from './fineTuneReadiness'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges } from './graph'
 import { normalizeSearchText, noteMatchesSearch } from './search'
@@ -147,14 +148,6 @@ function saveStateLabel(saveState: SaveState): string {
   return 'Guardado'
 }
 
-function canReviewForFineTune(note: NoteRecord): boolean {
-  if (!note.content.trim() || (note.analysisStatus !== 'qwen' && note.analysisStatus !== 'fallback')) {
-    return false
-  }
-
-  return Boolean(note.summary.trim() || note.tags.length > 0 || note.related.length > 0 || note.suggestedActions.length > 0)
-}
-
 function directionLabel(direction: GraphConnection['direction']): string {
   if (direction === 'both') {
     return 'Mutua'
@@ -226,7 +219,8 @@ export default function App(): JSX.Element {
   const [bootstrapped, setBootstrapped] = useState(false)
 
   const selectedNote = notes.find((note) => note.id === selectedId) ?? notes[0] ?? null
-  const fineTuneReviewable = selectedNote ? canReviewForFineTune(selectedNote) : false
+  const fineTuneReviewable = selectedNote ? isFineTuneReviewable(selectedNote) : false
+  const fineTuneReadiness = useMemo(() => summarizeFineTuneReadiness(notes), [notes])
   const fineTuneReviewBusy = selectedNote ? busy === `trainingReview:${selectedNote.id}` : false
   const selectedActionItems = useMemo(
     () => (selectedNote ? actions.filter((action) => action.noteId === selectedNote.id) : []),
@@ -1394,6 +1388,21 @@ export default function App(): JSX.Element {
                 <span>Biblioteca local</span>
                 <strong>{notes.length} notas guardadas</strong>
                 <small>{libraryMessage || 'Exporta o importa una copia JSON de tus notas.'}</small>
+                <small>{fineTuneReadiness.message}</small>
+                <div
+                  className="dataset-readiness"
+                  data-status={fineTuneReadiness.status}
+                  title={`Dataset fine-tuning: ${fineTuneReadiness.reviewedQwenExamples} Qwen, ${fineTuneReadiness.reviewedLocalExamples} local.`}
+                >
+                  <span>
+                    <strong>{fineTuneReadiness.reviewedExamples}</strong>
+                    JSONL
+                  </span>
+                  <span>
+                    <strong>{fineTuneReadiness.pendingReviewNotes}</strong>
+                    por aprobar
+                  </span>
+                </div>
               </div>
               <div className="library-actions">
                 <button
@@ -1427,7 +1436,7 @@ export default function App(): JSX.Element {
                   type="button"
                   onClick={exportFineTuneDataset}
                   disabled={libraryBusy}
-                  title="Exportar dataset fine-tuning"
+                  title={`Exportar dataset fine-tuning (${formatFineTuneExampleCount(fineTuneReadiness.reviewedExamples)})`}
                 >
                   {busy === 'exportDataset' ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
                   Dataset

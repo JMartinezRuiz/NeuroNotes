@@ -1,4 +1,5 @@
 import { NeuronotesApi } from '../../preload'
+import { isFineTuneReviewable } from './fineTuneReadiness'
 import { ActionItem, ActionItemStatus, AiHealth, AppSettings, NoteRecord } from './types'
 
 type Api = NeuronotesApi
@@ -179,13 +180,6 @@ const isPreviewPending = (note: NoteRecord, mode: 'qwen' | 'local'): boolean => 
   }
 
   return note.analysisStatus !== 'qwen'
-}
-const isFineTuneReviewable = (note: NoteRecord): boolean => {
-  if (!note.content.trim() || (note.analysisStatus !== 'qwen' && note.analysisStatus !== 'fallback')) {
-    return false
-  }
-
-  return Boolean(note.summary.trim() || note.tags.length > 0 || note.related.length > 0 || note.suggestedActions.length > 0)
 }
 const fineTuneExampleCount = (): number =>
   notes.filter((note) => Boolean(note.trainingReviewedAt) && isFineTuneReviewable(note)).length

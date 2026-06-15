@@ -50,6 +50,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Read-only MCP stdio server for local hosts that need to search notes, read note context, list open action intents, and inspect library readiness.
 - MCP connection config is available from the app settings panel, including the stdio command, database path, and host-ready `mcpServers.neuronotes` JSON.
 - Fine-tuning dataset JSONL export from user-reviewed analyzed notes, for future local Qwen tuning experiments without sending data outside the machine.
+- Fine-tuning readiness summary in settings, showing reviewed JSONL examples and analyzed notes still awaiting approval.
 - Reciprocal note graph synchronization, including review invalidation when automatic relationships change.
 - Manual link and unlink controls.
 - Graph view for direct links, backlinks, and library connection counts.
