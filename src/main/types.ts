@@ -123,6 +123,9 @@ export interface AnalyzePendingResult {
   total: number
   analyzed: number
   failed: number
+  qwen: number
+  local: number
+  skipped: number
   lastUpdatedId?: string
 }
 

@@ -334,6 +334,8 @@ export function createPreviewApi(): Api {
     analyzePending: async (mode) => {
       const pending = notes.filter((note) => isPreviewPending(note, mode))
       let lastUpdatedId: string | undefined
+      let qwen = 0
+      let local = 0
 
       for (const note of pending) {
         note.summary = note.content.replace(/\s+/g, ' ').slice(0, 140)
@@ -371,12 +373,20 @@ export function createPreviewApi(): Api {
         }
         note.updatedAt = new Date().toISOString()
         lastUpdatedId = note.id
+        if (note.analysisStatus === 'qwen') {
+          qwen += 1
+        } else {
+          local += 1
+        }
       }
 
       return {
         total: pending.length,
         analyzed: pending.length,
         failed: 0,
+        qwen,
+        local,
+        skipped: 0,
         lastUpdatedId
       }
     },

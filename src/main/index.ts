@@ -387,7 +387,10 @@ function registerIpcHandlers(): void {
     const result: AnalyzePendingResult = {
       total: pendingIds.length,
       analyzed: 0,
-      failed: 0
+      failed: 0,
+      qwen: 0,
+      local: 0,
+      skipped: 0
     }
 
     for (const id of pendingIds) {
@@ -395,6 +398,7 @@ function registerIpcHandlers(): void {
         const updated = await analyzeAndPersistNote(id, mode)
         result.analyzed += 1
         result.lastUpdatedId = updated.id
+        recordPendingAnalysisStatus(result, updated)
       } catch {
         result.failed += 1
       }
@@ -717,6 +721,20 @@ function formatActionCount(count: number): string {
 
 function formatExampleCount(count: number): string {
   return count === 1 ? '1 ejemplo' : `${count} ejemplos`
+}
+
+function recordPendingAnalysisStatus(result: AnalyzePendingResult, note: NoteRecord): void {
+  if (note.analysisStatus === 'qwen') {
+    result.qwen += 1
+    return
+  }
+
+  if (note.analysisStatus === 'fallback') {
+    result.local += 1
+    return
+  }
+
+  result.skipped += 1
 }
 
 async function mergeImportedDatabase(

@@ -34,6 +34,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Single-note analysis uses the local analyzer immediately when Qwen is not ready, and Qwen can upgrade those notes later.
 - Local fallback analyzer normalizes Spanish accents for category, tag, and action heuristics.
 - Manual pending-note analysis can use the local fallback before Qwen is ready without contacting Ollama; when Qwen becomes available, fallback notes can be upgraded through the Qwen pending flow.
+- Pending analysis results report how many notes finished with Qwen, local fallback, failures, or stale skipped updates.
 - RAG context generation from locally related notes before Qwen analysis, with TF-IDF-style scoring, phrase/tag/title signals, stored excerpts, and scores for auditability.
 - Automatic summaries, categories, tags, and related-note suggestions.
 - Editing note content clears stale AI summaries, suggested actions, and automatic links while preserving manual links.

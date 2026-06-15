@@ -90,6 +90,9 @@ describe('pending analysis labels', () => {
     expect(pendingAnalysisResultMessage(engine, { analyzed: 2, failed: 0, total: 2 })).toBe(
       'Qwen actualizo 2 pendientes.'
     )
+    expect(pendingAnalysisResultMessage(engine, { analyzed: 3, failed: 0, total: 3, qwen: 2, local: 1, skipped: 0 })).toBe(
+      'Qwen actualizo 3 pendientes (2 Qwen, 1 local).'
+    )
   })
 
   it('uses local labels when Qwen is unavailable', () => {
@@ -100,6 +103,9 @@ describe('pending analysis labels', () => {
     expect(pendingAnalysisProgressMessage('manual', engine, 1)).toBe('Analizando 1 pendiente localmente...')
     expect(pendingAnalysisResultMessage(engine, { analyzed: 1, failed: 1, total: 2 })).toBe(
       'Analisis local proceso 1 de 2; 1 fallo.'
+    )
+    expect(pendingAnalysisResultMessage(engine, { analyzed: 2, failed: 1, total: 4, qwen: 0, local: 2, skipped: 1 })).toBe(
+      'Analisis local proceso 2 de 4 (2 local, 1 omitida); 1 fallo.'
     )
   })
 

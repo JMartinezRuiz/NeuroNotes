@@ -19,6 +19,9 @@ export type PendingAnalysisStatus = 'idle' | 'qwen' | 'fallback' | 'error'
 export interface PendingAnalysisResultSummary {
   analyzed: number
   failed: number
+  local?: number
+  qwen?: number
+  skipped?: number
   total: number
 }
 
@@ -68,12 +71,13 @@ export function pendingAnalysisResultMessage(
   result: PendingAnalysisResultSummary
 ): string {
   const label = engine === 'qwen' ? 'Qwen' : 'Analisis local'
+  const detail = pendingAnalysisDetail(result)
 
   if (result.failed > 0) {
-    return `${label} proceso ${result.analyzed} de ${result.total}; ${formatFailureCount(result.failed)}.`
+    return `${label} proceso ${result.analyzed} de ${result.total}${detail}; ${formatFailureCount(result.failed)}.`
   }
 
-  return `${label} actualizo ${formatPendingCount(result.analyzed)}.`
+  return `${label} actualizo ${formatPendingCount(result.analyzed)}${detail}.`
 }
 
 function formatPendingCount(count: number): string {
@@ -82,6 +86,16 @@ function formatPendingCount(count: number): string {
 
 function formatFailureCount(count: number): string {
   return count === 1 ? '1 fallo' : `${count} fallaron`
+}
+
+function pendingAnalysisDetail(result: PendingAnalysisResultSummary): string {
+  const parts = [
+    typeof result.qwen === 'number' && result.qwen > 0 ? `${result.qwen} Qwen` : '',
+    typeof result.local === 'number' && result.local > 0 ? `${result.local} local` : '',
+    typeof result.skipped === 'number' && result.skipped > 0 ? `${result.skipped} omitida${result.skipped === 1 ? '' : 's'}` : ''
+  ].filter(Boolean)
+
+  return parts.length > 0 ? ` (${parts.join(', ')})` : ''
 }
 
 export function shouldAutoAnalyzePending(decision: AutoAnalyzeDecision): boolean {
