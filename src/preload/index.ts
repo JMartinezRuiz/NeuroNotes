@@ -5,6 +5,7 @@ import {
   AiDiagnosticsResult,
   AiHealth,
   AiRuntimeStartResult,
+  AnalyzePendingMode,
   AnalyzePendingResult,
   AppSettings,
   DeleteNoteResult,
@@ -28,7 +29,8 @@ const api = {
   removeLink: (sourceId: string, targetId: string): Promise<NoteRecord> =>
     ipcRenderer.invoke('notes:removeLink', sourceId, targetId),
   analyzeNote: (id: string): Promise<NoteRecord> => ipcRenderer.invoke('notes:analyze', id),
-  analyzePending: (): Promise<AnalyzePendingResult> => ipcRenderer.invoke('notes:analyzePending'),
+  analyzePending: (mode: AnalyzePendingMode): Promise<AnalyzePendingResult> =>
+    ipcRenderer.invoke('notes:analyzePending', mode),
   listActions: (): Promise<ActionItem[]> => ipcRenderer.invoke('actions:list'),
   createActionFromSuggestion: (noteId: string, suggestionIndex: number): Promise<ActionItem> =>
     ipcRenderer.invoke('actions:createFromSuggestion', noteId, suggestionIndex),

@@ -14,6 +14,7 @@ export interface AutoAnalyzeDecision {
 }
 
 export type PendingAnalysisEngine = 'qwen' | 'local'
+export type PendingAnalysisStatus = 'idle' | 'qwen' | 'fallback' | 'error'
 
 export interface PendingAnalysisResultSummary {
   analyzed: number
@@ -36,6 +37,14 @@ export function pendingAnalysisEngine(healthOk: boolean): PendingAnalysisEngine 
 
 export function pendingAnalysisButtonTitle(engine: PendingAnalysisEngine): string {
   return engine === 'qwen' ? 'Analizar pendientes con Qwen' : 'Analizar pendientes con analisis local'
+}
+
+export function isPendingForAnalysis(status: PendingAnalysisStatus, engine: PendingAnalysisEngine): boolean {
+  if (engine === 'local') {
+    return status === 'idle' || status === 'error'
+  }
+
+  return status !== 'qwen'
 }
 
 export function pendingAnalysisProgressMessage(

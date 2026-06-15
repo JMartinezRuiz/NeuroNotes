@@ -21,6 +21,7 @@ import {
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   buildPendingAnalysisKey,
+  isPendingForAnalysis,
   pendingAnalysisButtonTitle,
   pendingAnalysisEngine,
   pendingAnalysisProgressMessage,
@@ -242,18 +243,18 @@ export default function App(): JSX.Element {
       }
     })
   }, [selectedConnections])
+  const pendingEngine = pendingAnalysisEngine(health.ok)
   const pendingAnalysisNotes = useMemo(
     () =>
       notes
-        .filter((note) => note.content.trim().length > 0 && note.analysisStatus !== 'qwen')
+        .filter((note) => note.content.trim().length > 0 && isPendingForAnalysis(note.analysisStatus, pendingEngine))
         .map((note) => ({
           id: note.id,
           content: note.content
         })),
-    [notes]
+    [notes, pendingEngine]
   )
   const pendingAnalysisCount = pendingAnalysisNotes.length
-  const pendingEngine = pendingAnalysisEngine(health.ok)
   const pendingAnalysisKey = useMemo(
     () => buildPendingAnalysisKey(settings.model, pendingAnalysisNotes),
     [pendingAnalysisNotes, settings.model]
@@ -756,7 +757,7 @@ export default function App(): JSX.Element {
         await saveSelected(true)
       }
 
-      const result = await api.analyzePending()
+      const result = await api.analyzePending(engine)
       await refreshNotes(result.lastUpdatedId ?? selectedId ?? undefined)
       setAnalysisQueueMessage(pendingAnalysisResultMessage(engine, result))
     } finally {

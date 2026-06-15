@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildPendingAnalysisKey,
+  isPendingForAnalysis,
   pendingAnalysisButtonTitle,
   pendingAnalysisEngine,
   pendingAnalysisProgressMessage,
@@ -104,5 +105,21 @@ describe('pending analysis labels', () => {
 
   it('keeps auto retry labeled as Qwen because it only starts after health is ready', () => {
     expect(pendingAnalysisProgressMessage('auto', 'qwen', 3)).toBe('Qwen listo. Reanalizando 3 pendientes...')
+  })
+})
+
+describe('isPendingForAnalysis', () => {
+  it('keeps fallback notes out of local pending batches', () => {
+    expect(isPendingForAnalysis('idle', 'local')).toBe(true)
+    expect(isPendingForAnalysis('error', 'local')).toBe(true)
+    expect(isPendingForAnalysis('fallback', 'local')).toBe(false)
+    expect(isPendingForAnalysis('qwen', 'local')).toBe(false)
+  })
+
+  it('keeps fallback notes pending for Qwen upgrade batches', () => {
+    expect(isPendingForAnalysis('idle', 'qwen')).toBe(true)
+    expect(isPendingForAnalysis('error', 'qwen')).toBe(true)
+    expect(isPendingForAnalysis('fallback', 'qwen')).toBe(true)
+    expect(isPendingForAnalysis('qwen', 'qwen')).toBe(false)
   })
 })

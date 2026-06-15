@@ -132,6 +132,17 @@ const sortActions = (): ActionItem[] =>
     return b.updatedAt.localeCompare(a.updatedAt)
   })
 const formatActionCount = (count: number): string => (count === 1 ? '1 accion' : `${count} acciones`)
+const isPreviewPending = (note: NoteRecord, mode: 'qwen' | 'local'): boolean => {
+  if (note.content.trim().length === 0) {
+    return false
+  }
+
+  if (mode === 'local') {
+    return note.analysisStatus === 'idle' || note.analysisStatus === 'error'
+  }
+
+  return note.analysisStatus !== 'qwen'
+}
 
 const previewHealth = (): AiHealth => ({
   ok: false,
@@ -320,8 +331,8 @@ export function createPreviewApi(): Api {
       note.updatedAt = new Date().toISOString()
       return note
     },
-    analyzePending: async () => {
-      const pending = notes.filter((note) => note.content.trim().length > 0 && note.analysisStatus !== 'qwen')
+    analyzePending: async (mode) => {
+      const pending = notes.filter((note) => isPreviewPending(note, mode))
       let lastUpdatedId: string | undefined
 
       for (const note of pending) {
@@ -337,13 +348,13 @@ export function createPreviewApi(): Api {
             confidence: 0.74
           }
         ]
-        note.analysisStatus = 'qwen'
-        note.analysisError = undefined
+        note.analysisStatus = mode === 'qwen' ? 'qwen' : 'fallback'
+        note.analysisError = mode === 'qwen' ? undefined : 'Vista previa: Qwen solo corre dentro de Electron/Ollama.'
         note.analysisRun = {
-          provider: 'qwen',
+          provider: mode === 'qwen' ? 'qwen' : 'local',
           model: settings.model,
           analyzedAt: new Date().toISOString(),
-          durationMs: 860,
+          durationMs: mode === 'qwen' ? 860 : 12,
           ragNoteIds: notes.filter((candidate) => candidate.id !== note.id).slice(0, 3).map((candidate) => candidate.id),
           ragContext: notes
             .filter((candidate) => candidate.id !== note.id)

@@ -21,6 +21,7 @@ import { createNoteDraft, listNotes, mutateDatabase, normalizeDatabase, readData
 import { captureWindowState, readWindowState, writeWindowState } from './windowState'
 import {
   AnalyzePendingResult,
+  AnalyzePendingMode,
   AppSettings,
   ActionItemStatus,
   DatabaseFile,
@@ -375,9 +376,10 @@ function registerIpcHandlers(): void {
     return analyzeAndPersistNote(id)
   })
 
-  ipcMain.handle('notes:analyzePending', async () => {
+  ipcMain.handle('notes:analyzePending', async (_, requestedMode: unknown) => {
+    const mode = normalizeAnalyzePendingMode(requestedMode)
     const initialDatabase = await readDatabase()
-    const pendingIds = initialDatabase.notes.filter((note) => isPendingAnalysis(note)).map((note) => note.id)
+    const pendingIds = initialDatabase.notes.filter((note) => isPendingAnalysis(note, mode)).map((note) => note.id)
     const result: AnalyzePendingResult = {
       total: pendingIds.length,
       analyzed: 0,
@@ -642,8 +644,20 @@ async function analyzeNoteSnapshot(note: NoteRecord, database: DatabaseFile): Pr
   }
 }
 
-function isPendingAnalysis(note: NoteRecord): boolean {
-  return note.content.trim().length > 0 && note.analysisStatus !== 'qwen'
+function isPendingAnalysis(note: NoteRecord, mode: AnalyzePendingMode): boolean {
+  if (note.content.trim().length === 0) {
+    return false
+  }
+
+  if (mode === 'local') {
+    return note.analysisStatus === 'idle' || note.analysisStatus === 'error'
+  }
+
+  return note.analysisStatus !== 'qwen'
+}
+
+function normalizeAnalyzePendingMode(value: unknown): AnalyzePendingMode {
+  return value === 'local' ? 'local' : 'qwen'
 }
 
 function formatActionCount(count: number): string {

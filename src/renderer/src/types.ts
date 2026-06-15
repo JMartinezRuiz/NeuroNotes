@@ -129,6 +129,8 @@ export interface AiDiagnosticsResult {
   error?: string
 }
 
+export type AnalyzePendingMode = 'qwen' | 'local'
+
 export interface AnalyzePendingResult {
   total: number
   analyzed: number

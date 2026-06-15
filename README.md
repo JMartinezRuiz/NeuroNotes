@@ -29,7 +29,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
 - Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.
 - Local fallback analyzer when Ollama/Qwen is unavailable.
-- Manual pending-note analysis can use the local fallback even before Qwen is ready.
+- Manual pending-note analysis can use the local fallback before Qwen is ready; when Qwen becomes available, fallback notes can be upgraded through the Qwen pending flow.
 - RAG context generation from locally related notes before Qwen analysis, with TF-IDF-style scoring, phrase/tag/title signals, stored excerpts, and scores for auditability.
 - Automatic summaries, categories, tags, and related-note suggestions.
 - Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
