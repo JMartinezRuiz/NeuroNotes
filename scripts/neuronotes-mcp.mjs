@@ -16,6 +16,7 @@ const RESOURCE_URIS = {
   summary: 'neuronotes://library/summary',
   openActions: 'neuronotes://actions/open',
   analysisQueue: 'neuronotes://analysis/queue',
+  qwenSetup: 'neuronotes://qwen/setup',
   fineTuneReadiness: 'neuronotes://finetune/readiness'
 }
 
@@ -134,6 +135,18 @@ const TOOLS = [
   {
     name: 'neuronotes_library_summary',
     description: 'Summarize local Neuronotes counts, AI settings, categories, fine-tuning readiness, open actions, and MCP readiness.',
+    annotations: {
+      readOnlyHint: true
+    },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {}
+    }
+  },
+  {
+    name: 'neuronotes_qwen_setup',
+    description: 'Read Qwen/Ollama setup guidance, configured RAG limits, and the latest stored Qwen diagnostic without executing setup.',
     annotations: {
       readOnlyHint: true
     },
@@ -280,6 +293,10 @@ export async function callTool(name, args = {}, context = {}) {
     return librarySummary(database, context.dbPath)
   }
 
+  if (name === 'neuronotes_qwen_setup') {
+    return qwenSetup(database)
+  }
+
   if (name === 'neuronotes_finetune_readiness') {
     return fineTuneReadiness(database)
   }
@@ -419,6 +436,17 @@ function listResources(database) {
         }
       },
       {
+        uri: RESOURCE_URIS.qwenSetup,
+        name: 'qwen-setup',
+        title: 'Qwen Local Setup',
+        description: 'Configured model, RAG limits, setup commands, and latest stored Qwen diagnostic.',
+        mimeType: 'application/json',
+        annotations: {
+          audience: ['assistant'],
+          priority: 0.83
+        }
+      },
+      {
         uri: RESOURCE_URIS.fineTuneReadiness,
         name: 'fine-tune-readiness',
         title: 'Fine-Tuning Readiness',
@@ -460,6 +488,10 @@ function readResource(uri, database, dbPath) {
 
   if (uri === RESOURCE_URIS.analysisQueue) {
     return jsonResource(uri, analysisQueues(database))
+  }
+
+  if (uri === RESOURCE_URIS.qwenSetup) {
+    return jsonResource(uri, qwenSetup(database))
   }
 
   if (uri === RESOURCE_URIS.fineTuneReadiness) {
@@ -838,6 +870,7 @@ function librarySummary(database, dbPath) {
     mcpApprovedActionCount: approvedActionCount,
     reviewedFineTuneCount: database.notes.filter((note) => Boolean(note.trainingReviewedAt)).length,
     fineTune: fineTuneReadiness(database, { includeNotes: false }),
+    qwenSetup: qwenSetup(database, { includeCommands: false }),
     aiDiagnostics: database.aiDiagnostics ?? null,
     qwenAnalyzedCount: statusCounts.qwen ?? 0,
     fallbackAnalyzedCount: statusCounts.fallback ?? 0,
@@ -850,6 +883,102 @@ function librarySummary(database, dbPath) {
       canExecuteExternalTools: false,
       requiresUserApprovalForFollowUp: true
     }
+  }
+}
+
+function qwenSetup(database, options = {}) {
+  const settings = database.settings
+  const diagnosticStatus = qwenDiagnosticStatus(settings, database.aiDiagnostics)
+  const includeCommands = options.includeCommands !== false
+
+  const payload = {
+    schema: 'neuronotes.mcp.qwen-setup.v1',
+    targetModel: settings.model,
+    ollamaUrl: settings.ollamaUrl,
+    ragSettings: {
+      maxNotes: settings.ragMaxNotes,
+      excerptLength: settings.ragExcerptLength
+    },
+    diagnosticStatus,
+    aiDiagnostics: database.aiDiagnostics ?? null,
+    mcpPosture: {
+      readOnly: true,
+      sideEffects: 'none',
+      canInstallOllama: false,
+      canPullModel: false,
+      canRunDiagnostics: false
+    }
+  }
+
+  if (includeCommands) {
+    payload.commands = qwenSetupCommands(settings)
+  }
+
+  return payload
+}
+
+function qwenDiagnosticStatus(settings, diagnostics) {
+  if (!diagnostics) {
+    return 'missing'
+  }
+
+  if (
+    diagnostics.model !== settings.model ||
+    diagnostics.ollamaUrl !== settings.ollamaUrl ||
+    diagnostics.ragMaxNotes !== settings.ragMaxNotes ||
+    diagnostics.ragExcerptLength !== settings.ragExcerptLength
+  ) {
+    return 'stale'
+  }
+
+  return diagnostics.ok && diagnostics.status === 'qwen' ? 'verified' : 'failed'
+}
+
+function qwenSetupCommands(settings) {
+  return {
+    windowsRepo: [
+      {
+        label: 'Install Ollama, pull Qwen, and verify JSON/RAG from the repo',
+        command: 'npm run setup:qwen:win:install'
+      },
+      {
+        label: 'Pull the configured Qwen model from the repo',
+        command: 'npm run setup:qwen:win:pull'
+      },
+      {
+        label: 'Verify the configured Qwen runtime from the repo',
+        command: 'npm run verify:qwen:start:json'
+      }
+    ],
+    manual: [
+      {
+        label: 'Install Ollama with the official Windows script',
+        command: 'irm https://ollama.com/install.ps1 | iex'
+      },
+      {
+        label: 'Pull the configured Qwen model',
+        command: `ollama pull ${settings.model}`
+      },
+      {
+        label: 'Start Ollama for the configured endpoint',
+        command: `$env:OLLAMA_HOST = '${ollamaHost(settings.ollamaUrl)}'; ollama serve`
+      }
+    ],
+    verification: {
+      endpoint: settings.ollamaUrl,
+      model: settings.model,
+      expectedContract: 'Neuronotes JSON analysis with summary, category, tags, related notes, suggested actions, and stored RAG context.'
+    }
+  }
+}
+
+function ollamaHost(ollamaUrl) {
+  try {
+    const url = new URL(ollamaUrl)
+    const port = url.port || (url.protocol === 'https:' ? '443' : '11434')
+    return `${url.hostname}:${port}`
+  } catch {
+    return '127.0.0.1:11434'
   }
 }
 

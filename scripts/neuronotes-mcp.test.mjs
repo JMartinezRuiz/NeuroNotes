@@ -61,11 +61,12 @@ describe('neuronotes MCP server', () => {
       'neuronotes_analysis_queue',
       'neuronotes_list_open_actions',
       'neuronotes_library_summary',
+      'neuronotes_qwen_setup',
       'neuronotes_finetune_readiness'
     ])
   })
 
-  it('exposes library, actions, fine-tuning readiness, and notes as MCP resources', async () => {
+  it('exposes library, actions, Qwen setup, fine-tuning readiness, and notes as MCP resources', async () => {
     const listResponse = await handleMcpMessage(
       {
         jsonrpc: '2.0',
@@ -89,6 +90,10 @@ describe('neuronotes MCP server', () => {
         expect.objectContaining({
           uri: 'neuronotes://analysis/queue',
           title: 'Neuronotes Analysis Queue'
+        }),
+        expect.objectContaining({
+          uri: 'neuronotes://qwen/setup',
+          title: 'Qwen Local Setup'
         }),
         expect.objectContaining({
           uri: 'neuronotes://finetune/readiness',
@@ -173,6 +178,33 @@ describe('neuronotes MCP server', () => {
         pendingCount: 0
       }
     })
+
+    const qwenSetupResponse = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 'resources-5',
+        method: 'resources/read',
+        params: {
+          uri: 'neuronotes://qwen/setup'
+        }
+      },
+      { dbPath }
+    )
+    const qwenSetupPayload = JSON.parse(qwenSetupResponse.result.contents[0].text)
+
+    expect(qwenSetupPayload).toMatchObject({
+      schema: 'neuronotes.mcp.qwen-setup.v1',
+      targetModel: 'qwen3.5:0.8b',
+      ollamaUrl: 'http://127.0.0.1:11434',
+      diagnosticStatus: 'verified',
+      mcpPosture: {
+        readOnly: true,
+        canInstallOllama: false,
+        canPullModel: false,
+        canRunDiagnostics: false
+      }
+    })
+    expect(qwenSetupPayload.commands.manual.map((command) => command.command)).toContain('ollama pull qwen3.5:0.8b')
   })
 
   it('exposes MCP prompts for RAG review and action planning', async () => {
@@ -492,6 +524,50 @@ describe('neuronotes MCP server', () => {
       status: 'ready'
     })
     expect(summary.fineTune.reviewedExamples).toBeUndefined()
+  })
+
+  it('summarizes Qwen setup guidance for MCP hosts without side effects', async () => {
+    const result = await callTool('neuronotes_qwen_setup', {}, { dbPath })
+
+    expect(result).toMatchObject({
+      schema: 'neuronotes.mcp.qwen-setup.v1',
+      targetModel: 'qwen3.5:0.8b',
+      ragSettings: {
+        maxNotes: 5,
+        excerptLength: 550
+      },
+      diagnosticStatus: 'verified',
+      mcpPosture: {
+        readOnly: true,
+        sideEffects: 'none'
+      },
+      commands: {
+        verification: {
+          endpoint: 'http://127.0.0.1:11434',
+          model: 'qwen3.5:0.8b'
+        }
+      }
+    })
+    expect(result.commands.windowsRepo.map((command) => command.command)).toContain('npm run setup:qwen:win:install')
+    expect(result.commands.manual.map((command) => command.command)).toContain('ollama pull qwen3.5:0.8b')
+
+    const staleDatabase = sampleDatabase()
+    staleDatabase.settings.ragMaxNotes = 3
+    await writeFile(dbPath, `${JSON.stringify(staleDatabase, null, 2)}\n`, 'utf8')
+
+    await expect(callTool('neuronotes_qwen_setup', {}, { dbPath })).resolves.toMatchObject({
+      diagnosticStatus: 'missing'
+    })
+
+    const failedDatabase = sampleDatabase()
+    failedDatabase.aiDiagnostics.ok = false
+    failedDatabase.aiDiagnostics.status = 'fallback'
+    failedDatabase.aiDiagnostics.error = 'Qwen no devolvio JSON valido.'
+    await writeFile(dbPath, `${JSON.stringify(failedDatabase, null, 2)}\n`, 'utf8')
+
+    await expect(callTool('neuronotes_qwen_setup', {}, { dbPath })).resolves.toMatchObject({
+      diagnosticStatus: 'failed'
+    })
   })
 
   it('lists open action intents without returning completed actions', async () => {

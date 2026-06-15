@@ -112,6 +112,7 @@ Neuronotes includes a read-only MCP stdio server for local hosts. It exposes not
 - `neuronotes_analysis_queue`
 - `neuronotes_list_open_actions`
 - `neuronotes_library_summary`
+- `neuronotes_qwen_setup`
 - `neuronotes_finetune_readiness`
 
 It also exposes MCP resources:
@@ -119,6 +120,7 @@ It also exposes MCP resources:
 - `neuronotes://library/summary`
 - `neuronotes://actions/open`
 - `neuronotes://analysis/queue`
+- `neuronotes://qwen/setup`
 - `neuronotes://finetune/readiness`
 - `neuronotes://notes/{noteId}`
 
@@ -174,7 +176,7 @@ MCP tool execution is not wired into the shipped app yet. The intended direction
 
 When MCP tool execution lands, it should be added as a separate integration layer with clear permissions, tests, and UI indicators showing what data is being sent to a tool.
 
-The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. Users can mark saved actions as approved for MCP handoff, and exports include approval state plus tool-call drafts for external review. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, manual-approval flags, stored RAG snippets, tool summaries, and action-kind summaries. The stdio server is also intentionally read-only today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
+The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. Users can mark saved actions as approved for MCP handoff, and exports include approval state plus tool-call drafts for external review. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, manual-approval flags, stored RAG snippets, tool summaries, and action-kind summaries. The stdio server can also report Qwen/Ollama setup guidance and the latest stored JSON/RAG diagnostic through `neuronotes_qwen_setup`, but it does not install Ollama, pull models, or run diagnostics. The stdio server is intentionally read-only today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
 
 ## Fine-Tuning Dataset
 
