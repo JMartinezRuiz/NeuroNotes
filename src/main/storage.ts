@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { copyFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import {
+  ActionItem,
+  ActionItemStatus,
   AnalysisRun,
   AnalysisStatus,
   DatabaseFile,
@@ -18,12 +20,14 @@ const DB_BACKUP_FILE = `${DB_FILE}.bak`
 const DB_TEMP_FILE = `${DB_FILE}.tmp`
 
 const ANALYSIS_STATUSES = new Set<AnalysisStatus>(['idle', 'qwen', 'fallback', 'error'])
+const ACTION_STATUSES = new Set<ActionItemStatus>(['open', 'done'])
 
 let mutationQueue: Promise<void> = Promise.resolve()
 
 const emptyDatabase = (): DatabaseFile => ({
   version: 1,
   notes: [],
+  actions: [],
   settings: { ...DEFAULT_SETTINGS }
 })
 
@@ -61,10 +65,18 @@ async function ensureDatabase(): Promise<void> {
 
 export function normalizeDatabase(raw: Partial<DatabaseFile> | null | undefined): DatabaseFile {
   const source = raw && typeof raw === 'object' ? raw : {}
+  const notes = Array.isArray(source.notes) ? source.notes.map(normalizeNote).filter(isNoteRecord) : []
+  const noteIds = new Set(notes.map((note) => note.id))
 
   return {
     version: 1,
-    notes: Array.isArray(source.notes) ? source.notes.map(normalizeNote).filter(isNoteRecord) : [],
+    notes,
+    actions: Array.isArray(source.actions)
+      ? source.actions
+          .map(normalizeActionItem)
+          .filter(isActionItem)
+          .filter((action) => noteIds.has(action.noteId))
+      : [],
     settings: normalizeSettings(source.settings)
   }
 }
@@ -347,6 +359,60 @@ function normalizeSuggestedActionKind(value: unknown): SuggestedActionKind | und
   return undefined
 }
 
+function normalizeActionItem(value: unknown): ActionItem | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+
+  const source = value as Partial<ActionItem>
+  const id = typeof source.id === 'string' ? source.id.trim() : ''
+  const noteId = typeof source.noteId === 'string' ? source.noteId.trim() : ''
+  const kind = normalizeSuggestedActionKind(source.kind)
+  const title = typeof source.title === 'string' && source.title.trim() ? source.title.trim().slice(0, 90) : ''
+
+  if (!id || !noteId || !kind || !title) {
+    return undefined
+  }
+
+  const status =
+    typeof source.status === 'string' && ACTION_STATUSES.has(source.status as ActionItemStatus)
+      ? (source.status as ActionItemStatus)
+      : 'open'
+  const now = new Date().toISOString()
+  const action: ActionItem = {
+    id,
+    noteId,
+    noteTitle:
+      typeof source.noteTitle === 'string' && source.noteTitle.trim()
+        ? source.noteTitle.trim().slice(0, 90)
+        : 'Nota vinculada',
+    kind,
+    title,
+    detail:
+      typeof source.detail === 'string' && source.detail.trim()
+        ? source.detail.trim().slice(0, 180)
+        : 'Accion guardada en Neuronotes.',
+    confidence: Math.max(0, Math.min(1, Number.isFinite(source.confidence) ? Number(source.confidence) : 0)),
+    status,
+    createdAt: typeof source.createdAt === 'string' && source.createdAt ? source.createdAt : now,
+    updatedAt: typeof source.updatedAt === 'string' && source.updatedAt ? source.updatedAt : now
+  }
+  const toolHint =
+    typeof source.toolHint === 'string' && source.toolHint.trim()
+      ? source.toolHint.trim().slice(0, 80)
+      : ''
+
+  if (toolHint) {
+    action.toolHint = toolHint
+  }
+
+  return action
+}
+
 function isNoteRecord(note: NoteRecord | undefined): note is NoteRecord {
   return Boolean(note)
+}
+
+function isActionItem(action: ActionItem | undefined): action is ActionItem {
+  return Boolean(action)
 }

@@ -1,5 +1,6 @@
 import {
   BrainCircuit,
+  Circle,
   CheckCircle2,
   CircleAlert,
   Download,
@@ -21,7 +22,16 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { buildPendingAnalysisKey, shouldAutoAnalyzePending } from './analysisAutomation'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges } from './graph'
-import { AiHealth, AnalysisProvider, AppSettings, NoteRecord, NOTE_CATEGORIES, SuggestedActionKind } from './types'
+import {
+  ActionItem,
+  AiHealth,
+  AnalysisProvider,
+  AppSettings,
+  NoteRecord,
+  NOTE_CATEGORIES,
+  SuggestedAction,
+  SuggestedActionKind
+} from './types'
 
 type NeuronotesApi = NonNullable<Window['neuronotes']>
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error'
@@ -82,6 +92,10 @@ function suggestedActionKindLabel(kind: SuggestedActionKind): string {
   }
 
   return 'MCP'
+}
+
+function actionIdentity(action: { kind: SuggestedActionKind; title: string; detail: string }): string {
+  return `${action.kind}:${action.title.trim().toLowerCase()}:${action.detail.trim().toLowerCase()}`
 }
 
 function durationLabel(durationMs: number): string {
@@ -154,6 +168,7 @@ export default function App(): JSX.Element {
   const api = useMemo(() => resolveApi(), [])
   const autoAnalyzeAttemptKey = useRef('')
   const [notes, setNotes] = useState<NoteRecord[]>([])
+  const [actions, setActions] = useState<ActionItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [quickNote, setQuickNote] = useState('')
   const [editorTitle, setEditorTitle] = useState('')
@@ -178,6 +193,14 @@ export default function App(): JSX.Element {
   const [bootstrapped, setBootstrapped] = useState(false)
 
   const selectedNote = notes.find((note) => note.id === selectedId) ?? notes[0] ?? null
+  const selectedActionItems = useMemo(
+    () => (selectedNote ? actions.filter((action) => action.noteId === selectedNote.id) : []),
+    [actions, selectedNote?.id]
+  )
+  const savedSuggestedActionKeys = useMemo(
+    () => new Set(selectedActionItems.map((action) => actionIdentity(action))),
+    [selectedActionItems]
+  )
   const selectedTagsKey = selectedNote?.tags.join('|') ?? ''
   const allGraphEdges = useMemo(() => graphEdges(notes), [notes])
   const selectedConnections = useMemo(
@@ -372,13 +395,15 @@ export default function App(): JSX.Element {
   }, [editorContent, editorTitle, editingNoteId, selectedNote?.id, selectedNote?.content, selectedNote?.title])
 
   async function bootstrap(): Promise<void> {
-    const [storedNotes, storedSettings] = await Promise.all([
+    const [storedNotes, storedSettings, storedActions] = await Promise.all([
       api.listNotes(),
-      api.getSettings()
+      api.getSettings(),
+      api.listActions()
     ])
 
     setNotes(storedNotes)
     setSettings(storedSettings)
+    setActions(storedActions)
     setSelectedId(storedNotes[0]?.id ?? null)
     await refreshHealth()
     setBootstrapped(true)
@@ -388,6 +413,11 @@ export default function App(): JSX.Element {
     const storedNotes = await api.listNotes()
     setNotes(storedNotes)
     setSelectedId(nextSelectedId ?? selectedId ?? storedNotes[0]?.id ?? null)
+  }
+
+  async function refreshActions(): Promise<void> {
+    const storedActions = await api.listActions()
+    setActions(storedActions)
   }
 
   async function refreshHealth(): Promise<void> {
@@ -652,6 +682,42 @@ export default function App(): JSX.Element {
       await api.deleteNote(selectedNote.id)
       const remaining = notes.filter((note) => note.id !== selectedNote.id)
       await refreshNotes(remaining[0]?.id)
+      await refreshActions()
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function saveSuggestedAction(suggestionIndex: number): Promise<void> {
+    if (!selectedNote) {
+      return
+    }
+
+    setBusy(`saveAction:${suggestionIndex}`)
+    try {
+      const action = await api.createActionFromSuggestion(selectedNote.id, suggestionIndex)
+      await refreshActions()
+      setEditorMessage(`Accion guardada: ${action.title}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function toggleActionStatus(action: ActionItem): Promise<void> {
+    setBusy(`actionStatus:${action.id}`)
+    try {
+      await api.setActionStatus(action.id, action.status === 'done' ? 'open' : 'done')
+      await refreshActions()
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function removeActionItem(actionId: string): Promise<void> {
+    setBusy(`deleteAction:${actionId}`)
+    try {
+      await api.deleteAction(actionId)
+      await refreshActions()
     } finally {
       setBusy(null)
     }
@@ -688,6 +754,7 @@ export default function App(): JSX.Element {
       setLibraryMessage(result.message)
       if (result.ok) {
         await refreshNotes(selectedId ?? undefined)
+        await refreshActions()
       }
     } finally {
       setBusy(null)
@@ -1092,21 +1159,88 @@ export default function App(): JSX.Element {
                 </div>
                 <div className="action-list">
                   {selectedNote.suggestedActions.length > 0 ? (
-                    selectedNote.suggestedActions.map((action) => (
-                      <div className="action-row" key={`${action.kind}:${action.title}`}>
+                    selectedNote.suggestedActions.map((action, index) => {
+                      const isSaved = savedSuggestedActionKeys.has(actionIdentity(action))
+                      const saveActionBusy = busy === `saveAction:${index}`
+
+                      return (
+                        <div className="action-row" key={`${action.kind}:${action.title}:${index}`}>
+                          <span>
+                            <strong>{action.title}</strong>
+                            <small>{action.detail}</small>
+                          </span>
+                          <div>
+                            <strong>{suggestedActionKindLabel(action.kind)}</strong>
+                            <small>{Math.round(action.confidence * 100)}%</small>
+                            <button
+                              type="button"
+                              onClick={() => saveSuggestedAction(index)}
+                              disabled={isSaved || saveActionBusy}
+                              title={isSaved ? 'Accion guardada' : 'Guardar accion'}
+                            >
+                              {saveActionBusy ? (
+                                <Loader2 className="spin" size={13} />
+                              ) : isSaved ? (
+                                <CheckCircle2 size={13} />
+                              ) : (
+                                <Plus size={13} />
+                              )}
+                              {isSaved ? 'Guardada' : 'Guardar'}
+                            </button>
+                          </div>
+                          {action.toolHint && <code>{action.toolHint}</code>}
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <p className="muted">Sin acciones sugeridas.</p>
+                  )}
+                </div>
+              </section>
+
+              <section>
+                <div className="section-title">
+                  <h3>Plan local</h3>
+                  <span>{selectedActionItems.filter((action) => action.status === 'open').length}</span>
+                </div>
+                <div className="saved-action-list">
+                  {selectedActionItems.length > 0 ? (
+                    selectedActionItems.map((action) => (
+                      <div className="saved-action-row" data-status={action.status} key={action.id}>
                         <span>
                           <strong>{action.title}</strong>
                           <small>{action.detail}</small>
+                          {action.toolHint && <code>{action.toolHint}</code>}
                         </span>
-                        <div>
-                          <strong>{suggestedActionKindLabel(action.kind)}</strong>
-                          <small>{Math.round(action.confidence * 100)}%</small>
+                        <div className="saved-action-actions">
+                          <button
+                            type="button"
+                            onClick={() => toggleActionStatus(action)}
+                            disabled={busy === `actionStatus:${action.id}`}
+                            title={action.status === 'done' ? 'Reabrir accion' : 'Marcar como hecha'}
+                          >
+                            {busy === `actionStatus:${action.id}` ? (
+                              <Loader2 className="spin" size={14} />
+                            ) : action.status === 'done' ? (
+                              <CheckCircle2 size={14} />
+                            ) : (
+                              <Circle size={14} />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className="danger"
+                            onClick={() => removeActionItem(action.id)}
+                            disabled={busy === `deleteAction:${action.id}`}
+                            title="Eliminar accion"
+                          >
+                            {busy === `deleteAction:${action.id}` ? <Loader2 className="spin" size={14} /> : <Trash2 size={14} />}
+                          </button>
                         </div>
-                        {action.toolHint && <code>{action.toolHint}</code>}
                       </div>
                     ))
                   ) : (
-                    <p className="muted">Sin acciones sugeridas.</p>
+                    <p className="muted">Sin acciones guardadas.</p>
                   )}
                 </div>
               </section>

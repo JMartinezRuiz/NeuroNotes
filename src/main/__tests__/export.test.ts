@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { noteToMarkdown, safeMarkdownFileName } from '../export'
-import { NoteRecord } from '../types'
+import { ActionItem, NoteRecord } from '../types'
 
 function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
   const now = '2026-06-15T00:00:00.000Z'
@@ -38,7 +38,22 @@ function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
 
 describe('noteToMarkdown', () => {
   it('exports note content, metadata, and related notes', () => {
-    const markdown = noteToMarkdown(note())
+    const localActions: ActionItem[] = [
+      {
+        id: 'action-1',
+        noteId: 'note-1',
+        noteTitle: 'Roadmap Neuronotes',
+        kind: 'task',
+        title: 'Crear tarea',
+        detail: 'Convertir esta nota en una tarea local.',
+        toolHint: 'task.create',
+        confidence: 0.75,
+        status: 'open',
+        createdAt: '2026-06-15T00:00:00.000Z',
+        updatedAt: '2026-06-15T00:00:00.000Z'
+      }
+    ]
+    const markdown = noteToMarkdown(note(), localActions)
 
     expect(markdown).toContain('# Roadmap Neuronotes')
     expect(markdown).toContain('> Plan para convertir notas rapidas en una base conectada.')
@@ -49,6 +64,8 @@ describe('noteToMarkdown', () => {
     expect(markdown).toContain('- Interfaz minimalista: Comparte contexto de producto. (82%)')
     expect(markdown).toContain('## Acciones sugeridas')
     expect(markdown).toContain('- Crear tarea (task, 75%) [task\\.create]: Convertir esta nota en una tarea local\\.')
+    expect(markdown).toContain('## Plan local')
+    expect(markdown).toContain('- [ ] Crear tarea (task) [task\\.create]: Convertir esta nota en una tarea local\\.')
   })
 
   it('uses stable fallbacks when summary, tags, or links are missing', () => {
@@ -58,6 +75,7 @@ describe('noteToMarkdown', () => {
     expect(markdown).toContain('- Etiquetas: Sin etiquetas')
     expect(markdown).toContain('- Sin notas enlazadas')
     expect(markdown).toContain('- Sin acciones sugeridas')
+    expect(markdown).toContain('- Sin acciones guardadas')
   })
 })
 

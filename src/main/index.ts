@@ -3,6 +3,14 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { analyzeNote, checkOllama, pullQwenModel, runAiDiagnostics, startOllamaRuntime } from './ai'
+import {
+  createActionItemFromSuggestion,
+  deleteActionItem,
+  listActionItems,
+  removeActionItemsForNote,
+  setActionItemStatus,
+  syncActionNoteTitle
+} from './actions'
 import { noteToMarkdown, safeMarkdownFileName } from './export'
 import { synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
@@ -11,6 +19,7 @@ import { createNoteDraft, listNotes, mutateDatabase, normalizeDatabase, readData
 import {
   AnalyzePendingResult,
   AppSettings,
+  ActionItemStatus,
   DatabaseFile,
   LibraryExportResult,
   LibraryImportResult,
@@ -114,6 +123,7 @@ function registerIpcHandlers(): void {
       }
 
       note.updatedAt = new Date().toISOString()
+      syncActionNoteTitle(database, note)
       synchronizeRelatedGraph(database.notes, note.id)
       return note
     })
@@ -127,6 +137,34 @@ function registerIpcHandlers(): void {
           ...note,
           related: note.related.filter((related) => related.noteId !== id)
       }))
+      removeActionItemsForNote(database, id)
+    })
+  })
+
+  ipcMain.handle('actions:list', async () => {
+    const database = await readDatabase()
+    return listActionItems(database)
+  })
+
+  ipcMain.handle('actions:createFromSuggestion', async (_, noteId: string, suggestionIndex: number) => {
+    return mutateDatabase((database) => {
+      return createActionItemFromSuggestion(database, noteId, suggestionIndex)
+    })
+  })
+
+  ipcMain.handle('actions:setStatus', async (_, actionId: string, status: ActionItemStatus) => {
+    if (status !== 'open' && status !== 'done') {
+      throw new Error('Estado de accion invalido')
+    }
+
+    return mutateDatabase((database) => {
+      return setActionItemStatus(database, actionId, status)
+    })
+  })
+
+  ipcMain.handle('actions:delete', async (_, actionId: string) => {
+    await mutateDatabase((database) => {
+      deleteActionItem(database, actionId)
     })
   })
 
@@ -196,7 +234,14 @@ function registerIpcHandlers(): void {
       } satisfies NoteMarkdownExportResult
     }
 
-    await writeFile(result.filePath, noteToMarkdown(note), 'utf8')
+    await writeFile(
+      result.filePath,
+      noteToMarkdown(
+        note,
+        listActionItems(database).filter((action) => action.noteId === note.id)
+      ),
+      'utf8'
+    )
 
     return {
       ok: true,
@@ -281,19 +326,22 @@ function registerIpcHandlers(): void {
         total: 0,
         imported: 0,
         updated: 0,
-        skipped: 0
+        skipped: 0,
+        actionsImported: 0,
+        actionsUpdated: 0,
+        actionsSkipped: 0
       } satisfies LibraryImportResult
     }
 
     const filePath = result.filePaths[0]
     const raw = await readFile(filePath, 'utf8')
     const importedDatabase = normalizeDatabase(JSON.parse(raw) as Partial<DatabaseFile>)
-    const importResult = await mergeImportedNotes(importedDatabase.notes)
+    const importResult = await mergeImportedDatabase(importedDatabase)
 
     return {
       ok: true,
       canceled: false,
-      message: `Importacion lista: ${importResult.imported} nuevas, ${importResult.updated} actualizadas`,
+      message: `Importacion lista: ${importResult.imported} notas nuevas, ${importResult.updated} notas actualizadas, ${importResult.actionsImported} acciones nuevas`,
       path: filePath,
       total: importedDatabase.notes.length,
       ...importResult
@@ -339,6 +387,7 @@ async function analyzeAndPersistNote(id: string): Promise<NoteRecord> {
     const index = nextDatabase.notes.findIndex((item) => item.id === id)
     if (index !== -1) {
       nextDatabase.notes[index] = updated
+      syncActionNoteTitle(nextDatabase, updated)
       synchronizeRelatedGraph(nextDatabase.notes, updated.id)
     }
   })
@@ -368,13 +417,23 @@ function isPendingAnalysis(note: NoteRecord): boolean {
   return note.content.trim().length > 0 && note.analysisStatus !== 'qwen'
 }
 
-async function mergeImportedNotes(importedNotes: NoteRecord[]): Promise<Pick<LibraryImportResult, 'imported' | 'updated' | 'skipped'>> {
+async function mergeImportedDatabase(
+  importedDatabase: DatabaseFile
+): Promise<
+  Pick<
+    LibraryImportResult,
+    'imported' | 'updated' | 'skipped' | 'actionsImported' | 'actionsUpdated' | 'actionsSkipped'
+  >
+> {
   return mutateDatabase((database) => {
     let imported = 0
     let updated = 0
     let skipped = 0
+    let actionsImported = 0
+    let actionsUpdated = 0
+    let actionsSkipped = 0
 
-    for (const importedNote of importedNotes) {
+    for (const importedNote of importedDatabase.notes) {
       if (!importedNote.id || !importedNote.content?.trim()) {
         skipped += 1
         continue
@@ -401,10 +460,41 @@ async function mergeImportedNotes(importedNotes: NoteRecord[]): Promise<Pick<Lib
       synchronizeRelatedGraph(database.notes, note.id)
     }
 
+    const notesById = new Map(database.notes.map((note) => [note.id, note]))
+
+    for (const importedAction of importedDatabase.actions) {
+      const linkedNote = notesById.get(importedAction.noteId)
+
+      if (!linkedNote) {
+        actionsSkipped += 1
+        continue
+      }
+
+      importedAction.noteTitle = linkedNote.title
+      const existingIndex = database.actions.findIndex((action) => action.id === importedAction.id)
+
+      if (existingIndex === -1) {
+        database.actions.push(importedAction)
+        actionsImported += 1
+        continue
+      }
+
+      const existing = database.actions[existingIndex]
+      if (importedAction.updatedAt.localeCompare(existing.updatedAt) > 0) {
+        database.actions[existingIndex] = importedAction
+        actionsUpdated += 1
+      } else {
+        actionsSkipped += 1
+      }
+    }
+
     return {
       imported,
       updated,
-      skipped
+      skipped,
+      actionsImported,
+      actionsUpdated,
+      actionsSkipped
     }
   })
 }

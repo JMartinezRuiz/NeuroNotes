@@ -17,6 +17,22 @@ export interface SuggestedAction {
   confidence: number
 }
 
+export type ActionItemStatus = 'open' | 'done'
+
+export interface ActionItem {
+  id: string
+  noteId: string
+  noteTitle: string
+  kind: SuggestedActionKind
+  title: string
+  detail: string
+  toolHint?: string
+  confidence: number
+  status: ActionItemStatus
+  createdAt: string
+  updatedAt: string
+}
+
 export type AnalysisProvider = 'qwen' | 'local'
 
 export interface AnalysisRun {
@@ -113,6 +129,9 @@ export interface LibraryImportResult {
   imported: number
   updated: number
   skipped: number
+  actionsImported: number
+  actionsUpdated: number
+  actionsSkipped: number
 }
 
 export interface NoteMarkdownExportResult {
@@ -126,6 +145,7 @@ export interface NoteMarkdownExportResult {
 export interface DatabaseFile {
   version: 1
   notes: NoteRecord[]
+  actions: ActionItem[]
   settings: AppSettings
 }
 

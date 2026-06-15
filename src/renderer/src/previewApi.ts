@@ -1,5 +1,5 @@
 import { NeuronotesApi } from '../../preload'
-import { AiHealth, AppSettings, NoteRecord } from './types'
+import { ActionItem, ActionItemStatus, AiHealth, AppSettings, NoteRecord } from './types'
 
 type Api = NeuronotesApi
 
@@ -84,7 +84,31 @@ let notes: NoteRecord[] = [
   }
 ]
 
+let actions: ActionItem[] = [
+  {
+    id: 'preview-action-roadmap',
+    noteId: 'preview-roadmap',
+    noteTitle: 'Roadmap Neuronotes',
+    kind: 'task',
+    title: 'Definir plan MCP',
+    detail: 'Convertir el roadmap en una lista de tareas para la integracion MCP.',
+    toolHint: 'task.create',
+    confidence: 0.78,
+    status: 'open',
+    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString()
+  }
+]
+
 const sortNotes = (): NoteRecord[] => [...notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+const sortActions = (): ActionItem[] =>
+  [...actions].sort((a, b) => {
+    if (a.status !== b.status) {
+      return a.status === 'open' ? -1 : 1
+    }
+
+    return b.updatedAt.localeCompare(a.updatedAt)
+  })
 
 const previewHealth = (): AiHealth => ({
   ok: false,
@@ -140,6 +164,12 @@ export function createPreviewApi(): Api {
 
       if (updates.title) {
         note.title = updates.title
+        for (const action of actions) {
+          if (action.noteId === note.id) {
+            action.noteTitle = note.title
+            action.updatedAt = new Date().toISOString()
+          }
+        }
       }
 
       if (updates.category) {
@@ -161,6 +191,7 @@ export function createPreviewApi(): Api {
     },
     deleteNote: async (id) => {
       notes = notes.filter((note) => note.id !== id)
+      actions = actions.filter((action) => action.noteId !== id)
     },
     addManualLink: async (sourceId, targetId) => {
       const source = notes.find((note) => note.id === sourceId)
@@ -283,6 +314,62 @@ export function createPreviewApi(): Api {
         lastUpdatedId
       }
     },
+    listActions: async () => sortActions(),
+    createActionFromSuggestion: async (noteId, suggestionIndex) => {
+      const note = notes.find((item) => item.id === noteId)
+      const suggestion = note?.suggestedActions[suggestionIndex]
+
+      if (!note || !suggestion) {
+        throw new Error('Accion sugerida no encontrada')
+      }
+
+      const existing = actions.find(
+        (action) =>
+          action.noteId === note.id &&
+          action.kind === suggestion.kind &&
+          action.title.trim().toLowerCase() === suggestion.title.trim().toLowerCase() &&
+          action.detail.trim().toLowerCase() === suggestion.detail.trim().toLowerCase()
+      )
+
+      if (existing) {
+        return existing
+      }
+
+      const now = new Date().toISOString()
+      const action: ActionItem = {
+        id: makeId(),
+        noteId: note.id,
+        noteTitle: note.title,
+        kind: suggestion.kind,
+        title: suggestion.title,
+        detail: suggestion.detail,
+        confidence: suggestion.confidence,
+        status: 'open',
+        createdAt: now,
+        updatedAt: now
+      }
+
+      if (suggestion.toolHint) {
+        action.toolHint = suggestion.toolHint
+      }
+
+      actions = [action, ...actions]
+      return action
+    },
+    setActionStatus: async (actionId, status: ActionItemStatus) => {
+      const action = actions.find((item) => item.id === actionId)
+
+      if (!action) {
+        throw new Error('Accion no encontrada')
+      }
+
+      action.status = status
+      action.updatedAt = new Date().toISOString()
+      return action
+    },
+    deleteAction: async (actionId) => {
+      actions = actions.filter((action) => action.id !== actionId)
+    },
     exportNoteMarkdown: async (id) => ({
       ok: true,
       canceled: false,
@@ -305,7 +392,10 @@ export function createPreviewApi(): Api {
       total: 0,
       imported: 0,
       updated: 0,
-      skipped: 0
+      skipped: 0,
+      actionsImported: 0,
+      actionsUpdated: 0,
+      actionsSkipped: 0
     }),
     getSettings: async () => ({ ...settings }),
     updateSettings: async (updates) => {

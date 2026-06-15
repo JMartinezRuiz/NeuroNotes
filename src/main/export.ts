@@ -1,6 +1,6 @@
-import { NoteRecord } from './types'
+import { ActionItem, NoteRecord } from './types'
 
-export function noteToMarkdown(note: NoteRecord): string {
+export function noteToMarkdown(note: NoteRecord, localActions: ActionItem[] = []): string {
   const tags = note.tags.length > 0 ? note.tags.map((tag) => `#${tag}`).join(' ') : 'Sin etiquetas'
   const related = note.related.length > 0
     ? note.related
@@ -15,6 +15,14 @@ export function noteToMarkdown(note: NoteRecord): string {
         })
         .join('\n')
     : '- Sin acciones sugeridas'
+  const plan = localActions.length > 0
+    ? localActions
+        .map((item) => {
+          const tool = item.toolHint ? ` [${escapeMarkdown(item.toolHint)}]` : ''
+          return `- [${item.status === 'done' ? 'x' : ' '}] ${escapeMarkdown(item.title)} (${item.kind})${tool}: ${escapeMarkdown(item.detail)}`
+        })
+        .join('\n')
+    : '- Sin acciones guardadas'
 
   return [
     `# ${escapeMarkdown(note.title)}`,
@@ -38,6 +46,10 @@ export function noteToMarkdown(note: NoteRecord): string {
     '## Acciones sugeridas',
     '',
     actions,
+    '',
+    '## Plan local',
+    '',
+    plan,
     ''
   ].join('\n')
 }

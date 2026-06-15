@@ -38,6 +38,7 @@ function database(notes: NoteRecord[]): DatabaseFile {
   return {
     version: 1,
     notes,
+    actions: [],
     settings: { ...DEFAULT_SETTINGS }
   }
 }
@@ -128,7 +129,28 @@ describe('normalizeDatabase', () => {
         model: '',
         ollamaUrl: 'http://127.0.0.1:11434/',
         autoAnalyze: false
-      }
+      },
+      actions: [
+        {
+          id: 'action-1',
+          noteId: 'valid',
+          noteTitle: '  Nota importada  ',
+          kind: 'REMINDER',
+          title: '  Revisar despues  ',
+          detail: '',
+          toolHint: ' reminder.create ',
+          confidence: 4,
+          status: 'unknown',
+          createdAt: '',
+          updatedAt: '2026-06-15T00:01:00.000Z'
+        },
+        {
+          id: '',
+          noteId: 'valid',
+          kind: 'task',
+          title: 'No entra'
+        }
+      ]
     } as unknown as Partial<DatabaseFile>)
 
     expect(normalized.settings).toEqual({
@@ -164,6 +186,19 @@ describe('normalizeDatabase', () => {
           reason: 'Relacion detectada por Neuronotes.'
         }
       ]
+    })
+    expect(normalized.actions).toHaveLength(1)
+    expect(normalized.actions[0]).toMatchObject({
+      id: 'action-1',
+      noteId: 'valid',
+      noteTitle: 'Nota importada',
+      kind: 'reminder',
+      title: 'Revisar despues',
+      detail: 'Accion guardada en Neuronotes.',
+      toolHint: 'reminder.create',
+      confidence: 1,
+      status: 'open',
+      updatedAt: '2026-06-15T00:01:00.000Z'
     })
   })
 })

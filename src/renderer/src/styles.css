@@ -1088,7 +1088,7 @@ button:disabled {
 
 .action-row > div {
   display: grid;
-  min-width: 74px;
+  min-width: 86px;
   justify-items: end;
   gap: 3px;
 }
@@ -1119,6 +1119,114 @@ button:disabled {
   border-radius: 6px;
   background: #e5f4ec;
   font-size: 11px;
+}
+
+.action-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 8px;
+  color: var(--accent-strong);
+  border: 1px solid rgba(31, 122, 100, 0.22);
+  border-radius: 7px;
+  background: #e5f4ec;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.action-row button:hover:not(:disabled) {
+  color: #fff;
+  background: var(--accent-strong);
+}
+
+.saved-action-list {
+  display: grid;
+  gap: 8px;
+}
+
+.saved-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.saved-action-row[data-status='done'] {
+  opacity: 0.68;
+}
+
+.saved-action-row[data-status='done'] strong {
+  text-decoration: line-through;
+}
+
+.saved-action-row > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.saved-action-row strong,
+.saved-action-row small,
+.saved-action-row code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saved-action-row strong {
+  font-size: 13px;
+}
+
+.saved-action-row small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.saved-action-row code {
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 6px;
+  color: var(--accent-strong);
+  border-radius: 6px;
+  background: #e5f4ec;
+  font-size: 11px;
+}
+
+.saved-action-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.saved-action-actions button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  color: var(--accent-strong);
+  border: 1px solid rgba(31, 122, 100, 0.2);
+  border-radius: 8px;
+  background: #e5f4ec;
+}
+
+.saved-action-actions button:hover:not(:disabled) {
+  color: #fff;
+  background: var(--accent-strong);
+}
+
+.saved-action-actions button.danger {
+  color: var(--danger);
+  border-color: rgba(180, 61, 47, 0.18);
+  background: rgba(255, 228, 223, 0.44);
+}
+
+.saved-action-actions button.danger:hover:not(:disabled) {
+  color: #fff;
+  background: var(--danger);
 }
 
 .muted {
