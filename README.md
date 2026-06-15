@@ -56,7 +56,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Saved actions can be explicitly approved or revoked for MCP handoff review before any future external tool execution exists.
 - Plan view now shows MCP handoff readiness per action, separating ready tool-call drafts from actions that still need approval or a tool hint.
 - MCP handoff JSON export for open local actions, including tool summaries, action-kind summaries, tool hints, source-note context, and stored RAG snippets without executing external tools.
-- Read-only MCP stdio server for local hosts that need to search notes, read note context, list open action intents, and inspect library/fine-tuning readiness.
+- Read-only MCP stdio server for local hosts that need to search notes, read note context, inspect analysis queues, list open action intents, and inspect library/fine-tuning readiness.
 - MCP connection config is available from the app settings panel, including the stdio command, database path, and host-ready `mcpServers.neuronotes` JSON.
 - Fine-tuning dataset JSONL export from user-reviewed analyzed notes, for future local Qwen tuning experiments without sending data outside the machine.
 - Fine-tuning readiness summary in settings, showing reviewed JSONL examples and analyzed notes still awaiting approval.
@@ -102,6 +102,7 @@ Neuronotes includes a read-only MCP stdio server for local hosts. It exposes not
 
 - `neuronotes_search_notes`
 - `neuronotes_get_note`
+- `neuronotes_analysis_queue`
 - `neuronotes_list_open_actions`
 - `neuronotes_library_summary`
 - `neuronotes_finetune_readiness`
@@ -110,6 +111,7 @@ It also exposes MCP resources:
 
 - `neuronotes://library/summary`
 - `neuronotes://actions/open`
+- `neuronotes://analysis/queue`
 - `neuronotes://finetune/readiness`
 - `neuronotes://notes/{noteId}`
 

@@ -58,6 +58,7 @@ describe('neuronotes MCP server', () => {
     expect(response.result.tools.map((tool) => tool.name)).toEqual([
       'neuronotes_search_notes',
       'neuronotes_get_note',
+      'neuronotes_analysis_queue',
       'neuronotes_list_open_actions',
       'neuronotes_library_summary',
       'neuronotes_finetune_readiness'
@@ -84,6 +85,10 @@ describe('neuronotes MCP server', () => {
         expect.objectContaining({
           uri: 'neuronotes://actions/open',
           title: 'Open Neuronotes Actions'
+        }),
+        expect.objectContaining({
+          uri: 'neuronotes://analysis/queue',
+          title: 'Neuronotes Analysis Queue'
         }),
         expect.objectContaining({
           uri: 'neuronotes://finetune/readiness',
@@ -140,6 +145,33 @@ describe('neuronotes MCP server', () => {
       reviewedExampleCount: 0,
       pendingReviewCount: 2,
       status: 'needs-review'
+    })
+
+    const queueResponse = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 'resources-4',
+        method: 'resources/read',
+        params: {
+          uri: 'neuronotes://analysis/queue'
+        }
+      },
+      { dbPath }
+    )
+    const queuePayload = JSON.parse(queueResponse.result.contents[0].text)
+
+    expect(queuePayload).toMatchObject({
+      schema: 'neuronotes.mcp.analysis-queues.v1',
+      targetModel: 'qwen3.5:0.8b',
+      qwen: {
+        pendingCount: 1,
+        statusCounts: {
+          fallback: 1
+        }
+      },
+      local: {
+        pendingCount: 0
+      }
     })
   })
 
@@ -244,6 +276,60 @@ describe('neuronotes MCP server', () => {
         title: 'Roadmap Neuronotes'
       })
     ])
+  })
+
+  it('lists analysis queues for Qwen upgrades and local fallback retries', async () => {
+    const queueDatabase = sampleDatabase()
+    queueDatabase.notes.push({
+      id: 'note-draft',
+      title: 'Nota pendiente',
+      content: 'Captura nueva que todavia no fue analizada.',
+      summary: '',
+      category: 'Inbox',
+      tags: [],
+      related: [],
+      suggestedActions: [],
+      analysisStatus: 'idle',
+      createdAt: '2026-06-15T00:00:00.000Z',
+      updatedAt: '2026-06-15T00:05:00.000Z'
+    })
+    await writeFile(dbPath, `${JSON.stringify(queueDatabase, null, 2)}\n`, 'utf8')
+
+    const qwenQueue = await callTool('neuronotes_analysis_queue', { mode: 'qwen', limit: 10 }, { dbPath })
+    const localQueue = await callTool('neuronotes_analysis_queue', { mode: 'local', limit: 10 }, { dbPath })
+
+    expect(qwenQueue).toMatchObject({
+      schema: 'neuronotes.mcp.analysis-queue.v1',
+      mode: 'qwen',
+      pendingCount: 2,
+      statusCounts: {
+        fallback: 1,
+        idle: 1
+      },
+      notes: [
+        expect.objectContaining({
+          id: 'note-project',
+          analysisStatus: 'fallback',
+          reason: 'Local fallback result can be upgraded with Qwen and stored RAG context.'
+        }),
+        expect.objectContaining({
+          id: 'note-draft',
+          analysisStatus: 'idle',
+          reason: 'New or edited note waiting for Qwen analysis.'
+        })
+      ]
+    })
+    expect(localQueue).toMatchObject({
+      schema: 'neuronotes.mcp.analysis-queue.v1',
+      mode: 'local',
+      pendingCount: 1,
+      notes: [
+        expect.objectContaining({
+          id: 'note-draft',
+          reason: 'New or edited note waiting for local fallback analysis.'
+        })
+      ]
+    })
   })
 
   it('normalizes stale note references before exposing MCP context', async () => {

@@ -15,6 +15,7 @@ const MAX_LIMIT = 25
 const RESOURCE_URIS = {
   summary: 'neuronotes://library/summary',
   openActions: 'neuronotes://actions/open',
+  analysisQueue: 'neuronotes://analysis/queue',
   fineTuneReadiness: 'neuronotes://finetune/readiness'
 }
 
@@ -74,6 +75,30 @@ const TOOLS = [
         includeContent: {
           type: 'boolean',
           description: 'Include full note content. Defaults to true.'
+        }
+      }
+    }
+  },
+  {
+    name: 'neuronotes_analysis_queue',
+    description: 'List notes pending local analysis or Qwen upgrade, without modifying the library.',
+    annotations: {
+      readOnlyHint: true
+    },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        mode: {
+          type: 'string',
+          enum: ['qwen', 'local'],
+          description: 'Queue to inspect. qwen includes local fallback notes that can be upgraded. Default: qwen.'
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: MAX_LIMIT,
+          description: `Maximum notes to return. Default: ${DEFAULT_LIMIT}.`
         }
       }
     }
@@ -243,6 +268,10 @@ export async function callTool(name, args = {}, context = {}) {
     return getNote(database, args)
   }
 
+  if (name === 'neuronotes_analysis_queue') {
+    return analysisQueue(database, args)
+  }
+
   if (name === 'neuronotes_list_open_actions') {
     return listOpenActions(database, args)
   }
@@ -379,6 +408,17 @@ function listResources(database) {
         }
       },
       {
+        uri: RESOURCE_URIS.analysisQueue,
+        name: 'analysis-queue',
+        title: 'Neuronotes Analysis Queue',
+        description: 'Notes pending local fallback analysis and Qwen upgrade.',
+        mimeType: 'application/json',
+        annotations: {
+          audience: ['assistant'],
+          priority: 0.84
+        }
+      },
+      {
         uri: RESOURCE_URIS.fineTuneReadiness,
         name: 'fine-tune-readiness',
         title: 'Fine-Tuning Readiness',
@@ -416,6 +456,10 @@ function readResource(uri, database, dbPath) {
 
   if (uri === RESOURCE_URIS.openActions) {
     return jsonResource(uri, listOpenActions(database, { limit: MAX_LIMIT }))
+  }
+
+  if (uri === RESOURCE_URIS.analysisQueue) {
+    return jsonResource(uri, analysisQueues(database))
   }
 
   if (uri === RESOURCE_URIS.fineTuneReadiness) {
@@ -613,6 +657,90 @@ function getNote(database, args) {
       analysisRun: note.analysisRun ?? null
     }
   }
+}
+
+function analysisQueues(database) {
+  return {
+    schema: 'neuronotes.mcp.analysis-queues.v1',
+    targetModel: database.settings.model,
+    qwen: analysisQueue(database, { mode: 'qwen', limit: MAX_LIMIT }),
+    local: analysisQueue(database, { mode: 'local', limit: MAX_LIMIT }),
+    execution: {
+      mode: 'read-only-context',
+      canAnalyzeNotes: false,
+      canExecuteExternalTools: false
+    }
+  }
+}
+
+function analysisQueue(database, args) {
+  const mode = normalizeAnalysisQueueMode(args.mode)
+  const limit = limitArg(args.limit)
+  const pending = database.notes
+    .filter((note) => note.content.trim().length > 0 && isPendingAnalysisNote(note, mode))
+    .sort(compareAnalysisQueueNotes)
+  const statusCounts = countBy(pending, (note) => note.analysisStatus)
+
+  return {
+    schema: 'neuronotes.mcp.analysis-queue.v1',
+    mode,
+    targetModel: database.settings.model,
+    pendingCount: pending.length,
+    statusCounts,
+    notes: pending.slice(0, limit).map((note) => ({
+      ...noteSummary(note, 1),
+      reason: analysisQueueReason(note, mode),
+      ragNoteIds: note.analysisRun?.ragNoteIds ?? [],
+      analysisError: note.analysisError ?? null
+    }))
+  }
+}
+
+function normalizeAnalysisQueueMode(value) {
+  return value === 'local' ? 'local' : 'qwen'
+}
+
+function isPendingAnalysisNote(note, mode) {
+  if (mode === 'local') {
+    return note.analysisStatus === 'idle' || note.analysisStatus === 'error'
+  }
+
+  return note.analysisStatus !== 'qwen'
+}
+
+function compareAnalysisQueueNotes(a, b) {
+  const priority = analysisQueuePriority(b) - analysisQueuePriority(a)
+  return priority || b.updatedAt.localeCompare(a.updatedAt)
+}
+
+function analysisQueuePriority(note) {
+  if (note.analysisStatus === 'error') {
+    return 3
+  }
+
+  if (note.analysisStatus === 'fallback') {
+    return 2
+  }
+
+  return 1
+}
+
+function analysisQueueReason(note, mode) {
+  if (mode === 'local') {
+    return note.analysisStatus === 'error'
+      ? 'Previous analysis failed; local fallback can retry without Qwen.'
+      : 'New or edited note waiting for local fallback analysis.'
+  }
+
+  if (note.analysisStatus === 'fallback') {
+    return 'Local fallback result can be upgraded with Qwen and stored RAG context.'
+  }
+
+  if (note.analysisStatus === 'error') {
+    return 'Previous analysis failed; Qwen can retry when the model is ready.'
+  }
+
+  return 'New or edited note waiting for Qwen analysis.'
 }
 
 function listOpenActions(database, args) {
