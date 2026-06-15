@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { addManualLink, removeManualLink } from '../manualLinks'
+import { resetAnalysisAfterContentEdit } from '../noteLifecycle'
 import { NoteRecord } from '../types'
 
 function note(id: string): NoteRecord {
@@ -32,6 +33,55 @@ describe('manual links', () => {
       expect.objectContaining({
         noteId: target.id,
         title: target.title,
+        reason: 'Enlace manual.'
+      })
+    ])
+    expect(target.related).toEqual([
+      expect.objectContaining({
+        noteId: source.id,
+        reason: 'Enlace reciproco: Enlace manual.'
+      })
+    ])
+  })
+
+  it('promotes an existing automatic link to manual so content edits keep it', () => {
+    const source = note('source')
+    const target = note('target')
+    source.related = [
+      {
+        noteId: target.id,
+        title: target.title,
+        score: 0.91,
+        reason: 'Comparte vocabulario relevante.'
+      }
+    ]
+    source.summary = 'Resumen generado antes de guardar el enlace.'
+    source.suggestedActions = [
+      {
+        kind: 'task',
+        title: 'Accion vieja',
+        detail: 'Depende del analisis previo.',
+        confidence: 0.7
+      }
+    ]
+    source.analysisStatus = 'qwen'
+    source.analysisRun = {
+      provider: 'qwen',
+      model: 'qwen3.5:0.8b',
+      analyzedAt: source.updatedAt,
+      durationMs: 1200,
+      ragNoteIds: [target.id]
+    }
+    const notes = [source, target]
+
+    addManualLink(notes, source.id, target.id)
+    resetAnalysisAfterContentEdit(source)
+
+    expect(source.related).toEqual([
+      expect.objectContaining({
+        noteId: target.id,
+        title: target.title,
+        score: 0.91,
         reason: 'Enlace manual.'
       })
     ])

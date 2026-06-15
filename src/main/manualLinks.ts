@@ -1,6 +1,8 @@
 import { synchronizeRelatedGraph } from './linking'
 import { NoteRecord } from './types'
 
+const MANUAL_LINK_REASON = 'Enlace manual.'
+
 export function addManualLink(notes: NoteRecord[], sourceId: string, targetId: string): NoteRecord {
   const source = findNote(notes, sourceId)
   const target = findNote(notes, targetId)
@@ -14,7 +16,7 @@ export function addManualLink(notes: NoteRecord[], sourceId: string, targetId: s
     noteId: target.id,
     title: target.title,
     score: 0.72,
-    reason: 'Enlace manual.'
+    reason: MANUAL_LINK_REASON
   }
 
   if (existingIndex === -1) {
@@ -24,7 +26,7 @@ export function addManualLink(notes: NoteRecord[], sourceId: string, targetId: s
       ...source.related[existingIndex],
       title: target.title,
       score: Math.max(source.related[existingIndex].score, manualLink.score),
-      reason: source.related[existingIndex].reason || manualLink.reason
+      reason: manualLink.reason
     }
   }
 
