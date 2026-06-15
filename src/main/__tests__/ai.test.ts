@@ -160,7 +160,7 @@ describe('analyzeNote', () => {
 {
   "title": "Mapa de notas",
   "summary": "Convierte notas rapidas en una base enlazada.",
-  "category": "proyecto",
+  "category": "project roadmap",
   "tags": ["#Qwen", "RAG", "Notas", "M\u00e9dico"],
   "related": [
     { "noteId": "context-note", "reason": "Usa el roadmap existente como contexto." },

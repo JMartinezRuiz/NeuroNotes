@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { copyFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { normalizeNoteTags } from './metadata'
+import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
 import {
   ActionItem,
   ActionItemStatus,
@@ -346,7 +346,7 @@ function normalizeAiDiagnostics(value: unknown, settings: DatabaseFile['settings
     ragExcerptLength: settings.ragExcerptLength,
     diagnosedAt,
     durationMs: Math.max(0, Math.round(Number.isFinite(source.durationMs) ? Number(source.durationMs) : 0)),
-    category: typeof source.category === 'string' && source.category.trim() ? source.category.trim().slice(0, 80) : 'Inbox',
+    category: normalizeNoteCategory(source.category),
     summary: typeof source.summary === 'string' ? source.summary.trim().slice(0, 320) : '',
     related: Math.max(0, Math.round(Number.isFinite(source.related) ? Number(source.related) : 0))
   }
@@ -394,7 +394,7 @@ function normalizeNote(value: unknown): NoteRecord | undefined {
     title,
     content,
     summary: typeof source.summary === 'string' ? source.summary : '',
-    category: typeof source.category === 'string' && source.category.trim() ? source.category.trim() : 'Inbox',
+    category: normalizeNoteCategory(source.category),
     tags: normalizeTags(source.tags),
     related: normalizeRelated(source.related),
     suggestedActions: normalizeSuggestedActions(source.suggestedActions),
@@ -495,10 +495,7 @@ function normalizeRagContext(value: unknown): RagContextItem[] {
       return {
         noteId,
         title,
-        category:
-          typeof source.category === 'string' && source.category.trim()
-            ? source.category.trim().slice(0, 40)
-            : 'Inbox',
+        category: normalizeNoteCategory(source.category),
         tags: normalizeTags(source.tags).slice(0, 8),
         score: Math.max(0, Math.min(1, Number.isFinite(source.score) ? Number(source.score) : 0)),
         reason:

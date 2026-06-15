@@ -29,6 +29,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Sidebar filters can also isolate notes pending fine-tuning approval and notes already approved for JSONL export.
 - Search covers note text plus AI-generated and saved actions, related-note titles, tool hints, and stored RAG audit context.
 - Accent-insensitive search and tag normalization for Spanish notes.
+- Category aliases from Qwen, imports, and MCP capture are normalized across Spanish and English terms such as `project`, `health`, `work`, and `finanzas personales`.
 - Native desktop menu with keyboard shortcuts for capture, search, save, analysis, export, settings, and note/network views.
 - Quick capture can submit the current note with `Ctrl+Enter` or `Cmd+Enter` while plain Enter remains available for multiline notes.
 - Native confirmation before deleting notes.
@@ -47,6 +48,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Qwen JSON responses are sanitized and lightly repaired for common model output issues such as Markdown fences and trailing commas.
 - MCP library summary includes the latest matching Qwen JSON/RAG diagnostic result so external hosts can see whether local AI was actually verified.
 - Qwen prompts include the note reference date and current title/category/tags, improving time-sensitive actions and metadata-aware categorization.
+- Qwen category output is normalized before saving, so small-model answers like `project roadmap` or `health follow up` still land in the app's built-in categories.
 - Local fallback analyzer when Ollama/Qwen is unavailable.
 - Single-note analysis uses the local analyzer immediately when Qwen is not ready, and Qwen can upgrade those notes later.
 - The note analysis button labels Qwen upgrades explicitly when a local fallback note can be reprocessed by the ready model.

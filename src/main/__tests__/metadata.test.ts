@@ -6,6 +6,14 @@ describe('normalizeNoteCategory', () => {
     expect(normalizeNoteCategory(' proyecto ')).toBe('Proyecto')
   })
 
+  it('maps common Spanish and English aliases to built-in categories', () => {
+    expect(normalizeNoteCategory('project roadmap')).toBe('Proyecto')
+    expect(normalizeNoteCategory('health follow up')).toBe('Salud')
+    expect(normalizeNoteCategory('finanzas personales')).toBe('Finanzas')
+    expect(normalizeNoteCategory('work')).toBe('Trabajo')
+    expect(normalizeNoteCategory('idea nueva')).toBe('Ideas')
+  })
+
   it('keeps custom categories when the user provides one', () => {
     expect(normalizeNoteCategory('Investigacion')).toBe('Investigacion')
   })

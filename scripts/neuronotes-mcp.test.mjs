@@ -934,7 +934,7 @@ describe('neuronotes MCP server', () => {
         {
           title: 'Captura desde MCP',
           content: 'Nueva idea capturada desde un host MCP autorizado.',
-          category: 'Ideas',
+          category: 'product roadmap',
           tags: ['#MCP', 'Qwen', 'mcp']
         },
         { dbPath }
@@ -946,7 +946,7 @@ describe('neuronotes MCP server', () => {
       {
         title: 'Captura desde MCP',
         content: 'Nueva idea capturada desde un host MCP autorizado.',
-        category: 'Ideas',
+        category: 'product roadmap',
         tags: ['#MCP', 'Qwen', 'mcp']
       },
       { dbPath, writeEnabled: true }
@@ -957,7 +957,7 @@ describe('neuronotes MCP server', () => {
       writeMode: 'enabled',
       note: {
         title: 'Captura desde MCP',
-        category: 'Ideas',
+        category: 'Proyecto',
         tags: ['mcp', 'qwen'],
         analysisStatus: 'idle',
         content: 'Nueva idea capturada desde un host MCP autorizado.'
@@ -976,6 +976,13 @@ describe('neuronotes MCP server', () => {
       related: [],
       suggestedActions: []
     })
+
+    const projectSearch = await callTool('neuronotes_search_notes', { category: 'project' }, { dbPath })
+    expect(projectSearch).toMatchObject({
+      schema: 'neuronotes.mcp.search.v1',
+      count: 2
+    })
+    expect(projectSearch.notes.every((note) => note.category === 'Proyecto')).toBe(true)
 
     const backup = JSON.parse(await readFile(path.join(tempDir, 'neuronotes.json.bak'), 'utf8'))
     expect(backup.notes[0]).toMatchObject({

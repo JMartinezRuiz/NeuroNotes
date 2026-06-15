@@ -16,6 +16,53 @@ const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 25
 const MAX_GRAPH_NODES = 100
 const MAX_MCP_NOTE_CONTENT_LENGTH = 20000
+const NOTE_CATEGORIES = ['Inbox', 'Trabajo', 'Proyecto', 'Ideas', 'Aprendizaje', 'Personal', 'Salud', 'Finanzas']
+const CATEGORY_ALIASES = new Map([
+  ['entrada', 'Inbox'],
+  ['bandeja', 'Inbox'],
+  ['general', 'Inbox'],
+  ['misc', 'Inbox'],
+  ['sin categoria', 'Inbox'],
+  ['sin clasificar', 'Inbox'],
+  ['work', 'Trabajo'],
+  ['job', 'Trabajo'],
+  ['laboral', 'Trabajo'],
+  ['oficina', 'Trabajo'],
+  ['project', 'Proyecto'],
+  ['product', 'Proyecto'],
+  ['producto', 'Proyecto'],
+  ['roadmap', 'Proyecto'],
+  ['idea', 'Ideas'],
+  ['brainstorming', 'Ideas'],
+  ['propuesta', 'Ideas'],
+  ['learning', 'Aprendizaje'],
+  ['study', 'Aprendizaje'],
+  ['estudio', 'Aprendizaje'],
+  ['curso', 'Aprendizaje'],
+  ['personal', 'Personal'],
+  ['home', 'Personal'],
+  ['hogar', 'Personal'],
+  ['health', 'Salud'],
+  ['medico', 'Salud'],
+  ['medica', 'Salud'],
+  ['wellness', 'Salud'],
+  ['bienestar', 'Salud'],
+  ['finance', 'Finanzas'],
+  ['finances', 'Finanzas'],
+  ['dinero', 'Finanzas'],
+  ['presupuesto', 'Finanzas'],
+  ['gastos', 'Finanzas'],
+  ['pagos', 'Finanzas']
+])
+const CATEGORY_KEYWORDS = [
+  { category: 'Finanzas', pattern: /\b(finanzas?|finance|finances|money|dinero|presupuesto|gastos?|pagos?)\b/ },
+  { category: 'Salud', pattern: /\b(salud|health|medic[ao]|wellness|bienestar)\b/ },
+  { category: 'Trabajo', pattern: /\b(work|job|laboral|oficina|cliente|equipo|reunion)\b/ },
+  { category: 'Proyecto', pattern: /\b(project|producto|product|roadmap|lanzamiento)\b/ },
+  { category: 'Ideas', pattern: /\b(idea|ideas|brainstorming|propuesta)\b/ },
+  { category: 'Aprendizaje', pattern: /\b(learning|study|estudio|curso|libro|aprender)\b/ },
+  { category: 'Personal', pattern: /\b(personal|vida|hogar|home|familia)\b/ }
+]
 const RESOURCE_URIS = {
   summary: 'neuronotes://library/summary',
   noteGraph: 'neuronotes://graph/links',
@@ -820,7 +867,7 @@ function parseNoteResourceUri(uri) {
 
 function searchNotes(database, args) {
   const query = normalizeText(stringArg(args.query))
-  const category = stringArg(args.category)
+  const category = categoryArg(args.category)
   const tags = arrayArg(args.tags).map(normalizeTag).filter(Boolean)
   const analysisStatus = stringArg(args.analysisStatus)
   const limit = limitArg(args.limit)
@@ -924,7 +971,7 @@ async function createNoteFromMcp(database, args, context) {
     title: mcpNoteTitle(args.title, content),
     content,
     summary: '',
-    category: excerpt(stringArg(args.category) || 'Inbox', 80),
+    category: normalizeNoteCategory(args.category),
     tags: uniqueNormalizedTags(args.tags).slice(0, 10),
     related: [],
     suggestedActions: [],
@@ -981,7 +1028,7 @@ function uniqueNormalizedTags(values) {
 }
 
 function noteGraph(database, args = {}) {
-  const category = stringArg(args.category)
+  const category = categoryArg(args.category)
   const limit = graphLimitArg(args.limit)
   const notes = database.notes
     .filter((note) => !category || note.category === category)
@@ -1754,7 +1801,7 @@ function normalizeNote(value) {
     title: stringArg(value.title) || 'Nota sin titulo',
     content: typeof value.content === 'string' ? value.content : '',
     summary: stringArg(value.summary),
-    category: stringArg(value.category) || 'Inbox',
+    category: normalizeNoteCategory(value.category),
     tags: arrayArg(value.tags).map(normalizeTag).filter(Boolean).slice(0, 10),
     related: Array.isArray(value.related) ? value.related.map(normalizeRelated).filter(Boolean).slice(0, 10) : [],
     suggestedActions: Array.isArray(value.suggestedActions)
@@ -1870,7 +1917,7 @@ function normalizeRagContextItem(value) {
   return {
     noteId: stringArg(value.noteId),
     title: stringArg(value.title) || 'Contexto RAG',
-    category: stringArg(value.category) || 'Inbox',
+    category: normalizeNoteCategory(value.category),
     tags: arrayArg(value.tags).map(normalizeTag).filter(Boolean).slice(0, 8),
     score: clampNumber(value.score, 0, 1, 0),
     reason: stringArg(value.reason) || 'Contexto recuperado por RAG local.',
@@ -1925,7 +1972,7 @@ function normalizeAiDiagnostics(value, settings) {
     ragExcerptLength: settings.ragExcerptLength,
     diagnosedAt,
     durationMs: clampInteger(value.durationMs, 0, Number.MAX_SAFE_INTEGER, 0),
-    category: excerpt(stringArg(value.category) || 'Inbox', 80),
+    category: normalizeNoteCategory(value.category),
     summary: excerpt(stringArg(value.summary), 320),
     related: clampInteger(value.related, 0, Number.MAX_SAFE_INTEGER, 0)
   }
@@ -1945,6 +1992,42 @@ function normalizeAnalysisStatus(value) {
 function normalizeActionKind(value) {
   const kind = stringArg(value).toLowerCase()
   return kind === 'task' || kind === 'reminder' || kind === 'research' || kind === 'mcp' ? kind : undefined
+}
+
+function categoryArg(value) {
+  const raw = stringArg(value)
+  return raw ? normalizeNoteCategory(raw) : ''
+}
+
+function normalizeNoteCategory(value) {
+  const raw = stringArg(value)
+
+  if (!raw) {
+    return 'Inbox'
+  }
+
+  const key = normalizeCategoryKey(raw)
+  const exact = NOTE_CATEGORIES.find((category) => normalizeCategoryKey(category) === key)
+
+  if (exact) {
+    return exact
+  }
+
+  const alias = CATEGORY_ALIASES.get(key)
+
+  if (alias) {
+    return alias
+  }
+
+  const keyword = CATEGORY_KEYWORDS.find((item) => item.pattern.test(key))
+  return keyword?.category ?? excerpt(raw, 80)
+}
+
+function normalizeCategoryKey(value) {
+  return normalizeText(value)
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function normalizeTag(value) {

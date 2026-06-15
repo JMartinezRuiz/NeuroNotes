@@ -103,6 +103,7 @@ describe('normalizeDatabase', () => {
         {
           id: 'valid',
           content: 'Nota importada',
+          category: 'project roadmap',
           tags: ['#Qwen', 'qwen', '  local  ', 'm\u00e9dico'],
           related: [
             {
@@ -200,6 +201,7 @@ describe('normalizeDatabase', () => {
     expect(normalized.notes[0]).toMatchObject({
       id: 'valid',
       title: 'Nota importada',
+      category: 'Proyecto',
       tags: ['qwen', 'local', 'medico'],
       suggestedActions: [
         {
@@ -264,7 +266,7 @@ describe('normalizeDatabase', () => {
       ragExcerptLength: DEFAULT_SETTINGS.ragExcerptLength,
       diagnosedAt: '2026-06-15T00:05:00.000Z',
       durationMs: 842,
-      category: ' Proyecto ',
+      category: 'health check',
       summary: '  Diagnostico JSON valido.  ',
       related: 1
     }
@@ -278,12 +280,12 @@ describe('normalizeDatabase', () => {
       ok: true,
       status: 'qwen',
       model: DEFAULT_SETTINGS.model,
+      category: 'Salud',
       ollamaUrl: DEFAULT_SETTINGS.ollamaUrl,
       ragMaxNotes: DEFAULT_SETTINGS.ragMaxNotes,
       ragExcerptLength: DEFAULT_SETTINGS.ragExcerptLength,
       diagnosedAt: '2026-06-15T00:05:00.000Z',
       durationMs: 842,
-      category: 'Proyecto',
       summary: 'Diagnostico JSON valido.',
       related: 1
     })

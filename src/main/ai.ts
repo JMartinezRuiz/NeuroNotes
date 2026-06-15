@@ -20,7 +20,7 @@ import {
   SuggestedActionKind
 } from './types'
 import { buildRagContextBundle, rankRelatedNotes } from './linking'
-import { normalizeNoteTags } from './metadata'
+import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
 
 interface OllamaChatResponse {
   message?: {
@@ -561,7 +561,7 @@ function sanitizeAiPayload(payload: AiPayload, allNotes: NoteRecord[]): Omit<Ana
         .filter((item): item is RelatedNote => Boolean(item))
     : []
 
-  const category = typeof payload.category === 'string' ? normalizeCategory(payload.category) : 'Inbox'
+  const category = normalizeNoteCategory(payload.category)
   const tags = normalizeNoteTags(payload.tags).slice(0, 6)
   const suggestedActions = normalizeSuggestedActions(
     firstArray(payload.suggestedActions, payload.actions, payload.actionSuggestions)
@@ -575,11 +575,6 @@ function sanitizeAiPayload(payload: AiPayload, allNotes: NoteRecord[]): Omit<Ana
     related,
     suggestedActions
   }
-}
-
-function normalizeCategory(value: string): string {
-  const normalized = value.trim().toLowerCase()
-  return NOTE_CATEGORIES.find((category) => category.toLowerCase() === normalized) ?? 'Inbox'
 }
 
 function normalizeAnalyzerText(value: string): string {
