@@ -1,6 +1,6 @@
-import { AiHealth } from './types'
+import { AiDiagnosticsResult, AiHealth } from './types'
 
-export type AiSetupStepId = 'ollama' | 'model' | 'analysis'
+export type AiSetupStepId = 'ollama' | 'model' | 'contract' | 'analysis'
 export type AiSetupStepState = 'ready' | 'action' | 'fallback'
 
 export interface AiSetupStep {
@@ -10,7 +10,16 @@ export interface AiSetupStep {
   detail: string
 }
 
-export function aiSetupSteps(health: Pick<AiHealth, 'ok' | 'ollamaAvailable' | 'modelInstalled' | 'model' | 'status'>): AiSetupStep[] {
+export function aiSetupSteps(
+  health: Pick<AiHealth, 'ok' | 'ollamaAvailable' | 'modelInstalled' | 'model' | 'status'>,
+  diagnostics?: Pick<AiDiagnosticsResult, 'ok' | 'status' | 'model' | 'summary' | 'related' | 'error'> | null
+): AiSetupStep[] {
+  const canRunDiagnostics = health.ok && health.modelInstalled && health.ollamaAvailable
+  const diagnosticsCurrent = Boolean(diagnostics && (!diagnostics.model || diagnostics.model === health.model))
+  const hasDiagnostics = Boolean(diagnostics && diagnosticsCurrent)
+  const contractReady = canRunDiagnostics && diagnosticsCurrent && Boolean(diagnostics?.ok)
+  const analysisReady = health.ok && (!hasDiagnostics || diagnostics?.status === 'qwen')
+
   return [
     {
       id: 'ollama',
@@ -25,10 +34,32 @@ export function aiSetupSteps(health: Pick<AiHealth, 'ok' | 'ollamaAvailable' | '
       detail: health.modelInstalled ? `${health.model} instalado.` : `Descarga ${health.model}.`
     },
     {
+      id: 'contract',
+      label: 'JSON',
+      state: contractReady ? 'ready' : canRunDiagnostics ? 'action' : 'fallback',
+      detail: contractDetail(health.model, diagnosticsCurrent ? diagnostics : null, canRunDiagnostics)
+    },
+    {
       id: 'analysis',
       label: 'Analisis',
-      state: health.ok ? 'ready' : 'fallback',
-      detail: health.ok ? 'Qwen listo para RAG.' : 'Fallback local activo.'
+      state: analysisReady ? 'ready' : 'fallback',
+      detail: analysisReady ? 'Qwen listo para RAG.' : 'Fallback local activo.'
     }
   ]
+}
+
+function contractDetail(
+  model: string,
+  diagnostics: Pick<AiDiagnosticsResult, 'ok' | 'status' | 'model' | 'summary' | 'related' | 'error'> | null | undefined,
+  canRunDiagnostics: boolean
+): string {
+  if (diagnostics?.ok) {
+    return `${diagnostics.model || model} genero JSON valido con ${diagnostics.related} enlace(s) RAG.`
+  }
+
+  if (diagnostics) {
+    return diagnostics.error || 'La prueba Qwen no produjo JSON valido.'
+  }
+
+  return canRunDiagnostics ? 'Pulsa Probar para validar JSON y RAG.' : 'Pendiente hasta activar Qwen.'
 }

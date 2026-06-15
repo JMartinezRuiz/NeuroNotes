@@ -69,6 +69,7 @@ import {
   ActionItem,
   AppCommand,
   AiHealth,
+  AiDiagnosticsResult,
   AnalysisProvider,
   AppSettings,
   McpConnectionConfig,
@@ -249,6 +250,7 @@ export default function App(): JSX.Element {
   const [activeMcpReadinessFilter, setActiveMcpReadinessFilter] = useState<McpActionReadinessFilter>('all')
   const [settings, setSettings] = useState<AppSettings>(emptySettings)
   const [health, setHealth] = useState<AiHealth>(emptyHealth)
+  const [lastDiagnostics, setLastDiagnostics] = useState<AiDiagnosticsResult | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('saved')
   const [editingToolHintId, setEditingToolHintId] = useState<string | null>(null)
@@ -383,7 +385,7 @@ export default function App(): JSX.Element {
     () => buildPendingAnalysisKey(settings.model, pendingAnalysisNotes, pendingEngine),
     [pendingAnalysisNotes, pendingEngine, settings.model]
   )
-  const aiSetupStatus = useMemo(() => aiSetupSteps(health), [health])
+  const aiSetupStatus = useMemo(() => aiSetupSteps(health, lastDiagnostics), [health, lastDiagnostics])
   const ragBudget = useMemo(
     () => summarizeRagBudget(settings.ragMaxNotes, settings.ragExcerptLength),
     [settings.ragExcerptLength, settings.ragMaxNotes]
@@ -614,6 +616,10 @@ export default function App(): JSX.Element {
   async function refreshHealth(): Promise<void> {
     const nextHealth = await api.checkAiHealth()
     setHealth(nextHealth)
+
+    if (!nextHealth.ok) {
+      setLastDiagnostics(null)
+    }
   }
 
   async function handleAppCommand(command: AppCommand): Promise<void> {
@@ -755,12 +761,14 @@ export default function App(): JSX.Element {
 
     try {
       const result = await api.runAiDiagnostics()
+      setLastDiagnostics(result)
       setDiagnosticsMessage(
         result.ok
           ? `${result.message} (${result.durationMs} ms). ${result.summary}`
           : `${result.message} (${result.durationMs} ms).`
       )
     } catch (error) {
+      setLastDiagnostics(null)
       setDiagnosticsMessage(error instanceof Error ? error.message : 'No se pudo probar Qwen')
     } finally {
       setBusy(null)
@@ -1066,6 +1074,14 @@ export default function App(): JSX.Element {
     setDiagnosticsMessage('')
     setAnalysisQueueMessage('')
     setSetupCommandMessage('')
+    if (
+      'model' in nextSettings ||
+      'ollamaUrl' in nextSettings ||
+      'ragMaxNotes' in nextSettings ||
+      'ragExcerptLength' in nextSettings
+    ) {
+      setLastDiagnostics(null)
+    }
     const updated = await api.updateSettings(nextSettings)
     setSettings(updated)
   }
