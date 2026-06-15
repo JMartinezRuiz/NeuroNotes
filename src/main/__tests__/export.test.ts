@@ -20,6 +20,15 @@ function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
         reason: 'Comparte contexto de producto.'
       }
     ],
+    suggestedActions: [
+      {
+        kind: 'task',
+        title: 'Crear tarea',
+        detail: 'Convertir esta nota en una tarea local.',
+        toolHint: 'task.create',
+        confidence: 0.75
+      }
+    ],
     analysisStatus: 'qwen',
     createdAt: now,
     updatedAt: now,
@@ -38,14 +47,17 @@ describe('noteToMarkdown', () => {
     expect(markdown).toContain('## Nota')
     expect(markdown).toContain('Crear una app de notas con Qwen local.')
     expect(markdown).toContain('- Interfaz minimalista: Comparte contexto de producto. (82%)')
+    expect(markdown).toContain('## Acciones sugeridas')
+    expect(markdown).toContain('- Crear tarea (task, 75%) [task\\.create]: Convertir esta nota en una tarea local\\.')
   })
 
   it('uses stable fallbacks when summary, tags, or links are missing', () => {
-    const markdown = noteToMarkdown(note({ summary: '', tags: [], related: [] }))
+    const markdown = noteToMarkdown(note({ summary: '', tags: [], related: [], suggestedActions: [] }))
 
     expect(markdown).toContain('> Sin resumen')
     expect(markdown).toContain('- Etiquetas: Sin etiquetas')
     expect(markdown).toContain('- Sin notas enlazadas')
+    expect(markdown).toContain('- Sin acciones sugeridas')
   })
 })
 

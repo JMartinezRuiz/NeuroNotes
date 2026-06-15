@@ -17,6 +17,7 @@ function note(overrides: Partial<NoteRecord> & Pick<NoteRecord, 'id' | 'content'
     category: 'Inbox',
     tags: [],
     related: [],
+    suggestedActions: [],
     analysisStatus: 'idle',
     createdAt: now,
     updatedAt: now,
@@ -114,6 +115,15 @@ describe('analyzeNote', () => {
   "related": [
     { "noteId": "context-note", "reason": "Usa el roadmap existente como contexto." },
     { "noteId": "missing-note", "reason": "No debe sobrevivir." }
+  ],
+  "suggestedActions": [
+    {
+      "kind": "task",
+      "title": "Crear plan MCP",
+      "detail": "Convertir el roadmap en tareas ejecutables.",
+      "toolHint": "task.create",
+      "confidence": 1.4
+    }
   ]
 }`
         }),
@@ -145,6 +155,15 @@ describe('analyzeNote', () => {
         model: 'qwen3.5:0.8b',
         ragNoteIds: ['context-note']
       },
+      suggestedActions: [
+        {
+          kind: 'task',
+          title: 'Crear plan MCP',
+          detail: 'Convertir el roadmap en tareas ejecutables.',
+          toolHint: 'task.create',
+          confidence: 1
+        }
+      ],
       related: [
         expect.objectContaining({
           noteId: 'context-note',
@@ -180,6 +199,8 @@ describe('analyzeNote', () => {
     expect(body.prompt).toContain('ID: context-note')
     expect(body.prompt).toContain('Titulo: Roadmap RAG local')
     expect(body.prompt).toContain('No inventes IDs')
+    expect(body.prompt).toContain('suggestedActions')
+    expect(body.prompt).toContain('futura capa MCP')
   })
 
   it('keeps local related-note ranking when Qwen returns no links', async () => {
@@ -249,6 +270,12 @@ describe('analyzeNote', () => {
         model: 'qwen3.5:0.8b',
         ragNoteIds: ['related']
       },
+      suggestedActions: [
+        expect.objectContaining({
+          kind: 'task',
+          toolHint: 'task.create'
+        })
+      ],
       related: [
         expect.objectContaining({
           noteId: 'related',

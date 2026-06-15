@@ -21,7 +21,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { buildPendingAnalysisKey, shouldAutoAnalyzePending } from './analysisAutomation'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges } from './graph'
-import { AiHealth, AnalysisProvider, AppSettings, NoteRecord, NOTE_CATEGORIES } from './types'
+import { AiHealth, AnalysisProvider, AppSettings, NoteRecord, NOTE_CATEGORIES, SuggestedActionKind } from './types'
 
 type NeuronotesApi = NonNullable<Window['neuronotes']>
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error'
@@ -68,6 +68,20 @@ function statusLabel(note: NoteRecord): string {
 
 function analysisProviderLabel(provider: AnalysisProvider): string {
   return provider === 'qwen' ? 'Qwen' : 'Local'
+}
+
+function suggestedActionKindLabel(kind: SuggestedActionKind): string {
+  if (kind === 'task') {
+    return 'Tarea'
+  }
+  if (kind === 'reminder') {
+    return 'Recordatorio'
+  }
+  if (kind === 'research') {
+    return 'Busqueda'
+  }
+
+  return 'MCP'
 }
 
 function durationLabel(durationMs: number): string {
@@ -1067,6 +1081,32 @@ export default function App(): JSX.Element {
                     selectedNote.tags.map((tag) => <span key={tag}>#{tag}</span>)
                   ) : (
                     <span className="muted">Sin etiquetas</span>
+                  )}
+                </div>
+              </section>
+
+              <section>
+                <div className="section-title">
+                  <h3>Acciones</h3>
+                  <span>{selectedNote.suggestedActions.length}</span>
+                </div>
+                <div className="action-list">
+                  {selectedNote.suggestedActions.length > 0 ? (
+                    selectedNote.suggestedActions.map((action) => (
+                      <div className="action-row" key={`${action.kind}:${action.title}`}>
+                        <span>
+                          <strong>{action.title}</strong>
+                          <small>{action.detail}</small>
+                        </span>
+                        <div>
+                          <strong>{suggestedActionKindLabel(action.kind)}</strong>
+                          <small>{Math.round(action.confidence * 100)}%</small>
+                        </div>
+                        {action.toolHint && <code>{action.toolHint}</code>}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="muted">Sin acciones sugeridas.</p>
                   )}
                 </div>
               </section>

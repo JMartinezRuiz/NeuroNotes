@@ -98,6 +98,7 @@ function registerIpcHandlers(): void {
         note.analysisStatus = 'idle'
         note.analysisError = undefined
         note.analysisRun = undefined
+        note.suggestedActions = []
       }
 
       if (typeof updates.title === 'string' && updates.title.trim()) {
@@ -355,6 +356,7 @@ async function analyzeNoteSnapshot(note: NoteRecord, database: DatabaseFile): Pr
     category: analysis.category,
     tags: analysis.tags,
     related: analysis.related,
+    suggestedActions: analysis.suggestedActions,
     analysisStatus: analysis.status,
     analysisError: analysis.error,
     analysisRun: analysis.analysisRun,

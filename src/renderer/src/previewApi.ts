@@ -26,6 +26,15 @@ let notes: NoteRecord[] = [
         reason: 'Ambas notas tratan la experiencia principal de Neuronotes.'
       }
     ],
+    suggestedActions: [
+      {
+        kind: 'task',
+        title: 'Definir plan MCP',
+        detail: 'Convertir el roadmap en una lista de tareas para la integracion MCP.',
+        toolHint: 'task.create',
+        confidence: 0.78
+      }
+    ],
     analysisStatus: 'qwen',
     analysisRun: {
       provider: 'qwen',
@@ -50,6 +59,15 @@ let notes: NoteRecord[] = [
         title: 'Roadmap Neuronotes',
         score: 0.74,
         reason: 'Enlace reciproco: Ambas notas tratan la experiencia principal de Neuronotes.'
+      }
+    ],
+    suggestedActions: [
+      {
+        kind: 'research',
+        title: 'Revisar patrones de editor',
+        detail: 'Buscar referencias de interacciones minimalistas para notas conectadas.',
+        toolHint: 'documents.search',
+        confidence: 0.62
       }
     ],
     analysisStatus: 'fallback',
@@ -100,6 +118,7 @@ export function createPreviewApi(): Api {
         category: 'Inbox',
         tags: [],
         related: [],
+        suggestedActions: [],
         analysisStatus: 'idle',
         createdAt: now,
         updatedAt: now
@@ -206,6 +225,15 @@ export function createPreviewApi(): Api {
           score: 0.65,
           reason: 'Relacion simulada para vista previa.'
         }))
+      note.suggestedActions = [
+        {
+          kind: 'task',
+          title: 'Revisar nota capturada',
+          detail: 'Vista previa de una accion sugerida para futura ejecucion MCP.',
+          toolHint: 'task.create',
+          confidence: 0.68
+        }
+      ]
       note.analysisStatus = 'fallback'
       note.analysisError = 'Vista previa: Qwen solo corre dentro de Electron/Ollama.'
       note.analysisRun = {
@@ -226,6 +254,15 @@ export function createPreviewApi(): Api {
         note.summary = note.content.replace(/\s+/g, ' ').slice(0, 140)
         note.category = note.content.toLowerCase().includes('ui') ? 'Ideas' : 'Proyecto'
         note.tags = Array.from(new Set(note.content.toLowerCase().match(/\b[a-z]{4,}\b/g) ?? [])).slice(0, 4)
+        note.suggestedActions = [
+          {
+            kind: 'mcp',
+            title: 'Preparar automatizacion',
+            detail: 'Simulacion de accion estructurada lista para una futura capa MCP.',
+            toolHint: 'mcp.workflow.prepare',
+            confidence: 0.74
+          }
+        ]
         note.analysisStatus = 'qwen'
         note.analysisError = undefined
         note.analysisRun = {

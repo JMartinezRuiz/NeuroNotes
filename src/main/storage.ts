@@ -2,7 +2,16 @@ import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { copyFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { AnalysisRun, AnalysisStatus, DatabaseFile, DEFAULT_SETTINGS, NoteRecord, RelatedNote } from './types'
+import {
+  AnalysisRun,
+  AnalysisStatus,
+  DatabaseFile,
+  DEFAULT_SETTINGS,
+  NoteRecord,
+  RelatedNote,
+  SuggestedAction,
+  SuggestedActionKind
+} from './types'
 
 const DB_FILE = 'neuronotes.json'
 const DB_BACKUP_FILE = `${DB_FILE}.bak`
@@ -132,6 +141,7 @@ export function createNoteDraft(content: string): NoteRecord {
     category: 'Inbox',
     tags: [],
     related: [],
+    suggestedActions: [],
     analysisStatus: 'idle',
     createdAt: now,
     updatedAt: now
@@ -199,6 +209,7 @@ function normalizeNote(value: unknown): NoteRecord | undefined {
     category: typeof source.category === 'string' && source.category.trim() ? source.category.trim() : 'Inbox',
     tags: normalizeTags(source.tags),
     related: normalizeRelated(source.related),
+    suggestedActions: normalizeSuggestedActions(source.suggestedActions),
     analysisStatus,
     analysisError: typeof source.analysisError === 'string' && source.analysisError.trim() ? source.analysisError : undefined,
     analysisRun: normalizeAnalysisRun(source.analysisRun),
@@ -278,6 +289,62 @@ function normalizeAnalysisRun(value: unknown): AnalysisRun | undefined {
           .slice(0, 8)
       : []
   }
+}
+
+function normalizeSuggestedActions(value: unknown): SuggestedAction[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return undefined
+      }
+
+      const source = item as Partial<SuggestedAction>
+      const kind = normalizeSuggestedActionKind(source.kind)
+      const title = typeof source.title === 'string' && source.title.trim() ? source.title.trim().slice(0, 90) : ''
+
+      if (!kind || !title) {
+        return undefined
+      }
+
+      const action: SuggestedAction = {
+        kind,
+        title,
+        detail:
+          typeof source.detail === 'string' && source.detail.trim()
+            ? source.detail.trim().slice(0, 180)
+            : 'Accion sugerida por Neuronotes.',
+        confidence: Math.max(0, Math.min(1, Number.isFinite(source.confidence) ? Number(source.confidence) : 0))
+      }
+      const toolHint =
+        typeof source.toolHint === 'string' && source.toolHint.trim()
+          ? source.toolHint.trim().slice(0, 80)
+          : ''
+
+      if (toolHint) {
+        action.toolHint = toolHint
+      }
+
+      return action
+    })
+    .filter((item): item is SuggestedAction => Boolean(item))
+    .slice(0, 8)
+}
+
+function normalizeSuggestedActionKind(value: unknown): SuggestedActionKind | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'task' || normalized === 'reminder' || normalized === 'research' || normalized === 'mcp') {
+    return normalized
+  }
+
+  return undefined
 }
 
 function isNoteRecord(note: NoteRecord | undefined): note is NoteRecord {

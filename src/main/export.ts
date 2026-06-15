@@ -7,6 +7,14 @@ export function noteToMarkdown(note: NoteRecord): string {
         .map((item) => `- ${escapeMarkdown(item.title)}: ${item.reason} (${Math.round(item.score * 100)}%)`)
         .join('\n')
     : '- Sin notas enlazadas'
+  const actions = note.suggestedActions.length > 0
+    ? note.suggestedActions
+        .map((item) => {
+          const tool = item.toolHint ? ` [${escapeMarkdown(item.toolHint)}]` : ''
+          return `- ${escapeMarkdown(item.title)} (${item.kind}, ${Math.round(item.confidence * 100)}%)${tool}: ${escapeMarkdown(item.detail)}`
+        })
+        .join('\n')
+    : '- Sin acciones sugeridas'
 
   return [
     `# ${escapeMarkdown(note.title)}`,
@@ -26,6 +34,10 @@ export function noteToMarkdown(note: NoteRecord): string {
     '## Notas enlazadas',
     '',
     related,
+    '',
+    '## Acciones sugeridas',
+    '',
+    actions,
     ''
   ].join('\n')
 }

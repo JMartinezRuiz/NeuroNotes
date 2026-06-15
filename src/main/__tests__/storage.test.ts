@@ -27,6 +27,7 @@ function note(id: string): NoteRecord {
     category: 'Inbox',
     tags: [],
     related: [],
+    suggestedActions: [],
     analysisStatus: 'idle',
     createdAt: now,
     updatedAt: now
@@ -98,6 +99,19 @@ describe('normalizeDatabase', () => {
               reason: ''
             }
           ],
+          suggestedActions: [
+            {
+              kind: 'TASK',
+              title: '  Crear tarea  ',
+              detail: 'Preparar automatizacion local',
+              toolHint: ' task.create ',
+              confidence: 2
+            },
+            {
+              kind: 'unknown',
+              title: 'No entra'
+            }
+          ],
           analysisRun: {
             provider: 'qwen',
             model: ' qwen3.5:0.8b ',
@@ -127,6 +141,15 @@ describe('normalizeDatabase', () => {
       id: 'valid',
       title: 'Nota importada',
       tags: ['qwen', 'local'],
+      suggestedActions: [
+        {
+          kind: 'task',
+          title: 'Crear tarea',
+          detail: 'Preparar automatizacion local',
+          toolHint: 'task.create',
+          confidence: 1
+        }
+      ],
       analysisRun: {
         provider: 'qwen',
         model: 'qwen3.5:0.8b',

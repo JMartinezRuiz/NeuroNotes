@@ -27,6 +27,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Local fallback analyzer when Ollama/Qwen is unavailable.
 - RAG context generation from locally related notes before Qwen analysis.
 - Automatic summaries, categories, tags, and related-note suggestions.
+- Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
 - Reciprocal note graph synchronization.
 - Manual link and unlink controls.
 - Graph view for direct links, backlinks, and library connection counts.
@@ -43,8 +44,9 @@ The analysis flow is:
 3. The strongest matches are serialized as RAG context.
 4. Qwen 0.8B is called through Ollama with a strict JSON prompt.
 5. The response is sanitized and merged with local related-note ranking.
-6. If Qwen is unavailable, the app uses local fallback categorization, summary, tags, and links.
-7. The note stores an audit record of the analysis run.
+6. Suggested action intents are stored locally without executing external tools.
+7. If Qwen is unavailable, the app uses local fallback categorization, summary, tags, links, and action hints.
+8. The note stores an audit record of the analysis run.
 
 Default model:
 
@@ -68,6 +70,8 @@ MCP is not wired into the shipped app yet. The intended direction is to let Neur
 - Connecting a local assistant to user-approved tools while keeping note data local-first.
 
 When MCP lands, it should be added as a separate integration layer with clear permissions, tests, and UI indicators showing what data is being sent to a tool.
+
+The app already stores action intents with an optional `toolHint` field. That field is intentionally inert today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
 
 ## Local Setup
 

@@ -1065,6 +1065,62 @@ button:disabled {
   background: #e5f4ec;
 }
 
+.action-list {
+  display: grid;
+  gap: 8px;
+}
+
+.action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.action-row > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.action-row > div {
+  display: grid;
+  min-width: 74px;
+  justify-items: end;
+  gap: 3px;
+}
+
+.action-row strong,
+.action-row small,
+.action-row code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.action-row strong {
+  font-size: 13px;
+}
+
+.action-row small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.action-row code {
+  grid-column: 1 / -1;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 6px;
+  color: var(--accent-strong);
+  border-radius: 6px;
+  background: #e5f4ec;
+  font-size: 11px;
+}
+
 .muted {
   color: var(--muted) !important;
 }
@@ -1225,5 +1281,91 @@ button:disabled {
 
   .settings-panel {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  body {
+    overflow: auto;
+  }
+
+  html,
+  body,
+  #root,
+  .app-shell {
+    min-height: 100%;
+    height: auto;
+  }
+
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    min-height: 360px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .workspace {
+    min-width: 0;
+  }
+
+  .topbar,
+  .settings-panel,
+  .note-workspace,
+  .network-workspace {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .topbar-actions,
+  .view-tabs {
+    width: 100%;
+  }
+
+  .topbar-actions {
+    justify-content: space-between;
+  }
+
+  .view-tabs button,
+  .batch-button {
+    flex: 1 1 0;
+  }
+
+  .note-workspace,
+  .network-workspace {
+    gap: 14px;
+  }
+
+  .editor-pane,
+  .network-map {
+    min-height: 420px;
+  }
+
+  .note-heading,
+  .note-editor {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  .note-heading {
+    flex-direction: column;
+  }
+
+  .status-badge {
+    align-self: flex-start;
+  }
+
+  .editor-actions,
+  .metadata-actions,
+  .model-actions,
+  .library-actions {
+    flex-wrap: wrap;
   }
 }

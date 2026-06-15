@@ -7,6 +7,16 @@ export interface RelatedNote {
   reason: string
 }
 
+export type SuggestedActionKind = 'task' | 'reminder' | 'research' | 'mcp'
+
+export interface SuggestedAction {
+  kind: SuggestedActionKind
+  title: string
+  detail: string
+  toolHint?: string
+  confidence: number
+}
+
 export type AnalysisProvider = 'qwen' | 'local'
 
 export interface AnalysisRun {
@@ -25,6 +35,7 @@ export interface NoteRecord {
   category: string
   tags: string[]
   related: RelatedNote[]
+  suggestedActions: SuggestedAction[]
   analysisStatus: AnalysisStatus
   analysisError?: string
   analysisRun?: AnalysisRun

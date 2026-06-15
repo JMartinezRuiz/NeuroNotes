@@ -13,7 +13,9 @@ import {
   NoteRecord,
   NOTE_CATEGORIES,
   PullModelResult,
-  RelatedNote
+  RelatedNote,
+  SuggestedAction,
+  SuggestedActionKind
 } from './types'
 import { buildRagContextBundle, rankRelatedNotes } from './linking'
 
@@ -41,6 +43,9 @@ interface AiPayload {
   tags?: unknown
   related?: unknown
   linkSuggestions?: unknown
+  actions?: unknown
+  suggestedActions?: unknown
+  actionSuggestions?: unknown
 }
 
 export async function checkOllama(settings: AppSettings): Promise<AiHealth> {
@@ -199,6 +204,7 @@ export async function runAiDiagnostics(settings: AppSettings): Promise<AiDiagnos
     category: 'Proyecto',
     tags: ['qwen', 'rag', 'neuronotes'],
     related: [],
+    suggestedActions: [],
     analysisStatus: 'idle',
     createdAt,
     updatedAt: createdAt
@@ -211,6 +217,7 @@ export async function runAiDiagnostics(settings: AppSettings): Promise<AiDiagnos
     category: 'Proyecto',
     tags: ['rag', 'notas'],
     related: [],
+    suggestedActions: [],
     analysisStatus: 'qwen',
     createdAt,
     updatedAt: createdAt
@@ -315,11 +322,21 @@ Devuelve exclusivamente JSON valido con esta forma:
   "tags": ["2 a 6 etiquetas cortas"],
   "related": [
     { "noteId": "id de nota existente", "reason": "motivo breve" }
+  ],
+  "suggestedActions": [
+    {
+      "kind": "task | reminder | research | mcp",
+      "title": "accion breve",
+      "detail": "por que o como ejecutar",
+      "toolHint": "herramienta MCP opcional",
+      "confidence": 0.0
+    }
   ]
 }
 
 Categorias permitidas: ${NOTE_CATEGORIES.join(', ')}.
 No inventes IDs. Si no hay relacion clara, usa related: [].
+No ejecutes herramientas ni asumas permisos. Las suggestedActions son solo intenciones locales para una futura capa MCP.
 
 Nota nueva:
 ${note.content}
@@ -376,13 +393,17 @@ function sanitizeAiPayload(payload: AiPayload, allNotes: NoteRecord[]): Omit<Ana
         .filter(Boolean)
         .slice(0, 6)
     : []
+  const suggestedActions = normalizeSuggestedActions(
+    firstArray(payload.suggestedActions, payload.actions, payload.actionSuggestions)
+  )
 
   return {
     title: typeof payload.title === 'string' && payload.title.trim() ? payload.title.trim().slice(0, 90) : 'Nota sin titulo',
     summary: typeof payload.summary === 'string' ? payload.summary.trim().slice(0, 320) : '',
     category,
     tags,
-    related
+    related,
+    suggestedActions
   }
 }
 
@@ -416,7 +437,8 @@ function fallbackAnalysis(note: NoteRecord, related: RelatedNote[]): Omit<Analys
     summary,
     category,
     tags,
-    related
+    related,
+    suggestedActions: inferSuggestedActions(note.content)
   }
 }
 
@@ -453,6 +475,104 @@ function mergeRelated(primary: RelatedNote[], fallback: RelatedNote[]): RelatedN
   }
 
   return [...map.values()].slice(0, 6)
+}
+
+function firstArray(...values: unknown[]): unknown {
+  return values.find((value) => Array.isArray(value))
+}
+
+function normalizeSuggestedActions(value: unknown): SuggestedAction[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return undefined
+      }
+
+      const source = item as {
+        kind?: unknown
+        title?: unknown
+        detail?: unknown
+        toolHint?: unknown
+        confidence?: unknown
+      }
+      const kind = normalizeSuggestedActionKind(source.kind)
+      const title = typeof source.title === 'string' ? source.title.trim().slice(0, 90) : ''
+      const detail = typeof source.detail === 'string' ? source.detail.trim().slice(0, 180) : ''
+
+      if (!kind || !title) {
+        return undefined
+      }
+
+      const action: SuggestedAction = {
+        kind,
+        title,
+        detail: detail || 'Accion sugerida por Neuronotes.',
+        confidence: Math.max(0, Math.min(1, Number.isFinite(source.confidence) ? Number(source.confidence) : 0.62))
+      }
+      const toolHint = typeof source.toolHint === 'string' && source.toolHint.trim() ? source.toolHint.trim().slice(0, 80) : ''
+
+      if (toolHint) {
+        action.toolHint = toolHint
+      }
+
+      return action
+    })
+    .filter((item): item is SuggestedAction => Boolean(item))
+    .slice(0, 4)
+}
+
+function normalizeSuggestedActionKind(value: unknown): SuggestedActionKind | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'task' || normalized === 'reminder' || normalized === 'research' || normalized === 'mcp') {
+    return normalized
+  }
+
+  return undefined
+}
+
+function inferSuggestedActions(content: string): SuggestedAction[] {
+  const text = content.toLowerCase()
+  const actions: SuggestedAction[] = []
+
+  if (/(pendiente|tarea|hacer|preparar|crear|revisar|enviar|llamar)/.test(text)) {
+    actions.push({
+      kind: 'task',
+      title: 'Crear tarea desde la nota',
+      detail: 'La nota contiene lenguaje accionable que puede convertirse en una tarea local o MCP.',
+      toolHint: 'task.create',
+      confidence: 0.7
+    })
+  }
+
+  if (/(recordar|mañana|manana|cita|reunion|fecha|deadline|vencimiento)/.test(text)) {
+    actions.push({
+      kind: 'reminder',
+      title: 'Preparar recordatorio',
+      detail: 'La nota menciona tiempo, reunion o vencimiento; puede mapearse a una herramienta de recordatorios.',
+      toolHint: 'reminder.create',
+      confidence: 0.66
+    })
+  }
+
+  if (/(investigar|buscar|leer|comparar|referencia|documento|paper|fuente)/.test(text)) {
+    actions.push({
+      kind: 'research',
+      title: 'Buscar contexto adicional',
+      detail: 'La nota parece necesitar investigacion o documentos relacionados.',
+      toolHint: 'documents.search',
+      confidence: 0.64
+    })
+  }
+
+  return actions.slice(0, 3)
 }
 
 function createAnalysisRun(

@@ -11,6 +11,7 @@ function note(overrides: Partial<NoteRecord> & Pick<NoteRecord, 'id' | 'content'
     category: 'Inbox',
     tags: [],
     related: [],
+    suggestedActions: [],
     analysisStatus: 'idle',
     createdAt: now,
     updatedAt: now,

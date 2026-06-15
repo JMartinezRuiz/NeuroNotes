@@ -13,6 +13,7 @@ function note(id: string): NoteRecord {
     category: 'Inbox',
     tags: [],
     related: [],
+    suggestedActions: [],
     analysisStatus: 'idle',
     createdAt: now,
     updatedAt: now
