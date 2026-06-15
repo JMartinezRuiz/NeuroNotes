@@ -260,12 +260,15 @@ describe('synchronizeRelatedGraph', () => {
     const target = note({
       id: 'target',
       title: 'Nota destino',
-      content: 'Debe recibir backlink automatico'
+      content: 'Debe recibir backlink automatico',
+      trainingReviewedAt: '2026-06-15T00:02:00.000Z'
     })
     const notes = [source, target]
+    const graphUpdatedAt = '2026-06-15T00:05:00.000Z'
 
-    synchronizeRelatedGraph(notes, source.id)
+    const affectedIds = synchronizeRelatedGraph(notes, source.id, graphUpdatedAt)
 
+    expect(affectedIds).toEqual(['source', 'target'])
     expect(source.related).toEqual([
       {
         noteId: 'target',
@@ -274,12 +277,15 @@ describe('synchronizeRelatedGraph', () => {
         reason: 'Relacion mas fuerte.'
       }
     ])
+    expect(source.updatedAt).toBe(graphUpdatedAt)
     expect(target.related).toHaveLength(1)
     expect(target.related[0]).toMatchObject({
       noteId: 'source',
       title: 'Nota nueva',
       reason: 'Enlace reciproco: Relacion mas fuerte.'
     })
+    expect(target.updatedAt).toBe(graphUpdatedAt)
+    expect(target.trainingReviewedAt).toBeUndefined()
   })
 
   it('removes stale automatic backlinks without deleting manual direct links', () => {
@@ -306,7 +312,8 @@ describe('synchronizeRelatedGraph', () => {
           score: 0.7,
           reason: 'Relacion manual o directa.'
         }
-      ]
+      ],
+      trainingReviewedAt: '2026-06-15T00:02:00.000Z'
     })
     const manual = note({
       id: 'manual',
@@ -314,9 +321,11 @@ describe('synchronizeRelatedGraph', () => {
       content: 'Debe conservarse'
     })
     const notes = [source, target, manual]
+    const graphUpdatedAt = '2026-06-15T00:06:00.000Z'
 
-    synchronizeRelatedGraph(notes, source.id)
+    const affectedIds = synchronizeRelatedGraph(notes, source.id, graphUpdatedAt)
 
+    expect(affectedIds).toEqual(['target'])
     expect(target.related).toEqual([
       {
         noteId: 'manual',
@@ -325,5 +334,47 @@ describe('synchronizeRelatedGraph', () => {
         reason: 'Relacion manual o directa.'
       }
     ])
+    expect(target.updatedAt).toBe(graphUpdatedAt)
+    expect(target.trainingReviewedAt).toBeUndefined()
+  })
+
+  it('leaves reviewed notes untouched when reciprocal links are already synchronized', () => {
+    const source = note({
+      id: 'source',
+      title: 'Nota fuente',
+      content: 'Enlace ya sincronizado',
+      related: [
+        {
+          noteId: 'target',
+          title: 'Nota destino',
+          score: 0.5,
+          reason: 'Relacion detectada por Qwen.'
+        }
+      ],
+      trainingReviewedAt: '2026-06-15T00:02:00.000Z'
+    })
+    const target = note({
+      id: 'target',
+      title: 'Nota destino',
+      content: 'Backlink ya sincronizado',
+      related: [
+        {
+          noteId: 'source',
+          title: 'Nota fuente',
+          score: 0.45,
+          reason: 'Enlace reciproco: Relacion detectada por Qwen.'
+        }
+      ],
+      trainingReviewedAt: '2026-06-15T00:03:00.000Z'
+    })
+    const notes = [source, target]
+
+    const affectedIds = synchronizeRelatedGraph(notes, source.id, '2026-06-15T00:07:00.000Z')
+
+    expect(affectedIds).toEqual([])
+    expect(source.updatedAt).toBe('2026-06-15T00:00:00.000Z')
+    expect(source.trainingReviewedAt).toBe('2026-06-15T00:02:00.000Z')
+    expect(target.updatedAt).toBe('2026-06-15T00:00:00.000Z')
+    expect(target.trainingReviewedAt).toBe('2026-06-15T00:03:00.000Z')
   })
 })

@@ -379,14 +379,17 @@ function relatedReason(signals: {
   return 'Comparte vocabulario relevante.'
 }
 
-export function synchronizeRelatedGraph(notes: NoteRecord[], sourceId: string): void {
+export function synchronizeRelatedGraph(notes: NoteRecord[], sourceId: string, now = new Date().toISOString()): string[] {
   const source = notes.find((note) => note.id === sourceId)
 
   if (!source) {
-    return
+    return []
   }
 
+  const changedIds = new Set<string>()
+  const sourceBefore = relatedSignature(source.related)
   source.related = normalizeRelatedLinks(source, notes)
+  markRelatedGraphChanged(source, sourceBefore, changedIds, now)
   const sourceDirectLinks = source.related.filter((related) => !isReciprocalLink(related))
   const sourceTargets = new Set(sourceDirectLinks.map((related) => related.noteId))
 
@@ -395,6 +398,7 @@ export function synchronizeRelatedGraph(notes: NoteRecord[], sourceId: string): 
       continue
     }
 
+    const before = relatedSignature(note.related)
     const sourceLink = sourceDirectLinks.find((related) => related.noteId === note.id)
     const existingIndex = note.related.findIndex((related) => related.noteId === source.id)
 
@@ -422,7 +426,31 @@ export function synchronizeRelatedGraph(notes: NoteRecord[], sourceId: string): 
     }
 
     note.related = normalizeRelatedLinks(note, notes)
+    markRelatedGraphChanged(note, before, changedIds, now)
   }
+
+  return [...changedIds]
+}
+
+function markRelatedGraphChanged(note: NoteRecord, before: string, changedIds: Set<string>, now: string): void {
+  if (before === relatedSignature(note.related)) {
+    return
+  }
+
+  note.updatedAt = now
+  note.trainingReviewedAt = undefined
+  changedIds.add(note.id)
+}
+
+function relatedSignature(links: RelatedNote[]): string {
+  return JSON.stringify(
+    links.map((link) => ({
+      noteId: link.noteId,
+      title: link.title,
+      score: link.score,
+      reason: link.reason
+    }))
+  )
 }
 
 function normalizeRelatedLinks(note: NoteRecord, notes: NoteRecord[]): RelatedNote[] {
