@@ -1,64 +1,129 @@
 # Neuronotes
 
-Neuronotes is a local-first desktop notes app for Windows first, with a path to macOS packaging. It captures quick notes, summarizes them, assigns categories and tags, and links related notes.
+Neuronotes is a Windows-first desktop notes app for capturing quick thoughts and turning them into a connected local knowledge base. The product direction is a minimal Notion/OneNote-like workspace powered by local AI: notes are summarized, categorized, tagged, and linked to related notes automatically.
 
-## Stack
+This repository is now centered on the Codex-built Electron desktop app. The previous PWA/Flask prototype remains in Git history, but `main` is intended to track the desktop product going forward.
 
-- Electron + React + TypeScript
-- Local JSON storage in the Electron `userData` folder
-- Ollama adapter using `qwen3.5:0.8b` by default
-- Lightweight local retrieval for related-note context before calling Qwen
+## Product Direction
 
-## Local setup
+Neuronotes is being built as:
+
+- A local-first notes app with fast capture and a quiet, minimal interface.
+- A local AI workspace using Qwen 0.8B as the default model through Ollama.
+- A RAG-assisted note graph that retrieves nearby notes before asking the model to summarize, categorize, tag, and suggest links.
+- A future MCP-capable assistant surface for advanced local automations over notes, files, tools, and connected workflows.
+
+The current code uses a lightweight in-app retrieval/ranking layer for RAG context. It does not currently use LangChain; if LangChain or another orchestration layer is added later, it should be documented here and wired into tests.
+
+## Current App
+
+- Electron + React + TypeScript desktop app.
+- Windows installer via Electron Builder, with macOS packaging configured for later.
+- Local JSON database in Electron `userData`, written atomically with a backup file.
+- Quick note capture, auto-save editor, search, category filters, and metadata editing.
+- Automatic and manual note analysis.
+- Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
+- Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.
+- Local fallback analyzer when Ollama/Qwen is unavailable.
+- RAG context generation from locally related notes before Qwen analysis.
+- Automatic summaries, categories, tags, and related-note suggestions.
+- Reciprocal note graph synchronization.
+- Manual link and unlink controls.
+- Graph view for direct links, backlinks, and library connection counts.
+- Analysis audit metadata: provider, model, elapsed time, timestamp, and retrieved RAG note IDs.
+- Auto retry of pending notes once Qwen becomes ready, guarded to avoid retry loops.
+- JSON library export/import and per-note Markdown export.
+
+## AI Architecture
+
+The analysis flow is:
+
+1. A note is created or selected for analysis.
+2. Neuronotes ranks nearby notes locally using lexical similarity, tag overlap, and category signals.
+3. The strongest matches are serialized as RAG context.
+4. Qwen 0.8B is called through Ollama with a strict JSON prompt.
+5. The response is sanitized and merged with local related-note ranking.
+6. If Qwen is unavailable, the app uses local fallback categorization, summary, tags, and links.
+7. The note stores an audit record of the analysis run.
+
+Default model:
+
+```text
+qwen3.5:0.8b
+```
+
+Default Ollama endpoint:
+
+```text
+http://127.0.0.1:11434
+```
+
+## MCP Roadmap
+
+MCP is not wired into the shipped app yet. The intended direction is to let Neuronotes expose or consume MCP tools for advanced workflows such as:
+
+- Creating tasks, reminders, or calendar actions from notes.
+- Searching local documents and attaching findings to note context.
+- Running structured automations over selected notes.
+- Connecting a local assistant to user-approved tools while keeping note data local-first.
+
+When MCP lands, it should be added as a separate integration layer with clear permissions, tests, and UI indicators showing what data is being sent to a tool.
+
+## Local Setup
+
+Install dependencies:
 
 ```powershell
 npm install
+```
+
+Install Ollama and pull the model:
+
+```powershell
 ollama pull qwen3.5:0.8b
+```
+
+Run the desktop app:
+
+```powershell
 npm run dev
 ```
 
 Install Ollama first if the `ollama` command is not available: <https://ollama.com/download>.
 
-If Ollama is not running, Neuronotes still saves notes and uses a local fallback analyzer. When Ollama is available, analysis status shows `Qwen`.
+If Ollama is not running, Neuronotes still saves notes and uses the local fallback analyzer. When Ollama and the configured model are ready, analysis status shows `Qwen`.
 
-Title and editor changes are saved automatically after a short pause. The manual save button remains available for explicit saves.
+## Build And Test
 
-Use the category chips in the sidebar to move through automatically categorized notes while search remains scoped to the selected category.
-
-Use the `Red` workspace view to inspect the local graph around the selected note, including direct links, backlinks, and total library connections.
-
-The inspector lets users correct the selected note category and tags manually without marking the note as pending Qwen analysis.
-
-Related notes can also be linked or unlinked manually from the inspector; manual links still participate in the reciprocal local graph.
-
-Settings include library export/import actions for JSON backups. Import merges notes by ID and keeps local settings intact.
-
-The local database is written atomically and mirrored to `neuronotes.json.bak` inside Electron `userData` so the app can recover from an interrupted or corrupted write.
-
-Individual notes can also be exported as Markdown from the editor.
-
-Neuronotes checks both Ollama and the configured model from the app header. In settings, use the local engine action to start an installed Ollama runtime, open the Ollama download page if it is not installed, or pull the configured Qwen model when Ollama is already running.
-
-Settings also include a Qwen diagnostic action that runs a temporary in-memory note through the configured model and reports whether the result came from Qwen or the local fallback.
-
-When a note is analyzed, Neuronotes normalizes duplicate links and adds reciprocal links to connected notes so the note base behaves like a small local knowledge graph.
-
-Each analyzed note keeps a compact audit trail with the provider used, model name, elapsed time, timestamp, and retrieved note IDs used as RAG context.
-
-If notes were created while Qwen was unavailable, the header shows a pending-analysis action once there are notes that have not been processed by the configured model.
-
-When automatic analysis is enabled, Neuronotes retries one pending batch automatically after Qwen becomes ready. It records the attempted batch so a failing local runtime does not create a retry loop.
-
-## Build
+Run tests:
 
 ```powershell
-npm run icons
 npm test
+```
+
+Run type checks:
+
+```powershell
+npm run typecheck
+```
+
+Build the app:
+
+```powershell
+npm run build
+```
+
+Build the Windows installer:
+
+```powershell
 npm run dist:win
 ```
 
 The Windows installer is emitted under `release/`.
 
-The app icon source is `build/icon.svg`; `npm run icons` regenerates `build/icon.ico` for Windows packaging.
+## Development Notes
 
-The development build is currently unsigned. For public distribution, add a Windows signing certificate and remove `signExecutable: false` from the Electron Builder config.
+- The app icon source is `build/icon.svg`; `npm run icons` regenerates `build/icon.ico`.
+- The development build is currently unsigned.
+- For public Windows distribution, add a signing certificate and remove `signExecutable: false` from the Electron Builder config.
+- Real Qwen inference requires Ollama installed locally and the `qwen3.5:0.8b` model pulled.
