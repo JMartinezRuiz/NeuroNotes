@@ -135,6 +135,7 @@ describe('normalizeDatabase', () => {
               }
             ]
           },
+          analysisStatus: 'qwen',
           trainingReviewedAt: ' 2026-06-15T00:02:00.000Z '
         },
         {
@@ -331,6 +332,49 @@ describe('normalizeDatabase', () => {
       },
       trainingReviewedAt: undefined
     })
+  })
+
+  it('drops reviewed flags from notes that are no longer valid fine-tuning examples', () => {
+    const normalized = normalizeDatabase({
+      notes: [
+        {
+          id: 'draft-reviewed',
+          content: 'Borrador marcado por error.',
+          summary: '',
+          tags: [],
+          related: [],
+          suggestedActions: [],
+          analysisStatus: 'idle',
+          trainingReviewedAt: '2026-06-15T00:02:00.000Z'
+        },
+        {
+          id: 'empty-analysis',
+          content: 'Analisis sin salida util.',
+          summary: '',
+          tags: [],
+          related: [],
+          suggestedActions: [],
+          analysisStatus: 'qwen',
+          trainingReviewedAt: '2026-06-15T00:03:00.000Z'
+        },
+        {
+          id: 'valid-reviewed',
+          content: 'Nota analizada y revisada.',
+          summary: 'Resumen valido.',
+          tags: [],
+          related: [],
+          suggestedActions: [],
+          analysisStatus: 'fallback',
+          trainingReviewedAt: '2026-06-15T00:04:00.000Z'
+        }
+      ]
+    } as unknown as Partial<DatabaseFile>)
+
+    expect(normalized.notes.map((note) => [note.id, note.trainingReviewedAt])).toEqual([
+      ['draft-reviewed', undefined],
+      ['empty-analysis', undefined],
+      ['valid-reviewed', '2026-06-15T00:04:00.000Z']
+    ])
   })
 })
 

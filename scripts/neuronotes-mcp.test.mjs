@@ -269,6 +269,31 @@ describe('neuronotes MCP server', () => {
     expect(note.trainingReviewedAt).toBeUndefined()
   })
 
+  it('drops reviewed flags from notes that are not valid training examples', async () => {
+    const staleDatabase = sampleDatabase()
+    staleDatabase.notes.push({
+      id: 'draft-reviewed',
+      title: 'Borrador revisado por error',
+      content: 'Borrador sin analisis.',
+      summary: '',
+      category: 'Inbox',
+      tags: [],
+      related: [],
+      suggestedActions: [],
+      analysisStatus: 'idle',
+      trainingReviewedAt: '2026-06-15T00:04:00.000Z',
+      createdAt: '2026-06-15T00:00:00.000Z',
+      updatedAt: '2026-06-15T00:00:00.000Z'
+    })
+    await writeFile(dbPath, `${JSON.stringify(staleDatabase, null, 2)}\n`, 'utf8')
+
+    const result = await callTool('neuronotes_library_summary', {}, { dbPath })
+    const database = await readNeuronotesDatabase(dbPath)
+
+    expect(database.notes.find((note) => note.id === 'draft-reviewed').trainingReviewedAt).toBeUndefined()
+    expect(result.reviewedFineTuneCount).toBe(0)
+  })
+
   it('lists open action intents without returning completed actions', async () => {
     const result = await callTool(
       'neuronotes_list_open_actions',

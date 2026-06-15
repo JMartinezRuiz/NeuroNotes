@@ -743,11 +743,15 @@ function normalizeNoteReferences(note, noteIds) {
   const analysisRunResult = normalizeAnalysisRunReferences(note.analysisRun, note.id, noteIds)
   changed = changed || analysisRunResult.changed
 
-  return {
+  const normalized = {
     ...note,
     related,
-    analysisRun: analysisRunResult.analysisRun,
-    trainingReviewedAt: changed ? undefined : note.trainingReviewedAt
+    analysisRun: analysisRunResult.analysisRun
+  }
+
+  return {
+    ...normalized,
+    trainingReviewedAt: changed || !isTrainingReviewable(normalized) ? undefined : note.trainingReviewedAt
   }
 }
 
@@ -789,6 +793,14 @@ function uniqueValidReferenceIds(values, sourceNoteId, noteIds) {
   }
 
   return [...unique]
+}
+
+function isTrainingReviewable(note) {
+  if (!note.content.trim() || (note.analysisStatus !== 'qwen' && note.analysisStatus !== 'fallback')) {
+    return false
+  }
+
+  return Boolean(note.summary.trim() || note.tags.length > 0 || note.related.length > 0 || note.suggestedActions.length > 0)
 }
 
 function normalizeNote(value) {
