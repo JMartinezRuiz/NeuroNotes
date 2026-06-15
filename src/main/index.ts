@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } from 'electron'
 import type { MenuItemConstructorOptions, MessageBoxOptions } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -16,6 +16,7 @@ import { AppCommand } from './commands'
 import { buildFineTuneExamples, buildMcpHandoffPayload, fineTuneDatasetToJsonl, noteToMarkdown, safeMarkdownFileName } from './export'
 import { synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
+import { buildMcpConnectionConfig, resolveMcpServerPath } from './mcpConfig'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
 import {
   canApplyAnalysisResult,
@@ -25,7 +26,7 @@ import {
   removeDeletedNoteReferences,
   resetAnalysisAfterContentEdit
 } from './noteLifecycle'
-import { createNoteDraft, listNotes, mutateDatabase, normalizeDatabase, readDatabase } from './storage'
+import { createNoteDraft, databasePaths, listNotes, mutateDatabase, normalizeDatabase, readDatabase } from './storage'
 import { captureWindowState, readWindowState, writeWindowState } from './windowState'
 import {
   AnalyzePendingResult,
@@ -639,6 +640,23 @@ function registerIpcHandlers(): void {
       path: result.filePath,
       actions: handoffPayload.actionCount
     } satisfies McpHandoffExportResult
+  })
+
+  ipcMain.handle('mcp:getConfig', async () => {
+    return buildMcpConnectionConfig({
+      databasePath: databasePaths().data,
+      serverPath: resolveMcpServerPath()
+    })
+  })
+
+  ipcMain.handle('mcp:copyConfig', async () => {
+    const config = buildMcpConnectionConfig({
+      databasePath: databasePaths().data,
+      serverPath: resolveMcpServerPath()
+    })
+
+    clipboard.writeText(config.hostConfigJson)
+    return config
   })
 
   ipcMain.handle('finetune:exportDataset', async () => {

@@ -497,7 +497,8 @@ button:disabled {
 }
 
 .model-card,
-.library-card {
+.library-card,
+.mcp-card {
   display: flex;
   grid-column: 1 / -1;
   align-items: center;
@@ -510,6 +511,11 @@ button:disabled {
   background: var(--panel-strong);
 }
 
+.mcp-card {
+  display: grid;
+  align-items: stretch;
+}
+
 .model-card > div:first-child,
 .library-card > div:first-child {
   display: grid;
@@ -518,7 +524,8 @@ button:disabled {
 }
 
 .model-card span,
-.library-card span {
+.library-card span,
+.mcp-card span {
   color: var(--muted);
   font-size: 12px;
 }
@@ -526,19 +533,24 @@ button:disabled {
 .model-card strong,
 .model-card small,
 .library-card strong,
-.library-card small {
+.library-card small,
+.mcp-card strong,
+.mcp-card small,
+.mcp-card code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .model-card small,
-.library-card small {
+.library-card small,
+.mcp-card small {
   color: var(--muted);
 }
 
 .model-card button,
-.library-actions button {
+.library-actions button,
+.mcp-card button {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -566,7 +578,8 @@ button:disabled {
 }
 
 .model-card button:hover:not(:disabled),
-.library-actions button:hover:not(:disabled) {
+.library-actions button:hover:not(:disabled),
+.mcp-card button:hover:not(:disabled) {
   background: var(--accent-strong);
 }
 
@@ -583,6 +596,64 @@ button:disabled {
 
 .library-actions button {
   min-width: 112px;
+}
+
+.mcp-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+
+.mcp-card-header > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.mcp-card button {
+  min-width: 138px;
+}
+
+.mcp-path-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mcp-path-grid span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(247, 245, 239, 0.58);
+}
+
+.mcp-card code,
+.mcp-card pre {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.mcp-card code {
+  color: var(--ink);
+}
+
+.mcp-card pre {
+  max-height: 138px;
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 10px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f4f1e9;
+  white-space: pre;
 }
 
 .note-workspace {
@@ -1579,7 +1650,12 @@ button:disabled {
   .editor-actions,
   .metadata-actions,
   .model-actions,
-  .library-actions {
+  .library-actions,
+  .mcp-card-header {
     flex-wrap: wrap;
+  }
+
+  .mcp-path-grid {
+    grid-template-columns: 1fr;
   }
 }

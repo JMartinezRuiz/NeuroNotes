@@ -3,6 +3,7 @@ import {
   Circle,
   CheckCircle2,
   CircleAlert,
+  Copy,
   Download,
   FileDown,
   FileText,
@@ -38,6 +39,7 @@ import {
   AiHealth,
   AnalysisProvider,
   AppSettings,
+  McpConnectionConfig,
   NoteRecord,
   NOTE_CATEGORIES,
   SuggestedAction,
@@ -228,6 +230,8 @@ export default function App(): JSX.Element {
   const [saveState, setSaveState] = useState<SaveState>('saved')
   const [editorMessage, setEditorMessage] = useState<string>('')
   const [libraryMessage, setLibraryMessage] = useState<string>('')
+  const [mcpConfig, setMcpConfig] = useState<McpConnectionConfig | null>(null)
+  const [mcpMessage, setMcpMessage] = useState<string>('')
   const [diagnosticsMessage, setDiagnosticsMessage] = useState<string>('')
   const [analysisQueueMessage, setAnalysisQueueMessage] = useState<string>('')
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -317,7 +321,12 @@ export default function App(): JSX.Element {
     const linkedIds = new Set(selectedNote.related.map((related) => related.noteId))
     return notes.filter((note) => note.id !== selectedNote.id && !linkedIds.has(note.id))
   }, [notes, selectedNote])
-  const libraryBusy = busy === 'export' || busy === 'import' || busy === 'exportMcp' || busy === 'exportDataset'
+  const libraryBusy =
+    busy === 'export' ||
+    busy === 'import' ||
+    busy === 'exportMcp' ||
+    busy === 'exportDataset' ||
+    busy === 'copyMcpConfig'
 
   const filteredNotes = useMemo(() => {
     const categoryFilteredNotes =
@@ -385,6 +394,14 @@ export default function App(): JSX.Element {
     autoAnalyzeAttemptKey.current = pendingAnalysisKey
     void runPendingAnalysis('auto')
   }, [bootstrapped, busy, pendingAnalysisCount, pendingAnalysisKey, settings.autoAnalyze])
+
+  useEffect(() => {
+    if (!settingsOpen || mcpConfig) {
+      return
+    }
+
+    void loadMcpConfig()
+  }, [settingsOpen, mcpConfig])
 
   useEffect(() => {
     if (selectedNote) {
@@ -887,6 +904,28 @@ export default function App(): JSX.Element {
     })
   }
 
+  async function loadMcpConfig(): Promise<void> {
+    try {
+      const config = await api.getMcpConfig()
+      setMcpConfig(config)
+    } catch (error) {
+      setMcpMessage(error instanceof Error ? error.message : 'No se pudo leer la configuracion MCP')
+    }
+  }
+
+  async function copyMcpConfig(): Promise<void> {
+    setBusy('copyMcpConfig')
+    try {
+      const config = await api.copyMcpConfig()
+      setMcpConfig(config)
+      setMcpMessage('Configuracion MCP copiada.')
+    } catch (error) {
+      setMcpMessage(error instanceof Error ? error.message : 'No se pudo copiar la configuracion MCP')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function exportLibrary(): Promise<void> {
     setBusy('export')
     try {
@@ -1183,6 +1222,34 @@ export default function App(): JSX.Element {
                   Qwen 0.8B
                 </button>
               </div>
+            </div>
+            <div className="mcp-card">
+              <div className="mcp-card-header">
+                <span>
+                  <strong>MCP local</strong>
+                  <small>{mcpMessage || 'Servidor read-only para exponer notas, RAG y acciones guardadas.'}</small>
+                </span>
+                <button
+                  type="button"
+                  onClick={copyMcpConfig}
+                  disabled={busy === 'copyMcpConfig'}
+                  title="Copiar configuracion MCP"
+                >
+                  {busy === 'copyMcpConfig' ? <Loader2 className="spin" size={16} /> : <Copy size={16} />}
+                  Copiar config
+                </button>
+              </div>
+              <div className="mcp-path-grid">
+                <span>
+                  <small>Comando</small>
+                  <code>{mcpConfig ? `${mcpConfig.command} ${mcpConfig.args.map((arg) => `"${arg}"`).join(' ')}` : 'Cargando...'}</code>
+                </span>
+                <span>
+                  <small>Base local</small>
+                  <code>{mcpConfig?.databasePath ?? 'Cargando...'}</code>
+                </span>
+              </div>
+              <pre>{mcpConfig?.hostConfigJson.trim() ?? '{ "mcpServers": {} }'}</pre>
             </div>
             <div className="library-card">
               <div>

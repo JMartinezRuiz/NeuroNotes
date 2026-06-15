@@ -139,6 +139,33 @@ const sortActions = (): ActionItem[] =>
   })
 const formatActionCount = (count: number): string => (count === 1 ? '1 accion' : `${count} acciones`)
 const formatExampleCount = (count: number): string => (count === 1 ? '1 ejemplo' : `${count} ejemplos`)
+const previewMcpConfig = () => {
+  const serverPath = 'C:\\Program Files\\Neuronotes\\resources\\mcp\\neuronotes-mcp.mjs'
+  const databasePath = 'C:\\Users\\you\\AppData\\Roaming\\Neuronotes\\neuronotes.json'
+  const command = 'node'
+  const args = [serverPath, '--db', databasePath]
+
+  return {
+    schema: 'neuronotes.mcp-config.v1',
+    serverName: 'neuronotes',
+    command,
+    args,
+    databasePath,
+    serverPath,
+    hostConfigJson: `${JSON.stringify(
+      {
+        mcpServers: {
+          neuronotes: {
+            command,
+            args
+          }
+        }
+      },
+      null,
+      2
+    )}\n`
+  }
+}
 const isPreviewPending = (note: NoteRecord, mode: 'qwen' | 'local'): boolean => {
   if (note.content.trim().length === 0) {
     return false
@@ -560,6 +587,12 @@ export function createPreviewApi(): Api {
       path: `preview/${id}.md`,
       noteId: id
     }),
+    getMcpConfig: async () => previewMcpConfig(),
+    copyMcpConfig: async () => {
+      const config = previewMcpConfig()
+      await navigator.clipboard?.writeText(config.hostConfigJson)
+      return config
+    },
     exportMcpHandoff: async () => ({
       ok: true,
       canceled: false,

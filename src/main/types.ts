@@ -178,6 +178,16 @@ export interface McpHandoffExportResult {
   actions: number
 }
 
+export interface McpConnectionConfig {
+  schema: string
+  serverName: string
+  command: string
+  args: string[]
+  databasePath: string
+  serverPath: string
+  hostConfigJson: string
+}
+
 export interface FineTuneDatasetExportResult {
   ok: boolean
   canceled: boolean

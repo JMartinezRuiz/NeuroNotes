@@ -45,6 +45,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Local action plan: users can save suggested actions, mark them done, delete them, and carry them through library/Markdown export.
 - MCP handoff JSON export for open local actions, including tool summaries, action-kind summaries, tool hints, source-note context, and stored RAG snippets without executing external tools.
 - Read-only MCP stdio server for local hosts that need to search notes, read note context, list open action intents, and inspect library readiness.
+- MCP connection config is available from the app settings panel, including the stdio command, database path, and host-ready `mcpServers.neuronotes` JSON.
 - Fine-tuning dataset JSONL export from user-reviewed analyzed notes, for future local Qwen tuning experiments without sending data outside the machine.
 - Reciprocal note graph synchronization.
 - Manual link and unlink controls.
@@ -122,6 +123,23 @@ Windows builds include the same stdio server as an unpacked resource:
 ```
 
 That path can be used by local MCP hosts with `node` when the app has been installed instead of run from the repo.
+
+The app settings panel can copy a host-ready MCP configuration snippet. It has this shape, with paths resolved for the current install and local database:
+
+```json
+{
+  "mcpServers": {
+    "neuronotes": {
+      "command": "node",
+      "args": [
+        "<Neuronotes install dir>\\resources\\mcp\\neuronotes-mcp.mjs",
+        "--db",
+        "%APPDATA%\\Neuronotes\\neuronotes.json"
+      ]
+    }
+  }
+}
+```
 
 MCP tool execution is not wired into the shipped app yet. The intended direction is to let Neuronotes consume user-approved MCP tools for advanced workflows such as:
 
