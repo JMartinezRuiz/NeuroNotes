@@ -20,6 +20,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Electron + React + TypeScript desktop app.
 - Windows installer via Electron Builder, with macOS packaging configured for later.
 - Local JSON database in Electron `userData`, written atomically with a backup file.
+- Main window size, position, and maximized state are restored between launches.
 - Quick note capture, auto-save editor, search, category filters, and metadata editing.
 - Native desktop menu with keyboard shortcuts for capture, search, save, analysis, export, settings, and note/network views.
 - Automatic and manual note analysis.

@@ -18,6 +18,7 @@ import { synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
 import { createNoteDraft, listNotes, mutateDatabase, normalizeDatabase, readDatabase } from './storage'
+import { captureWindowState, readWindowState, writeWindowState } from './windowState'
 import {
   AnalyzePendingResult,
   AppSettings,
@@ -30,9 +31,13 @@ import {
 } from './types'
 
 function createWindow(): void {
+  const userDataPath = app.getPath('userData')
+  const windowState = readWindowState(userDataPath)
   const mainWindow = new BrowserWindow({
-    width: 1220,
-    height: 780,
+    width: windowState.width,
+    height: windowState.height,
+    x: windowState.x,
+    y: windowState.y,
     minWidth: 940,
     minHeight: 620,
     show: false,
@@ -50,10 +55,18 @@ function createWindow(): void {
     mainWindow.show()
   })
 
+  mainWindow.on('close', () => {
+    writeWindowState(userDataPath, captureWindowState(mainWindow))
+  })
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
+
+  if (windowState.isMaximized) {
+    mainWindow.maximize()
+  }
 
   if (is.dev && process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
