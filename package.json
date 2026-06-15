@@ -1,7 +1,7 @@
 {
   "name": "neuronotes",
   "version": "0.1.0",
-  "description": "Local-first desktop notes app powered by local AI, Qwen 0.8B, RAG context, and a roadmap for MCP-driven automations.",
+  "description": "Windows-first minimal desktop notes app powered by local AI, Qwen 0.8B, RAG context, MCP-ready note actions, and future fine-tuning exports.",
   "author": "Neuronotes",
   "private": true,
   "type": "module",

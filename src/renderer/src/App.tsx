@@ -32,6 +32,7 @@ import {
   shouldAutoAnalyzePending
 } from './analysisAutomation'
 import { analysisResultMessage, quickCaptureProgressMessage, quickCaptureResultMessage } from './analysisMessages'
+import { aiSetupSteps } from './aiSetupReadiness'
 import { formatFineTuneExampleCount, isFineTuneReviewable, summarizeFineTuneReadiness } from './fineTuneReadiness'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges } from './graph'
@@ -287,6 +288,7 @@ export default function App(): JSX.Element {
     () => buildPendingAnalysisKey(settings.model, pendingAnalysisNotes, pendingEngine),
     [pendingAnalysisNotes, pendingEngine, settings.model]
   )
+  const aiSetupStatus = useMemo(() => aiSetupSteps(health), [health])
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>()
 
@@ -1302,6 +1304,15 @@ export default function App(): JSX.Element {
                       ? 'Ollama responde, pero falta el modelo configurado.'
                       : 'Instala Ollama para activar Qwen local.')}
                 </small>
+                <div className="ai-setup-steps">
+                  {aiSetupStatus.map((step) => (
+                    <span key={step.id} data-state={step.state} title={step.detail}>
+                      {step.state === 'ready' ? <CheckCircle2 size={13} /> : <CircleAlert size={13} />}
+                      <strong>{step.label}</strong>
+                      <small>{step.detail}</small>
+                    </span>
+                  ))}
+                </div>
               </div>
               <div className="model-actions">
                 <button
