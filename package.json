@@ -57,6 +57,12 @@
       "build/icon.ico",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "scripts/neuronotes-mcp.mjs",
+        "to": "mcp/neuronotes-mcp.mjs"
+      }
+    ],
     "win": {
       "icon": "build/icon.ico",
       "signExecutable": false,

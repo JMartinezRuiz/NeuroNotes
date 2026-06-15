@@ -114,6 +114,14 @@ MCP hosts can also set `NEURONOTES_DB_PATH` to the full `neuronotes.json` path o
 %APPDATA%\Neuronotes\neuronotes.json
 ```
 
+Windows builds include the same stdio server as an unpacked resource:
+
+```text
+<Neuronotes install dir>\resources\mcp\neuronotes-mcp.mjs
+```
+
+That path can be used by local MCP hosts with `node` when the app has been installed instead of run from the repo.
+
 MCP tool execution is not wired into the shipped app yet. The intended direction is to let Neuronotes consume user-approved MCP tools for advanced workflows such as:
 
 - Creating tasks, reminders, or calendar actions from notes.
@@ -212,7 +220,7 @@ Build the Windows installer:
 npm run dist:win
 ```
 
-The Windows installer is emitted under `release/`. The `dist:win` script also verifies the NSIS installer, blockmap, update metadata, unpacked executable, and bundled `app.asar`.
+The Windows installer is emitted under `release/`. The `dist:win` script also verifies the NSIS installer, blockmap, update metadata, unpacked executable, bundled `app.asar`, and unpacked MCP stdio server resource.
 
 Verify an existing Windows build without rebuilding:
 

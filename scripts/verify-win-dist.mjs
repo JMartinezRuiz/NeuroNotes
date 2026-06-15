@@ -35,6 +35,16 @@ const requiredArtifacts = [
     label: 'asar bundle',
     relativePath: path.join('win-unpacked', 'resources', 'app.asar'),
     minBytes: 1024 * 1024
+  },
+  {
+    label: 'MCP stdio server',
+    relativePath: path.join('win-unpacked', 'resources', 'mcp', 'neuronotes-mcp.mjs'),
+    minBytes: 8 * 1024,
+    includes: [
+      'neuronotes_search_notes',
+      'neuronotes://library/summary',
+      'neuronotes_review_rag_analysis'
+    ]
   }
 ]
 
@@ -45,17 +55,20 @@ for (const artifact of requiredArtifacts) {
 
   try {
     const stats = await stat(fullPath)
+    const contentOk = artifact.includes ? await fileIncludes(fullPath, artifact.includes) : true
     results.push({
       ...artifact,
       fullPath,
       size: stats.size,
-      ok: stats.isFile() && stats.size >= artifact.minBytes
+      contentOk,
+      ok: stats.isFile() && stats.size >= artifact.minBytes && contentOk
     })
   } catch {
     results.push({
       ...artifact,
       fullPath,
       size: 0,
+      contentOk: false,
       ok: false
     })
   }
@@ -66,7 +79,8 @@ const failed = results.filter((result) => !result.ok)
 if (failed.length > 0) {
   console.error('Neuronotes Windows distribution verification failed')
   for (const result of failed) {
-    console.error(`- ${result.label}: missing or too small at ${result.fullPath}`)
+    const reason = result.size >= result.minBytes && result.includes ? 'missing expected MCP content' : 'missing or too small'
+    console.error(`- ${result.label}: ${reason} at ${result.fullPath}`)
   }
   process.exitCode = 1
 } else {
@@ -74,4 +88,9 @@ if (failed.length > 0) {
   for (const result of results) {
     console.log(`- ${result.label}: ${result.relativePath} (${result.size} bytes)`)
   }
+}
+
+async function fileIncludes(filePath, needles) {
+  const content = await readFile(filePath, 'utf8')
+  return needles.every((needle) => content.includes(needle))
 }
