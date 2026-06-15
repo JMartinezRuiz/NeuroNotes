@@ -17,6 +17,28 @@ export interface GraphEdge {
   score: number
 }
 
+export function graphIsolatedNotes(notes: NoteRecord[]): NoteRecord[] {
+  const notesById = new Map(notes.map((note) => [note.id, note]))
+  const connectedIds = new Set<string>()
+
+  for (const source of notes) {
+    for (const related of source.related) {
+      const target = notesById.get(related.noteId)
+
+      if (!target || target.id === source.id) {
+        continue
+      }
+
+      connectedIds.add(source.id)
+      connectedIds.add(target.id)
+    }
+  }
+
+  return notes
+    .filter((note) => !connectedIds.has(note.id))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+}
+
 export function graphConnections(selectedNote: NoteRecord, notes: NoteRecord[]): GraphConnection[] {
   const byId = new Map<string, GraphConnection>()
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { graphConnections, graphEdges } from '../graph'
+import { graphConnections, graphEdges, graphIsolatedNotes } from '../graph'
 import { NoteRecord } from '../types'
 
 function note(overrides: Partial<NoteRecord> & Pick<NoteRecord, 'id'>): NoteRecord {
@@ -90,6 +90,54 @@ describe('graphConnections', () => {
         direction: 'both',
         score: 0.9
       })
+    ])
+  })
+})
+
+describe('graphIsolatedNotes', () => {
+  it('finds notes without valid direct links or backlinks', () => {
+    const linked = note({
+      id: 'linked',
+      related: [
+        {
+          noteId: 'target',
+          title: 'Target',
+          score: 0.8,
+          reason: 'Relacion valida'
+        }
+      ],
+      updatedAt: '2026-06-15T00:01:00.000Z'
+    })
+    const target = note({
+      id: 'target',
+      updatedAt: '2026-06-15T00:02:00.000Z'
+    })
+    const isolated = note({
+      id: 'isolated',
+      updatedAt: '2026-06-15T00:03:00.000Z'
+    })
+    const stale = note({
+      id: 'stale',
+      related: [
+        {
+          noteId: 'missing',
+          title: 'Missing',
+          score: 0.7,
+          reason: 'Referencia stale'
+        },
+        {
+          noteId: 'stale',
+          title: 'Self',
+          score: 1,
+          reason: 'Self link'
+        }
+      ],
+      updatedAt: '2026-06-15T00:04:00.000Z'
+    })
+
+    expect(graphIsolatedNotes([linked, target, isolated, stale]).map((item) => item.id)).toEqual([
+      'stale',
+      'isolated'
     ])
   })
 })

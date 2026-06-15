@@ -55,7 +55,7 @@ import {
   summarizeFineTuneReviewFilters
 } from './fineTuneReadiness'
 import { createPreviewApi } from './previewApi'
-import { GraphConnection, graphConnections, graphEdges } from './graph'
+import { GraphConnection, graphConnections, graphEdges, graphIsolatedNotes } from './graph'
 import {
   McpActionReadinessFilter,
   actionMatchesMcpReadinessFilter,
@@ -339,6 +339,7 @@ export default function App(): JSX.Element {
   )
   const selectedTagsKey = selectedNote?.tags.join('|') ?? ''
   const allGraphEdges = useMemo(() => graphEdges(notes), [notes])
+  const isolatedNotes = useMemo(() => graphIsolatedNotes(notes), [notes])
   const selectedConnections = useMemo(
     () => (selectedNote ? graphConnections(selectedNote, notes) : []),
     [notes, selectedNote]
@@ -2389,6 +2390,10 @@ export default function App(): JSX.Element {
                     Conexiones
                   </span>
                   <span>
+                    <strong>{isolatedNotes.length}</strong>
+                    Aisladas
+                  </span>
+                  <span>
                     <strong>{pendingAnalysisCount}</strong>
                     Pendientes
                   </span>
@@ -2420,6 +2425,33 @@ export default function App(): JSX.Element {
                     ))
                   ) : (
                     <p className="muted">Sin conexiones todavia.</p>
+                  )}
+                </div>
+              </section>
+
+              <section>
+                <div className="section-title">
+                  <h3>Notas aisladas</h3>
+                  <span>{isolatedNotes.length}</span>
+                </div>
+                <div className="related-list">
+                  {isolatedNotes.length > 0 ? (
+                    isolatedNotes.slice(0, 6).map((note) => (
+                      <button
+                        type="button"
+                        key={note.id}
+                        onClick={() => setSelectedId(note.id)}
+                        className="related-row related-row-isolated"
+                      >
+                        <CircleAlert size={15} />
+                        <span>
+                          <strong>{note.title}</strong>
+                          <small>{note.category} - {statusLabel(note)}</small>
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="muted">Todas las notas tienen al menos una conexion.</p>
                   )}
                 </div>
               </section>

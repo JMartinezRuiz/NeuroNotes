@@ -1406,7 +1406,7 @@ button:disabled {
 
 .network-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -2149,6 +2149,14 @@ button:disabled {
 
 .related-row-incoming svg {
   color: var(--accent);
+}
+
+.related-row-isolated {
+  background: #fff8ec;
+}
+
+.related-row-isolated svg {
+  color: var(--amber);
 }
 
 .related-row span {
