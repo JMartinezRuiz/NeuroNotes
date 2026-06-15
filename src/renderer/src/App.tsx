@@ -158,6 +158,7 @@ export default function App(): JSX.Element {
   const [diagnosticsMessage, setDiagnosticsMessage] = useState<string>('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('note')
+  const [bootstrapped, setBootstrapped] = useState(false)
 
   const selectedNote = notes.find((note) => note.id === selectedId) ?? notes[0] ?? null
   const selectedTagsKey = selectedNote?.tags.join('|') ?? ''
@@ -240,6 +241,20 @@ export default function App(): JSX.Element {
   }, [])
 
   useEffect(() => {
+    if (!bootstrapped) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      void refreshHealth().catch(() => undefined)
+    }, 650)
+
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [bootstrapped, settings.model, settings.ollamaUrl])
+
+  useEffect(() => {
     if (selectedNote) {
       setEditorTitle(selectedNote.title)
       setEditorContent(selectedNote.content)
@@ -319,6 +334,7 @@ export default function App(): JSX.Element {
     setSettings(storedSettings)
     setSelectedId(storedNotes[0]?.id ?? null)
     await refreshHealth()
+    setBootstrapped(true)
   }
 
   async function refreshNotes(nextSelectedId?: string): Promise<void> {
@@ -585,8 +601,16 @@ export default function App(): JSX.Element {
   }
 
   async function updateSettings(nextSettings: Partial<AppSettings>): Promise<void> {
+    setDiagnosticsMessage('')
     const updated = await api.updateSettings(nextSettings)
     setSettings(updated)
+  }
+
+  async function restoreDefaultQwenSettings(): Promise<void> {
+    await updateSettings({
+      model: emptySettings.model,
+      ollamaUrl: emptySettings.ollamaUrl
+    })
   }
 
   async function exportLibrary(): Promise<void> {
@@ -816,6 +840,18 @@ export default function App(): JSX.Element {
                 >
                   {busy === 'diagnostics' ? <Loader2 className="spin" size={16} /> : <Sparkles size={16} />}
                   Probar
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={restoreDefaultQwenSettings}
+                  disabled={
+                    settings.model === emptySettings.model &&
+                    settings.ollamaUrl === emptySettings.ollamaUrl
+                  }
+                  title="Usar Qwen 0.8B"
+                >
+                  Qwen 0.8B
                 </button>
               </div>
             </div>

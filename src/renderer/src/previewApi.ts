@@ -270,10 +270,10 @@ export function createPreviewApi(): Api {
       updated: 0,
       skipped: 0
     }),
-    getSettings: async () => settings,
+    getSettings: async () => ({ ...settings }),
     updateSettings: async (updates) => {
       Object.assign(settings, updates)
-      return settings
+      return { ...settings }
     },
     checkAiHealth: async () => previewHealth(),
     pullModel: async () => ({
