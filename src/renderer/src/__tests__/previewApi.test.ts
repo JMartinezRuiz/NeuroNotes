@@ -2,6 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { createPreviewApi } from '../previewApi'
 
 describe('createPreviewApi', () => {
+  it('mirrors the missing Ollama install state used by the setup UI', async () => {
+    const api = createPreviewApi()
+
+    await expect(api.checkAiHealth()).resolves.toMatchObject({
+      ok: false,
+      status: 'ollama-not-installed',
+      message: 'Ollama no esta instalado'
+    })
+
+    await expect(api.startAiRuntime()).resolves.toMatchObject({
+      ok: false,
+      started: false,
+      reason: 'not-installed',
+      message: 'Ollama no esta instalado'
+    })
+  })
+
   it('supports local and Qwen modes for single-note analysis', async () => {
     const api = createPreviewApi()
 

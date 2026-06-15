@@ -242,8 +242,8 @@ const removePreviewDeletedNoteReferences = (deletedNoteId: string): void => {
 
 const previewHealth = (): AiHealth => ({
   ok: false,
-  status: 'ollama-missing',
-  message: 'Ollama no disponible',
+  status: 'ollama-not-installed',
+  message: 'Ollama no esta instalado',
   model: settings.model,
   ollamaUrl: settings.ollamaUrl,
   ollamaAvailable: false,
