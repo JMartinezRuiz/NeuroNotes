@@ -368,6 +368,14 @@ Categorias permitidas: ${NOTE_CATEGORIES.join(', ')}.
 No inventes IDs. Si no hay relacion clara, usa related: [].
 No ejecutes herramientas ni asumas permisos. Las suggestedActions son solo intenciones locales para una futura capa MCP.
 
+Fecha de referencia:
+${note.createdAt.slice(0, 10)}
+
+Metadatos actuales:
+Titulo: ${note.title || 'Sin titulo'}
+Categoria actual: ${note.category || 'Inbox'}
+Etiquetas actuales: ${note.tags.join(', ') || 'sin etiquetas'}
+
 Nota nueva:
 ${note.content}
 

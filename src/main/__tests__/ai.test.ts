@@ -160,6 +160,9 @@ describe('analyzeNote', () => {
 
     const source = note({
       id: 'source',
+      title: 'Nota fuente Qwen',
+      category: 'Proyecto',
+      tags: ['producto'],
       content: 'Proyecto Neuronotes: usar Qwen 0.8b con RAG para enlazar notas rapidas.'
     })
     const contextNote = note({
@@ -237,6 +240,11 @@ describe('analyzeNote', () => {
     expect(body.prompt).toContain('No inventes IDs')
     expect(body.prompt).toContain('suggestedActions')
     expect(body.prompt).toContain('futura capa MCP')
+    expect(body.prompt).toContain('Fecha de referencia:\n2026-06-15')
+    expect(body.prompt).toContain('Metadatos actuales:')
+    expect(body.prompt).toContain('Titulo: Nota fuente Qwen')
+    expect(body.prompt).toContain('Categoria actual: Proyecto')
+    expect(body.prompt).toContain('Etiquetas actuales: producto')
   })
 
   it('keeps local related-note ranking when Qwen returns no links', async () => {
