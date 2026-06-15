@@ -6,6 +6,7 @@ import {
   AiHealth,
   AiDiagnosticsResult,
   AiRuntimeStartResult,
+  AnalysisMode,
   AnalysisProvider,
   AnalysisResult,
   AnalysisRun,
@@ -244,11 +245,22 @@ export async function runAiDiagnostics(settings: AppSettings): Promise<AiDiagnos
 export async function analyzeNote(
   note: NoteRecord,
   allNotes: NoteRecord[],
-  settings: AppSettings
+  settings: AppSettings,
+  mode: AnalysisMode = 'qwen'
 ): Promise<AnalysisResult> {
   const startedAt = Date.now()
   const localRelated = rankRelatedNotes(note, allNotes)
   const ragContext = buildRagContextBundle(note, allNotes)
+
+  if (mode === 'local') {
+    const fallback = fallbackAnalysis(note, localRelated)
+
+    return {
+      ...fallback,
+      status: 'fallback',
+      analysisRun: createAnalysisRun('local', settings, startedAt, ragContext.items)
+    }
+  }
 
   try {
     const qwenResult = await analyzeWithQwen(note, allNotes, settings, ragContext.text)

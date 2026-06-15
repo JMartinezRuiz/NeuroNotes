@@ -44,6 +44,7 @@ export interface ActionItem {
 }
 
 export type AnalysisProvider = 'qwen' | 'local'
+export type AnalysisMode = 'qwen' | 'local'
 
 export interface AnalysisRun {
   provider: AnalysisProvider

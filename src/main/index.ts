@@ -22,6 +22,7 @@ import { captureWindowState, readWindowState, writeWindowState } from './windowS
 import {
   AnalyzePendingResult,
   AnalyzePendingMode,
+  AnalysisMode,
   AppSettings,
   ActionItemStatus,
   DatabaseFile,
@@ -388,7 +389,7 @@ function registerIpcHandlers(): void {
 
     for (const id of pendingIds) {
       try {
-        const updated = await analyzeAndPersistNote(id)
+        const updated = await analyzeAndPersistNote(id, mode)
         result.analyzed += 1
         result.lastUpdatedId = updated.id
       } catch {
@@ -604,7 +605,7 @@ function registerIpcHandlers(): void {
   })
 }
 
-async function analyzeAndPersistNote(id: string): Promise<NoteRecord> {
+async function analyzeAndPersistNote(id: string, mode: AnalysisMode = 'qwen'): Promise<NoteRecord> {
   const database = await readDatabase()
   const note = database.notes.find((item) => item.id === id)
 
@@ -612,7 +613,7 @@ async function analyzeAndPersistNote(id: string): Promise<NoteRecord> {
     throw new Error('Nota no encontrada')
   }
 
-  const updated = await analyzeNoteSnapshot(note, database)
+  const updated = await analyzeNoteSnapshot(note, database, mode)
 
   await mutateDatabase((nextDatabase) => {
     const index = nextDatabase.notes.findIndex((item) => item.id === id)
@@ -626,8 +627,8 @@ async function analyzeAndPersistNote(id: string): Promise<NoteRecord> {
   return updated
 }
 
-async function analyzeNoteSnapshot(note: NoteRecord, database: DatabaseFile): Promise<NoteRecord> {
-  const analysis = await analyzeNote(note, database.notes, database.settings)
+async function analyzeNoteSnapshot(note: NoteRecord, database: DatabaseFile, mode: AnalysisMode): Promise<NoteRecord> {
+  const analysis = await analyzeNote(note, database.notes, database.settings, mode)
 
   return {
     ...note,

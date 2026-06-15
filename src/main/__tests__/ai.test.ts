@@ -300,6 +300,49 @@ describe('analyzeNote', () => {
       ]
     })
   })
+
+  it('can run local analysis without contacting Ollama', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const source = note({
+      id: 'source',
+      content: 'Proyecto Neuronotes: revisar tarea local para enlazar notas y preparar MCP.'
+    })
+    const related = note({
+      id: 'related',
+      title: 'Plan MCP local',
+      category: 'Proyecto',
+      tags: ['mcp'],
+      content: 'Preparar MCP local requiere acciones guardadas, enlaces y contexto de notas.'
+    })
+
+    const analysis = await analyzeNote(source, [source, related], settings, 'local')
+
+    expect(analysis).toMatchObject({
+      status: 'fallback',
+      category: 'Proyecto',
+      analysisRun: {
+        provider: 'local',
+        model: 'qwen3.5:0.8b',
+        ragNoteIds: ['related']
+      },
+      related: [
+        expect.objectContaining({
+          noteId: 'related',
+          title: 'Plan MCP local'
+        })
+      ],
+      suggestedActions: [
+        expect.objectContaining({
+          kind: 'task',
+          toolHint: 'task.create'
+        })
+      ]
+    })
+    expect(analysis.error).toBeUndefined()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('runAiDiagnostics', () => {
