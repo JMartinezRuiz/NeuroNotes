@@ -39,6 +39,7 @@ import { GraphConnection, graphConnections, graphEdges } from './graph'
 import { mcpActionReadiness, summarizeMcpActionReadiness } from './mcpActionReadiness'
 import { normalizeSearchText, noteMatchesSearch } from './search'
 import { commandFromKeyboardShortcut } from './shortcuts'
+import { summarizeRagBudget } from './ragBudget'
 import {
   ActionItem,
   AppCommand,
@@ -290,6 +291,10 @@ export default function App(): JSX.Element {
     [pendingAnalysisNotes, pendingEngine, settings.model]
   )
   const aiSetupStatus = useMemo(() => aiSetupSteps(health), [health])
+  const ragBudget = useMemo(
+    () => summarizeRagBudget(settings.ragMaxNotes, settings.ragExcerptLength),
+    [settings.ragExcerptLength, settings.ragMaxNotes]
+  )
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>()
 
@@ -1300,6 +1305,13 @@ export default function App(): JSX.Element {
                 <small>
                   RAG: {settings.ragMaxNotes} notas, {settings.ragExcerptLength} caracteres por extracto
                 </small>
+                <div className="rag-budget" data-state={ragBudget.state} title={ragBudget.detail}>
+                  <span>
+                    <strong>{ragBudget.label}</strong>
+                    <small>{ragBudget.totalChars} caracteres de contexto</small>
+                  </span>
+                  <code>~{ragBudget.estimatedTokens} tokens</code>
+                </div>
                 <small>
                   {setupCommandMessage ||
                   diagnosticsMessage ||

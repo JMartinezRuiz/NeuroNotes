@@ -616,6 +616,67 @@ button:disabled {
   padding-top: 5px;
 }
 
+.rag-budget {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 30px;
+  margin-top: 3px;
+  padding: 4px 8px;
+  color: var(--muted);
+  border: 1px solid rgba(122, 135, 126, 0.18);
+  border-radius: 8px;
+  background: rgba(247, 245, 239, 0.74);
+}
+
+.rag-budget span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.rag-budget strong,
+.rag-budget small,
+.rag-budget code {
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rag-budget strong {
+  font-size: 11px;
+}
+
+.rag-budget small {
+  font-size: 10px;
+  opacity: 0.82;
+}
+
+.rag-budget code {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.rag-budget[data-state='compact'],
+.rag-budget[data-state='balanced'] {
+  color: var(--accent-strong);
+  border-color: rgba(31, 122, 100, 0.2);
+  background: rgba(232, 247, 240, 0.78);
+}
+
+.rag-budget[data-state='heavy'] {
+  color: var(--amber);
+  border-color: rgba(185, 111, 32, 0.22);
+  background: rgba(255, 247, 229, 0.86);
+}
+
 .ai-setup-steps span {
   display: inline-flex;
   align-items: center;

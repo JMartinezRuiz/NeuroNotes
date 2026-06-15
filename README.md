@@ -34,6 +34,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Local AI setup checklist in settings for Ollama, model availability, and fallback/Qwen analysis mode.
 - Settings can copy PowerShell setup commands for installing Ollama and pulling the configured Qwen model on Windows.
 - Configurable RAG context limits for Qwen: number of retrieved notes and excerpt length.
+- RAG budget indicator in settings to keep context compact enough for Qwen 0.8B.
 - Bounded Ollama health and Qwen generation requests, so stalled local AI calls fall back instead of blocking notes.
 - Local fallback analyzer when Ollama/Qwen is unavailable.
 - Single-note analysis uses the local analyzer immediately when Qwen is not ready, and Qwen can upgrade those notes later.
