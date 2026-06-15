@@ -92,7 +92,7 @@ describe('normalizeDatabase', () => {
         {
           id: 'valid',
           content: 'Nota importada',
-          tags: ['#Qwen', 'qwen', '  local  '],
+          tags: ['#Qwen', 'qwen', '  local  ', 'm\u00e9dico'],
           related: [
             {
               noteId: 'target',
@@ -124,7 +124,7 @@ describe('normalizeDatabase', () => {
                 noteId: 'target',
                 title: '  Contexto RAG  ',
                 category: ' Proyecto ',
-                tags: ['#Qwen', 'local'],
+                tags: ['#Qwen', 'local', 'ma\u00f1ana'],
                 score: 5,
                 reason: '',
                 excerpt: '  Extracto   con   espacios  '
@@ -177,7 +177,7 @@ describe('normalizeDatabase', () => {
     expect(normalized.notes[0]).toMatchObject({
       id: 'valid',
       title: 'Nota importada',
-      tags: ['qwen', 'local'],
+      tags: ['qwen', 'local', 'medico'],
       suggestedActions: [
         {
           kind: 'task',
@@ -198,7 +198,7 @@ describe('normalizeDatabase', () => {
             noteId: 'target',
             title: 'Contexto RAG',
             category: 'Proyecto',
-            tags: ['qwen', 'local'],
+            tags: ['qwen', 'local', 'manana'],
             score: 1,
             reason: 'Contexto recuperado por RAG local.',
             excerpt: 'Extracto con espacios'

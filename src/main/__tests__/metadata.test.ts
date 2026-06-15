@@ -18,11 +18,13 @@ describe('normalizeNoteCategory', () => {
 
 describe('normalizeNoteTags', () => {
   it('normalizes comma and hash separated tags', () => {
-    expect(normalizeNoteTags(['#Qwen', 'rag, producto', 'qwen', '  Notas  '])).toEqual([
+    expect(normalizeNoteTags(['#Qwen', 'rag, producto', 'qwen', '  Notas  ', 'm\u00e9dico, ma\u00f1ana'])).toEqual([
       'qwen',
       'rag',
       'producto',
-      'notas'
+      'notas',
+      'medico',
+      'manana'
     ])
   })
 

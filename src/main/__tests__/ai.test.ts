@@ -111,7 +111,7 @@ describe('analyzeNote', () => {
   "title": "Mapa de notas",
   "summary": "Convierte notas rapidas en una base enlazada.",
   "category": "proyecto",
-  "tags": ["#Qwen", "RAG", "Notas"],
+  "tags": ["#Qwen", "RAG", "Notas", "M\u00e9dico"],
   "related": [
     { "noteId": "context-note", "reason": "Usa el roadmap existente como contexto." },
     { "noteId": "missing-note", "reason": "No debe sobrevivir." }
@@ -149,7 +149,7 @@ describe('analyzeNote', () => {
       title: 'Mapa de notas',
       summary: 'Convierte notas rapidas en una base enlazada.',
       category: 'Proyecto',
-      tags: ['qwen', 'rag', 'notas'],
+      tags: ['qwen', 'rag', 'notas', 'medico'],
       analysisRun: {
         provider: 'qwen',
         model: 'qwen3.5:0.8b',

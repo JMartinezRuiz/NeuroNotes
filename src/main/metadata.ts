@@ -19,8 +19,16 @@ export function normalizeNoteTags(value: unknown): string[] {
       value
         .filter((tag): tag is string => typeof tag === 'string')
         .flatMap((tag) => tag.split(/[,#]/))
-        .map((tag) => tag.trim().toLowerCase())
+        .map(normalizeTag)
         .filter(Boolean)
     )
   ).slice(0, 10)
+}
+
+function normalizeTag(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
 }

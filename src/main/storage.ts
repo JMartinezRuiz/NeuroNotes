@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { copyFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { normalizeNoteTags } from './metadata'
 import {
   ActionItem,
   ActionItemStatus,
@@ -232,18 +233,7 @@ function normalizeNote(value: unknown): NoteRecord | undefined {
 }
 
 function normalizeTags(tags: unknown): string[] {
-  if (!Array.isArray(tags)) {
-    return []
-  }
-
-  return Array.from(
-    new Set(
-      tags
-        .filter((tag): tag is string => typeof tag === 'string')
-        .map((tag) => tag.trim().toLowerCase().replace(/^#/, ''))
-        .filter(Boolean)
-    )
-  ).slice(0, 10)
+  return normalizeNoteTags(tags)
 }
 
 function normalizeRelated(related: unknown): RelatedNote[] {

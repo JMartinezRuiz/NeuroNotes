@@ -30,6 +30,7 @@ import {
 } from './analysisAutomation'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges } from './graph'
+import { normalizeSearchText, noteMatchesSearch } from './search'
 import { commandFromKeyboardShortcut } from './shortcuts'
 import {
   ActionItem,
@@ -156,7 +157,8 @@ function parseTagInput(value: string): string[] {
     new Set(
       value
         .split(/[,#]/)
-        .map((tag) => tag.trim().toLowerCase())
+        .map(normalizeSearchText)
+        .map((tag) => tag.trim())
         .filter(Boolean)
     )
   ).slice(0, 10)
@@ -288,18 +290,10 @@ export default function App(): JSX.Element {
   const libraryBusy = busy === 'export' || busy === 'import' || busy === 'exportMcp' || busy === 'exportDataset'
 
   const filteredNotes = useMemo(() => {
-    const query = search.trim().toLowerCase()
     const categoryFilteredNotes =
       activeCategory === 'Todas' ? notes : notes.filter((note) => note.category === activeCategory)
 
-    if (!query) {
-      return categoryFilteredNotes
-    }
-
-    return categoryFilteredNotes.filter((note) => {
-      const haystack = `${note.title} ${note.summary} ${note.content} ${note.category} ${note.tags.join(' ')}`.toLowerCase()
-      return haystack.includes(query)
-    })
+    return categoryFilteredNotes.filter((note) => noteMatchesSearch(note, search))
   }, [activeCategory, notes, search])
 
   useEffect(() => {

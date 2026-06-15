@@ -20,6 +20,7 @@ import {
   SuggestedActionKind
 } from './types'
 import { buildRagContextBundle, rankRelatedNotes } from './linking'
+import { normalizeNoteTags } from './metadata'
 
 interface OllamaGenerateResponse {
   response?: string
@@ -399,13 +400,7 @@ function sanitizeAiPayload(payload: AiPayload, allNotes: NoteRecord[]): Omit<Ana
     : []
 
   const category = typeof payload.category === 'string' ? normalizeCategory(payload.category) : 'Inbox'
-  const tags = Array.isArray(payload.tags)
-    ? payload.tags
-        .filter((tag): tag is string => typeof tag === 'string')
-        .map((tag) => tag.trim().toLowerCase().replace(/^#/, ''))
-        .filter(Boolean)
-        .slice(0, 6)
-    : []
+  const tags = normalizeNoteTags(payload.tags).slice(0, 6)
   const suggestedActions = normalizeSuggestedActions(
     firstArray(payload.suggestedActions, payload.actions, payload.actionSuggestions)
   )
