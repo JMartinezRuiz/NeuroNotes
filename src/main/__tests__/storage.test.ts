@@ -158,7 +158,7 @@ describe('normalizeDatabase', () => {
         {
           id: 'action-1',
           noteId: 'valid',
-          noteTitle: '  Nota importada  ',
+          noteTitle: '  Titulo viejo  ',
           kind: 'REMINDER',
           title: '  Revisar despues  ',
           detail: '',

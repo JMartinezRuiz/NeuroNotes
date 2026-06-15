@@ -717,8 +717,12 @@ function normalizeDatabase(raw) {
   const notes = Array.isArray(source.notes) ? source.notes.map(normalizeNote).filter(Boolean) : []
   const noteIds = new Set(notes.map((note) => note.id))
   const normalizedNotes = notes.map((note) => normalizeNoteReferences(note, noteIds))
+  const notesById = new Map(normalizedNotes.map((note) => [note.id, note]))
   const actions = Array.isArray(source.actions)
-    ? source.actions.map(normalizeAction).filter((action) => action && noteIds.has(action.noteId))
+    ? source.actions
+        .map(normalizeAction)
+        .filter((action) => action && noteIds.has(action.noteId))
+        .map((action) => normalizeActionReferences(action, notesById))
     : []
 
   return {
@@ -726,6 +730,19 @@ function normalizeDatabase(raw) {
     notes: normalizedNotes,
     actions,
     settings: normalizeSettings(source.settings)
+  }
+}
+
+function normalizeActionReferences(action, notesById) {
+  const note = notesById.get(action.noteId)
+
+  if (!note || action.noteTitle === note.title) {
+    return action
+  }
+
+  return {
+    ...action,
+    noteTitle: note.title
   }
 }
 

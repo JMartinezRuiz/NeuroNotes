@@ -321,6 +321,26 @@ describe('neuronotes MCP server', () => {
     })
   })
 
+  it('normalizes saved action note titles from linked notes', async () => {
+    const staleDatabase = sampleDatabase()
+    staleDatabase.actions[0].noteTitle = 'Titulo anterior'
+    await writeFile(dbPath, `${JSON.stringify(staleDatabase, null, 2)}\n`, 'utf8')
+
+    const result = await callTool(
+      'neuronotes_list_open_actions',
+      {
+        kind: 'reminder',
+        limit: 5
+      },
+      { dbPath }
+    )
+
+    expect(result.actions[0]).toMatchObject({
+      id: 'action-reminder',
+      noteTitle: 'Cita medico'
+    })
+  })
+
   it('summarizes library state and keeps MCP execution read-only', async () => {
     const result = await callTool('neuronotes_library_summary', {}, { dbPath })
 
