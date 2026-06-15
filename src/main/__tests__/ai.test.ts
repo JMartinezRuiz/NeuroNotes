@@ -343,6 +343,35 @@ describe('analyzeNote', () => {
     expect(analysis.error).toBeUndefined()
     expect(fetchMock).not.toHaveBeenCalled()
   })
+
+  it('normalizes Spanish accents in local fallback analysis', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const source = note({
+      id: 'source',
+      content: 'Cita m\u00e9dica ma\u00f1ana para revisar salud y preparar tarea de seguimiento.'
+    })
+
+    const analysis = await analyzeNote(source, [source], settings, 'local')
+
+    expect(analysis).toMatchObject({
+      status: 'fallback',
+      category: 'Salud',
+      tags: expect.arrayContaining(['medica', 'manana']),
+      suggestedActions: [
+        expect.objectContaining({
+          kind: 'task',
+          toolHint: 'task.create'
+        }),
+        expect.objectContaining({
+          kind: 'reminder',
+          toolHint: 'reminder.create'
+        })
+      ]
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('runAiDiagnostics', () => {

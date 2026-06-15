@@ -425,6 +425,13 @@ function normalizeCategory(value: string): string {
   return NOTE_CATEGORIES.find((category) => category.toLowerCase() === normalized) ?? 'Inbox'
 }
 
+function normalizeAnalyzerText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
 function fallbackAnalysis(note: NoteRecord, related: RelatedNote[]): Omit<AnalysisResult, 'status' | 'error' | 'analysisRun'> {
   const words = note.content
     .replace(/\s+/g, ' ')
@@ -433,7 +440,7 @@ function fallbackAnalysis(note: NoteRecord, related: RelatedNote[]): Omit<Analys
     .filter(Boolean)
   const title = note.content.split(/\r?\n/).find((line) => line.trim())?.trim().slice(0, 80) || 'Nota sin titulo'
   const summary = words.slice(0, 34).join(' ') + (words.length > 34 ? '...' : '')
-  const text = note.content.toLowerCase()
+  const text = normalizeAnalyzerText(note.content)
   const category = guessCategory(text)
   const tags = Array.from(
     new Set(
@@ -552,7 +559,7 @@ function normalizeSuggestedActionKind(value: unknown): SuggestedActionKind | und
 }
 
 function inferSuggestedActions(content: string): SuggestedAction[] {
-  const text = content.toLowerCase()
+  const text = normalizeAnalyzerText(content)
   const actions: SuggestedAction[] = []
 
   if (/(pendiente|tarea|hacer|preparar|crear|revisar|enviar|llamar)/.test(text)) {
@@ -565,7 +572,7 @@ function inferSuggestedActions(content: string): SuggestedAction[] {
     })
   }
 
-  if (/(recordar|mañana|manana|cita|reunion|fecha|deadline|vencimiento)/.test(text)) {
+  if (/(recordar|manana|cita|reunion|fecha|deadline|vencimiento)/.test(text)) {
     actions.push({
       kind: 'reminder',
       title: 'Preparar recordatorio',

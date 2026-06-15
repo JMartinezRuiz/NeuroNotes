@@ -29,6 +29,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
 - Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.
 - Local fallback analyzer when Ollama/Qwen is unavailable.
+- Local fallback analyzer normalizes Spanish accents for category, tag, and action heuristics.
 - Manual pending-note analysis can use the local fallback before Qwen is ready without contacting Ollama; when Qwen becomes available, fallback notes can be upgraded through the Qwen pending flow.
 - RAG context generation from locally related notes before Qwen analysis, with TF-IDF-style scoring, phrase/tag/title signals, stored excerpts, and scores for auditability.
 - Automatic summaries, categories, tags, and related-note suggestions.
