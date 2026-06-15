@@ -74,6 +74,7 @@ export interface McpHandoffPayload {
         model: string
         analyzedAt: string
         ragNoteIds: string[]
+        ragContext: RagContextItem[]
       } | null
     }
   }>
@@ -193,7 +194,8 @@ export function buildMcpHandoffPayload(database: DatabaseFile, exportedAt = new 
               provider: note.analysisRun.provider,
               model: note.analysisRun.model,
               analyzedAt: note.analysisRun.analyzedAt,
-              ragNoteIds: note.analysisRun.ragNoteIds
+              ragNoteIds: note.analysisRun.ragNoteIds,
+              ragContext: note.analysisRun.ragContext ?? []
             }
           : null
       }

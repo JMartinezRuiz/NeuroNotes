@@ -220,7 +220,18 @@ describe('buildMcpHandoffPayload', () => {
             analysis: expect.objectContaining({
               provider: 'qwen',
               model: 'qwen3.5:0.8b',
-              ragNoteIds: ['note-2']
+              ragNoteIds: ['note-2'],
+              ragContext: [
+                {
+                  noteId: 'note-2',
+                  title: 'Interfaz minimalista',
+                  category: 'Ideas',
+                  tags: ['ui', 'notas'],
+                  score: 0.82,
+                  reason: 'Comparte contexto de producto.',
+                  excerpt: 'Direccion visual para una interfaz sobria y centrada en escritura.'
+                }
+              ]
             })
           })
         }),
