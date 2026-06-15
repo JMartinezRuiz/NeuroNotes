@@ -1,4 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
+import type { MenuItemConstructorOptions } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -11,6 +12,7 @@ import {
   setActionItemStatus,
   syncActionNoteTitle
 } from './actions'
+import { AppCommand } from './commands'
 import { noteToMarkdown, safeMarkdownFileName } from './export'
 import { synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
@@ -60,6 +62,104 @@ function createWindow(): void {
   }
 }
 
+function sendCommand(command: AppCommand): void {
+  const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+
+  if (!window) {
+    return
+  }
+
+  window.webContents.send('app:command', command)
+}
+
+function createAppMenu(): void {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: 'Archivo',
+      submenu: [
+        {
+          label: 'Nueva nota',
+          accelerator: 'CommandOrControl+N',
+          click: () => sendCommand('focus-capture')
+        },
+        {
+          label: 'Guardar nota',
+          accelerator: 'CommandOrControl+S',
+          click: () => sendCommand('save-note')
+        },
+        {
+          label: 'Analizar nota',
+          accelerator: 'CommandOrControl+Enter',
+          click: () => sendCommand('analyze-note')
+        },
+        { type: 'separator' },
+        {
+          label: 'Exportar nota Markdown',
+          accelerator: 'CommandOrControl+Shift+E',
+          click: () => sendCommand('export-markdown')
+        },
+        {
+          label: 'Importar biblioteca',
+          click: () => sendCommand('import-library')
+        },
+        {
+          label: 'Exportar biblioteca',
+          click: () => sendCommand('export-library')
+        },
+        { type: 'separator' },
+        {
+          role: process.platform === 'darwin' ? 'close' : 'quit',
+          label: process.platform === 'darwin' ? 'Cerrar ventana' : 'Salir'
+        }
+      ]
+    },
+    {
+      label: 'Editar',
+      submenu: [
+        { role: 'undo', label: 'Deshacer' },
+        { role: 'redo', label: 'Rehacer' },
+        { type: 'separator' },
+        { role: 'cut', label: 'Cortar' },
+        { role: 'copy', label: 'Copiar' },
+        { role: 'paste', label: 'Pegar' },
+        { role: 'selectAll', label: 'Seleccionar todo' },
+        { type: 'separator' },
+        {
+          label: 'Buscar',
+          accelerator: 'CommandOrControl+F',
+          click: () => sendCommand('focus-search')
+        }
+      ]
+    },
+    {
+      label: 'Vista',
+      submenu: [
+        {
+          label: 'Nota',
+          accelerator: 'CommandOrControl+1',
+          click: () => sendCommand('view-note')
+        },
+        {
+          label: 'Red',
+          accelerator: 'CommandOrControl+2',
+          click: () => sendCommand('view-network')
+        },
+        { type: 'separator' },
+        {
+          label: 'Ajustes',
+          accelerator: 'CommandOrControl+,',
+          click: () => sendCommand('toggle-settings')
+        },
+        { type: 'separator' },
+        { role: 'reload', label: 'Recargar' },
+        { role: 'toggleDevTools', label: 'Herramientas de desarrollo' }
+      ]
+    }
+  ]
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.neuronotes.desktop')
 
@@ -68,6 +168,7 @@ app.whenReady().then(() => {
   })
 
   registerIpcHandlers()
+  createAppMenu()
   createWindow()
 
   app.on('activate', () => {

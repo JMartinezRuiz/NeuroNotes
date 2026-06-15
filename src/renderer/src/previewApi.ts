@@ -474,6 +474,9 @@ export function createPreviewApi(): Api {
     }),
     openOllamaDownload: async () => {
       window.open('https://ollama.com/download', '_blank', 'noopener,noreferrer')
+    },
+    onCommand: () => {
+      return () => undefined
     }
   }
 }

@@ -22,8 +22,10 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { buildPendingAnalysisKey, shouldAutoAnalyzePending } from './analysisAutomation'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges } from './graph'
+import { commandFromKeyboardShortcut } from './shortcuts'
 import {
   ActionItem,
+  AppCommand,
   AiHealth,
   AnalysisProvider,
   AppSettings,
@@ -167,6 +169,8 @@ function resolveApi(): NeuronotesApi {
 export default function App(): JSX.Element {
   const api = useMemo(() => resolveApi(), [])
   const autoAnalyzeAttemptKey = useRef('')
+  const quickCaptureRef = useRef<HTMLTextAreaElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [notes, setNotes] = useState<NoteRecord[]>([])
   const [actions, setActions] = useState<ActionItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -287,6 +291,30 @@ export default function App(): JSX.Element {
       return haystack.includes(query)
     })
   }, [activeCategory, notes, search])
+
+  useEffect(() => {
+    return api.onCommand((command) => {
+      void handleAppCommand(command as AppCommand)
+    })
+  })
+
+  useEffect(() => {
+    const listener = (event: KeyboardEvent): void => {
+      const command = commandFromKeyboardShortcut(event)
+
+      if (!command) {
+        return
+      }
+
+      event.preventDefault()
+      void handleAppCommand(command)
+    }
+
+    window.addEventListener('keydown', listener)
+    return () => {
+      window.removeEventListener('keydown', listener)
+    }
+  })
 
   useEffect(() => {
     void bootstrap()
@@ -424,6 +452,63 @@ export default function App(): JSX.Element {
   async function refreshHealth(): Promise<void> {
     const nextHealth = await api.checkAiHealth()
     setHealth(nextHealth)
+  }
+
+  async function handleAppCommand(command: AppCommand): Promise<void> {
+    if (command === 'focus-capture') {
+      setWorkspaceView('note')
+      window.requestAnimationFrame(() => {
+        quickCaptureRef.current?.focus()
+      })
+      return
+    }
+
+    if (command === 'focus-search') {
+      window.requestAnimationFrame(() => {
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+      })
+      return
+    }
+
+    if (command === 'save-note') {
+      await saveSelected()
+      return
+    }
+
+    if (command === 'analyze-note') {
+      await runAnalysis()
+      return
+    }
+
+    if (command === 'export-markdown') {
+      await exportSelectedMarkdown()
+      return
+    }
+
+    if (command === 'import-library') {
+      await importLibrary()
+      return
+    }
+
+    if (command === 'export-library') {
+      await exportLibrary()
+      return
+    }
+
+    if (command === 'toggle-settings') {
+      setSettingsOpen((value) => !value)
+      return
+    }
+
+    if (command === 'view-note') {
+      setWorkspaceView('note')
+      return
+    }
+
+    if (command === 'view-network') {
+      setWorkspaceView('network')
+    }
   }
 
   async function prepareAiRuntime(): Promise<void> {
@@ -795,6 +880,7 @@ export default function App(): JSX.Element {
 
         <form className="quick-capture" onSubmit={createQuickNote}>
           <textarea
+            ref={quickCaptureRef}
             value={quickNote}
             onChange={(event) => setQuickNote(event.target.value)}
             placeholder="Nota rapida"
@@ -809,6 +895,7 @@ export default function App(): JSX.Element {
         <label className="search-box">
           <Search size={16} />
           <input
+            ref={searchInputRef}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Buscar"

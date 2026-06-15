@@ -21,6 +21,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Windows installer via Electron Builder, with macOS packaging configured for later.
 - Local JSON database in Electron `userData`, written atomically with a backup file.
 - Quick note capture, auto-save editor, search, category filters, and metadata editing.
+- Native desktop menu with keyboard shortcuts for capture, search, save, analysis, export, settings, and note/network views.
 - Automatic and manual note analysis.
 - Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
 - Health checks, Ollama start attempt, model pull action, and Qwen diagnostics.

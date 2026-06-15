@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 import {
   ActionItem,
   ActionItemStatus,
@@ -13,6 +13,7 @@ import {
   NoteRecord,
   PullModelResult
 } from '../main/types'
+import { AppCommand } from '../main/commands'
 
 const api = {
   listNotes: (): Promise<NoteRecord[]> => ipcRenderer.invoke('notes:list'),
@@ -41,7 +42,17 @@ const api = {
   pullModel: (): Promise<PullModelResult> => ipcRenderer.invoke('ai:pullModel'),
   startAiRuntime: (): Promise<AiRuntimeStartResult> => ipcRenderer.invoke('ai:startRuntime'),
   runAiDiagnostics: (): Promise<AiDiagnosticsResult> => ipcRenderer.invoke('ai:diagnostics'),
-  openOllamaDownload: (): Promise<void> => ipcRenderer.invoke('ai:openOllamaDownload')
+  openOllamaDownload: (): Promise<void> => ipcRenderer.invoke('ai:openOllamaDownload'),
+  onCommand: (callback: (command: AppCommand) => void): (() => void) => {
+    const listener = (_event: IpcRendererEvent, command: AppCommand): void => {
+      callback(command)
+    }
+
+    ipcRenderer.on('app:command', listener)
+    return () => {
+      ipcRenderer.removeListener('app:command', listener)
+    }
+  }
 }
 
 contextBridge.exposeInMainWorld('neuronotes', api)

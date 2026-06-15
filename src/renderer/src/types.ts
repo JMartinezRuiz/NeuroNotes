@@ -1,5 +1,17 @@
 export type AnalysisStatus = 'idle' | 'qwen' | 'fallback' | 'error'
 
+export type AppCommand =
+  | 'focus-capture'
+  | 'focus-search'
+  | 'save-note'
+  | 'analyze-note'
+  | 'export-markdown'
+  | 'import-library'
+  | 'export-library'
+  | 'toggle-settings'
+  | 'view-note'
+  | 'view-network'
+
 export interface RelatedNote {
   noteId: string
   title: string
