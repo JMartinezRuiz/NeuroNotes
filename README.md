@@ -119,16 +119,29 @@ Verify the local Qwen runtime from the repo:
 npm run verify:qwen
 ```
 
+If Ollama is installed but not running, the verifier can try to start it first:
+
+```powershell
+npm run verify:qwen:start
+```
+
 If Ollama is running but the model is missing, the verifier can pull it first:
 
 ```powershell
 npm run verify:qwen:pull
 ```
 
+To start Ollama and pull the model if needed:
+
+```powershell
+npm run verify:qwen:start:pull
+```
+
 For machine-readable output:
 
 ```powershell
 npm run verify:qwen:json
+npm run verify:qwen:start:json
 ```
 
 Run the desktop app:

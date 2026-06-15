@@ -1,18 +1,25 @@
 #!/usr/bin/env node
 
+import { spawn } from 'node:child_process'
+import { constants } from 'node:fs'
+import { access } from 'node:fs/promises'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const DEFAULT_MODEL = 'qwen3.5:0.8b'
 const DEFAULT_ENDPOINT = 'http://127.0.0.1:11434'
 const DEFAULT_TIMEOUT_MS = 600000
+const DEFAULT_START_TIMEOUT_MS = 15000
 
 function parseArgs(argv) {
   const options = {
     endpoint: process.env.OLLAMA_URL || DEFAULT_ENDPOINT,
     model: process.env.NEURONOTES_MODEL || DEFAULT_MODEL,
     pull: false,
+    start: false,
     json: false,
     timeoutMs: DEFAULT_TIMEOUT_MS,
+    startTimeoutMs: DEFAULT_START_TIMEOUT_MS,
     help: false
   }
 
@@ -23,6 +30,8 @@ function parseArgs(argv) {
       options.help = true
     } else if (arg === '--pull') {
       options.pull = true
+    } else if (arg === '--start') {
+      options.start = true
     } else if (arg === '--json') {
       options.json = true
     } else if (arg === '--endpoint') {
@@ -40,6 +49,11 @@ function parseArgs(argv) {
       index += 1
     } else if (arg.startsWith('--timeout-ms=')) {
       options.timeoutMs = Number(arg.slice('--timeout-ms='.length))
+    } else if (arg === '--start-timeout-ms') {
+      options.startTimeoutMs = Number(readValue(argv, index, arg))
+      index += 1
+    } else if (arg.startsWith('--start-timeout-ms=')) {
+      options.startTimeoutMs = Number(arg.slice('--start-timeout-ms='.length))
     } else {
       throw new Error(`Unknown option: ${arg}`)
     }
@@ -48,6 +62,10 @@ function parseArgs(argv) {
   options.endpoint = normalizeEndpoint(options.endpoint)
   options.model = options.model.trim() || DEFAULT_MODEL
   options.timeoutMs = Number.isFinite(options.timeoutMs) && options.timeoutMs > 0 ? options.timeoutMs : DEFAULT_TIMEOUT_MS
+  options.startTimeoutMs =
+    Number.isFinite(options.startTimeoutMs) && options.startTimeoutMs > 0
+      ? options.startTimeoutMs
+      : DEFAULT_START_TIMEOUT_MS
   return options
 }
 
@@ -70,15 +88,19 @@ function usage() {
 
 Usage:
   npm run verify:qwen
+  npm run verify:qwen:start
   npm run verify:qwen:pull
   npm run verify:qwen:json
   node scripts/verify-qwen.mjs --model qwen3.5:0.8b --endpoint http://127.0.0.1:11434
 
 Options:
+  --start             Try to start Ollama locally before verifying.
   --pull              Pull the configured model if it is missing.
   --model <name>      Ollama model to verify. Default: ${DEFAULT_MODEL}
   --endpoint <url>    Ollama endpoint. Default: ${DEFAULT_ENDPOINT}
   --timeout-ms <ms>   Request timeout. Default: ${DEFAULT_TIMEOUT_MS}
+  --start-timeout-ms <ms>
+                      Time to wait for Ollama after --start. Default: ${DEFAULT_START_TIMEOUT_MS}
   --json              Print machine-readable result JSON.
 `
 }
@@ -233,6 +255,24 @@ function validateProbeAnalysis(payload) {
 }
 
 async function verifyQwen(options) {
+  let runtime
+
+  if (options.start) {
+    runtime = await ensureOllamaAvailable(options)
+
+    if (!runtime.ok) {
+      return {
+        ok: false,
+        stage: runtime.stage,
+        message: runtime.message,
+        endpoint: options.endpoint,
+        model: options.model,
+        runtimeStarted: runtime.started,
+        runtimeExecutablePath: runtime.executablePath
+      }
+    }
+  }
+
   const installedModels = await getInstalledModels(options.endpoint, options.timeoutMs)
   const modelInstalled = installedModels.some((model) => model.toLowerCase() === options.model.toLowerCase())
 
@@ -260,9 +300,157 @@ async function verifyQwen(options) {
     endpoint: options.endpoint,
     model: options.model,
     installedModels: modelInstalled ? installedModels : await getInstalledModels(options.endpoint, options.timeoutMs),
+    runtimeStarted: runtime?.started ?? false,
+    runtimeExecutablePath: runtime?.executablePath,
     durationMs: probe.durationMs,
     analysis: probe.analysis
   }
+}
+
+async function ensureOllamaAvailable(options) {
+  if (await canReachOllama(options.endpoint)) {
+    return {
+      ok: true,
+      started: false
+    }
+  }
+
+  const executablePath = await findOllamaExecutable()
+
+  if (!executablePath) {
+    return {
+      ok: false,
+      stage: 'ollama-not-installed',
+      started: false,
+      message: 'Ollama executable not found. Install Ollama or add it to PATH.'
+    }
+  }
+
+  try {
+    const child = spawn(executablePath, ['serve'], {
+      detached: true,
+      env: {
+        ...process.env,
+        ...resolveOllamaHostEnv(options.endpoint)
+      },
+      stdio: 'ignore',
+      windowsHide: true
+    })
+
+    child.unref()
+  } catch (error) {
+    return {
+      ok: false,
+      stage: 'ollama-start-failed',
+      started: false,
+      executablePath,
+      message: error instanceof Error ? error.message : 'Failed to start Ollama.'
+    }
+  }
+
+  const reachable = await waitForOllama(options.endpoint, options.startTimeoutMs)
+
+  return {
+    ok: reachable,
+    stage: reachable ? 'ready' : 'ollama-unavailable',
+    started: true,
+    executablePath,
+    message: reachable ? 'Ollama started.' : 'Ollama did not respond after starting.'
+  }
+}
+
+async function canReachOllama(endpoint) {
+  try {
+    await getInstalledModels(endpoint, 3500)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function waitForOllama(endpoint, timeoutMs) {
+  const startedAt = Date.now()
+
+  while (Date.now() - startedAt < timeoutMs) {
+    if (await canReachOllama(endpoint)) {
+      return true
+    }
+
+    await sleep(700)
+  }
+
+  return false
+}
+
+async function findOllamaExecutable() {
+  const candidates = unique([
+    ...(process.env.OLLAMA_PATH ? [process.env.OLLAMA_PATH] : []),
+    ...pathCandidates('ollama'),
+    ...windowsOllamaCandidates()
+  ])
+
+  for (const candidate of candidates) {
+    if (await exists(candidate)) {
+      return candidate
+    }
+  }
+
+  return undefined
+}
+
+function pathCandidates(command) {
+  const entries = (process.env.PATH ?? '')
+    .split(path.delimiter)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+  const names = process.platform === 'win32' ? [`${command}.exe`, command] : [command]
+
+  return entries.flatMap((entry) => names.map((name) => path.join(entry, name)))
+}
+
+function windowsOllamaCandidates() {
+  if (process.platform !== 'win32') {
+    return []
+  }
+
+  return [
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs', 'Ollama', 'ollama.exe'),
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Ollama', 'ollama.exe'),
+    process.env.ProgramFiles && path.join(process.env.ProgramFiles, 'Ollama', 'ollama.exe'),
+    process.env['ProgramFiles(x86)'] && path.join(process.env['ProgramFiles(x86)'], 'Ollama', 'ollama.exe')
+  ].filter(Boolean)
+}
+
+async function exists(filePath) {
+  try {
+    await access(filePath, constants.F_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function resolveOllamaHostEnv(endpoint) {
+  try {
+    const url = new URL(endpoint)
+    const port = url.port || (url.protocol === 'https:' ? '443' : '11434')
+
+    return {
+      OLLAMA_HOST: `${url.hostname}:${port}`
+    }
+  } catch {
+    return {}
+  }
+}
+
+function sleep(milliseconds) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds)
+  })
+}
+
+function unique(values) {
+  return [...new Set(values.filter(Boolean))]
 }
 
 function printHuman(result) {
@@ -349,5 +537,6 @@ export {
   parseArgs,
   parseJson,
   validateProbeAnalysis,
+  resolveOllamaHostEnv,
   verifyQwen
 }
