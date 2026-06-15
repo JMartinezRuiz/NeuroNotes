@@ -43,6 +43,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
 - Local action plan: users can save suggested actions, mark them done, delete them, and carry them through library/Markdown export.
 - MCP handoff JSON export for open local actions, including tool summaries, action-kind summaries, tool hints, source-note context, and stored RAG snippets without executing external tools.
+- Read-only MCP stdio server for local hosts that need to search notes, read note context, list open action intents, and inspect library readiness.
 - Fine-tuning dataset JSONL export from user-reviewed analyzed notes, for future local Qwen tuning experiments without sending data outside the machine.
 - Reciprocal note graph synchronization.
 - Manual link and unlink controls.
@@ -80,9 +81,28 @@ Default Ollama endpoint:
 http://127.0.0.1:11434
 ```
 
-## MCP Roadmap
+## MCP Integration
 
-MCP tool execution is not wired into the shipped app yet. The intended direction is to let Neuronotes expose or consume MCP tools for advanced workflows such as:
+Neuronotes includes a read-only MCP stdio server for local hosts. It exposes note context and saved action intents without modifying notes or executing external tools. The server currently provides these tools:
+
+- `neuronotes_search_notes`
+- `neuronotes_get_note`
+- `neuronotes_list_open_actions`
+- `neuronotes_library_summary`
+
+Run it from the repo with an explicit database path:
+
+```powershell
+npm run mcp:stdio -- --db "$env:APPDATA\Neuronotes\neuronotes.json"
+```
+
+MCP hosts can also set `NEURONOTES_DB_PATH` to the full `neuronotes.json` path or `NEURONOTES_USER_DATA` to the directory containing it. The default Windows location is:
+
+```text
+%APPDATA%\Neuronotes\neuronotes.json
+```
+
+MCP tool execution is not wired into the shipped app yet. The intended direction is to let Neuronotes consume user-approved MCP tools for advanced workflows such as:
 
 - Creating tasks, reminders, or calendar actions from notes.
 - Searching local documents and attaching findings to note context.
@@ -91,7 +111,7 @@ MCP tool execution is not wired into the shipped app yet. The intended direction
 
 When MCP lands, it should be added as a separate integration layer with clear permissions, tests, and UI indicators showing what data is being sent to a tool.
 
-The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, manual-approval flags, stored RAG snippets, tool summaries, and action-kind summaries. That handoff is intentionally inert today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
+The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, manual-approval flags, stored RAG snippets, tool summaries, and action-kind summaries. The stdio server is also intentionally read-only today; it is the bridge for future MCP execution once permissions and tool routing are implemented.
 
 ## Fine-Tuning Dataset
 
