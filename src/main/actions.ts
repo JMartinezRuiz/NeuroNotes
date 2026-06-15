@@ -96,6 +96,30 @@ export function removeActionItemsForNote(database: DatabaseFile, noteId: string)
   database.actions = database.actions.filter((item) => item.noteId !== noteId)
 }
 
+export function setActionItemToolHint(database: DatabaseFile, actionId: string, toolHint: string): ActionItem {
+  const action = database.actions.find((item) => item.id === actionId)
+
+  if (!action) {
+    throw new Error('Accion no encontrada')
+  }
+
+  const previousToolHint = action.toolHint?.trim() ?? ''
+  const nextToolHint = normalizeActionToolHint(toolHint)
+
+  if (nextToolHint) {
+    action.toolHint = nextToolHint
+  } else {
+    action.toolHint = undefined
+  }
+
+  if (previousToolHint !== nextToolHint) {
+    action.mcpApprovedAt = undefined
+  }
+
+  action.updatedAt = new Date().toISOString()
+  return action
+}
+
 export function syncActionNoteTitle(database: DatabaseFile, note: Pick<NoteRecord, 'id' | 'title'>): void {
   const now = new Date().toISOString()
 
@@ -122,4 +146,8 @@ function compareActionItems(a: ActionItem, b: ActionItem): number {
   }
 
   return b.updatedAt.localeCompare(a.updatedAt)
+}
+
+function normalizeActionToolHint(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').slice(0, 80)
 }

@@ -44,6 +44,8 @@ const api = {
     ipcRenderer.invoke('actions:setStatus', actionId, status),
   setActionMcpApproval: (actionId: string, approved: boolean): Promise<ActionItem> =>
     ipcRenderer.invoke('actions:setMcpApproval', actionId, approved),
+  setActionToolHint: (actionId: string, toolHint: string): Promise<ActionItem> =>
+    ipcRenderer.invoke('actions:setToolHint', actionId, toolHint),
   deleteAction: (actionId: string): Promise<void> => ipcRenderer.invoke('actions:delete', actionId),
   exportNoteMarkdown: (id: string): Promise<NoteMarkdownExportResult> => ipcRenderer.invoke('notes:exportMarkdown', id),
   getMcpConfig: (): Promise<McpConnectionConfig> => ipcRenderer.invoke('mcp:getConfig'),

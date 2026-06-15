@@ -1537,6 +1537,55 @@ button:disabled {
   background: #fff7e6;
 }
 
+.action-tool-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.action-tool-line code {
+  flex: 0 1 auto;
+}
+
+.action-tool-line button,
+.action-tool-form button {
+  display: grid;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  color: var(--accent-strong);
+  border: 1px solid rgba(31, 122, 100, 0.2);
+  border-radius: 7px;
+  background: #e5f4ec;
+}
+
+.action-tool-line button:hover:not(:disabled),
+.action-tool-form button:hover:not(:disabled) {
+  color: #fff;
+  background: var(--accent-strong);
+}
+
+.action-tool-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.action-tool-form input {
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fffdfa;
+  font-size: 12px;
+}
+
 .plan-action-buttons {
   display: flex;
   gap: 6px;

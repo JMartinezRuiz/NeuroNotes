@@ -586,6 +586,23 @@ export function createPreviewApi(): Api {
       action.updatedAt = now
       return action
     },
+    setActionToolHint: async (actionId, toolHint) => {
+      const action = actions.find((item) => item.id === actionId)
+
+      if (!action) {
+        throw new Error('Accion no encontrada')
+      }
+
+      const previousToolHint = action.toolHint?.trim() ?? ''
+      const nextToolHint = toolHint.trim().replace(/\s+/g, ' ').slice(0, 80)
+
+      action.toolHint = nextToolHint || undefined
+      if (previousToolHint !== nextToolHint) {
+        action.mcpApprovedAt = undefined
+      }
+      action.updatedAt = new Date().toISOString()
+      return action
+    },
     deleteAction: async (actionId) => {
       actions = actions.filter((action) => action.id !== actionId)
     },

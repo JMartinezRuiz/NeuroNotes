@@ -56,6 +56,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
 - Local action plan: users can save suggested actions, review them in a global Plan view, mark them done, delete them, and carry them through library/Markdown export.
 - Saved actions can be explicitly approved or revoked for MCP handoff review before any future external tool execution exists.
+- Saved actions can have their MCP `toolHint` filled or corrected before approval, and changing it clears stale approval.
 - Plan view now shows MCP handoff readiness per action, separating ready tool-call drafts from actions that still need approval or a tool hint.
 - MCP handoff JSON export for open local actions, including tool summaries, action-kind summaries, tool hints, source-note context, and stored RAG snippets without executing external tools.
 - Read-only MCP stdio server for local hosts that need to search notes, read note context, inspect analysis queues, list open action intents, and inspect library/fine-tuning readiness.

@@ -134,4 +134,18 @@ describe('createPreviewApi', () => {
 
     expect(revoked.mcpApprovedAt).toBeUndefined()
   })
+
+  it('updates preview action tool hints and clears stale MCP approval', async () => {
+    const api = createPreviewApi()
+    const note = await api.createNote('Recordatorio sin herramienta para MCP')
+    await api.analyzeNote(note.id, 'qwen')
+
+    const action = await api.createActionFromSuggestion(note.id, 0)
+    await api.setActionMcpApproval(action.id, true)
+
+    const updated = await api.setActionToolHint(action.id, 'reminder.create')
+
+    expect(updated.toolHint).toBe('reminder.create')
+    expect(updated.mcpApprovedAt).toBeUndefined()
+  })
 })

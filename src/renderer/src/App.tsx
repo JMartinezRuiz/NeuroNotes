@@ -18,7 +18,9 @@ import {
   Search,
   Settings,
   Sparkles,
-  Trash2
+  Trash2,
+  Wrench,
+  X
 } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -134,6 +136,20 @@ function suggestedActionKindLabel(kind: SuggestedActionKind): string {
   return 'MCP'
 }
 
+function suggestedToolHintForKind(kind: SuggestedActionKind): string {
+  if (kind === 'task') {
+    return 'task.create'
+  }
+  if (kind === 'reminder') {
+    return 'reminder.create'
+  }
+  if (kind === 'research') {
+    return 'documents.search'
+  }
+
+  return 'mcp.workflow.prepare'
+}
+
 function actionIdentity(action: { kind: SuggestedActionKind; title: string; detail: string }): string {
   return `${action.kind}:${action.title.trim().toLowerCase()}:${action.detail.trim().toLowerCase()}`
 }
@@ -229,6 +245,8 @@ export default function App(): JSX.Element {
   const [health, setHealth] = useState<AiHealth>(emptyHealth)
   const [busy, setBusy] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('saved')
+  const [editingToolHintId, setEditingToolHintId] = useState<string | null>(null)
+  const [toolHintDraft, setToolHintDraft] = useState('')
   const [captureMessage, setCaptureMessage] = useState<string>('')
   const [editorMessage, setEditorMessage] = useState<string>('')
   const [libraryMessage, setLibraryMessage] = useState<string>('')
@@ -931,6 +949,32 @@ export default function App(): JSX.Element {
     }
   }
 
+  function startToolHintEdit(action: ActionItem): void {
+    setEditingToolHintId(action.id)
+    setToolHintDraft(action.toolHint ?? suggestedToolHintForKind(action.kind))
+  }
+
+  function cancelToolHintEdit(): void {
+    setEditingToolHintId(null)
+    setToolHintDraft('')
+  }
+
+  async function updateActionToolHint(action: ActionItem): Promise<void> {
+    setBusy(`toolHint:${action.id}`)
+    try {
+      const updated = await api.setActionToolHint(action.id, toolHintDraft)
+      await refreshActions()
+      setEditorMessage(
+        updated.toolHint
+          ? `Tool MCP actualizado: ${updated.toolHint}. Revisa la aprobacion antes de exportar.`
+          : 'Tool MCP retirado de la accion.'
+      )
+      cancelToolHintEdit()
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function removeActionItem(actionId: string): Promise<void> {
     setBusy(`deleteAction:${actionId}`)
     try {
@@ -1059,6 +1103,51 @@ export default function App(): JSX.Element {
     }
   }
 
+  function renderActionToolHint(action: ActionItem): JSX.Element {
+    const isEditing = editingToolHintId === action.id
+    const isSaving = busy === `toolHint:${action.id}`
+
+    if (isEditing) {
+      return (
+        <form
+          className="action-tool-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void updateActionToolHint(action)
+          }}
+        >
+          <input
+            value={toolHintDraft}
+            onChange={(event) => setToolHintDraft(event.target.value)}
+            placeholder={suggestedToolHintForKind(action.kind)}
+            disabled={isSaving}
+            aria-label="Tool hint MCP"
+          />
+          <button type="submit" disabled={isSaving} title="Guardar toolHint MCP">
+            {isSaving ? <Loader2 className="spin" size={13} /> : <Save size={13} />}
+          </button>
+          <button type="button" onClick={cancelToolHintEdit} disabled={isSaving} title="Cancelar edicion">
+            <X size={13} />
+          </button>
+        </form>
+      )
+    }
+
+    return (
+      <div className="action-tool-line">
+        {action.toolHint ? <code>{action.toolHint}</code> : <code data-mcp-readiness="needs-tool">Sin toolHint</code>}
+        <button
+          type="button"
+          onClick={() => startToolHintEdit(action)}
+          disabled={action.status === 'done'}
+          title={action.toolHint ? 'Editar toolHint MCP' : 'Agregar toolHint MCP'}
+        >
+          <Wrench size={13} />
+        </button>
+      </div>
+    )
+  }
+
   function renderPlanAction(action: ActionItem): JSX.Element {
     const sourceNote = actionNotesById.get(action.noteId)
     const isDone = action.status === 'done'
@@ -1074,7 +1163,7 @@ export default function App(): JSX.Element {
             {suggestedActionKindLabel(action.kind)}
             {sourceNote ? ` - ${sourceNote.title}` : ` - ${action.noteTitle}`}
           </small>
-          {action.toolHint && <code>{action.toolHint}</code>}
+          {renderActionToolHint(action)}
           <code data-approval={isMcpApproved ? 'approved' : 'pending'}>
             {isMcpApproved ? 'MCP aprobado' : 'MCP por revisar'}
           </code>
@@ -1096,8 +1185,14 @@ export default function App(): JSX.Element {
           <button
             type="button"
             onClick={() => toggleActionMcpApproval(action)}
-            disabled={busy === `mcpApproval:${action.id}` || isDone}
-            title={isMcpApproved ? 'Revocar aprobacion MCP' : 'Aprobar para handoff MCP'}
+            disabled={busy === `mcpApproval:${action.id}` || isDone || !mcpReadiness.toolName}
+            title={
+              mcpReadiness.toolName
+                ? isMcpApproved
+                  ? 'Revocar aprobacion MCP'
+                  : 'Aprobar para handoff MCP'
+                : 'Agrega un toolHint antes de aprobar'
+            }
           >
             {busy === `mcpApproval:${action.id}` ? (
               <Loader2 className="spin" size={14} />
@@ -1859,7 +1954,7 @@ export default function App(): JSX.Element {
                           <span>
                             <strong>{action.title}</strong>
                             <small>{action.detail}</small>
-                            {action.toolHint && <code>{action.toolHint}</code>}
+                            {renderActionToolHint(action)}
                             <code data-approval={action.mcpApprovedAt ? 'approved' : 'pending'}>
                               {action.mcpApprovedAt ? 'MCP aprobado' : 'MCP por revisar'}
                             </code>
@@ -1871,8 +1966,14 @@ export default function App(): JSX.Element {
                             <button
                               type="button"
                               onClick={() => toggleActionMcpApproval(action)}
-                              disabled={busy === `mcpApproval:${action.id}` || action.status === 'done'}
-                              title={action.mcpApprovedAt ? 'Revocar aprobacion MCP' : 'Aprobar para handoff MCP'}
+                              disabled={busy === `mcpApproval:${action.id}` || action.status === 'done' || !mcpReadiness.toolName}
+                              title={
+                                mcpReadiness.toolName
+                                  ? action.mcpApprovedAt
+                                    ? 'Revocar aprobacion MCP'
+                                    : 'Aprobar para handoff MCP'
+                                  : 'Agrega un toolHint antes de aprobar'
+                              }
                             >
                               {busy === `mcpApproval:${action.id}` ? (
                                 <Loader2 className="spin" size={14} />

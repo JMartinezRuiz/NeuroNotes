@@ -7,6 +7,7 @@ import {
   removeActionItemsForNote,
   setActionItemMcpApproval,
   setActionItemStatus,
+  setActionItemToolHint,
   syncActionNoteTitle
 } from '../actions'
 import { DatabaseFile, DEFAULT_SETTINGS, NoteRecord, SuggestedAction } from '../types'
@@ -135,5 +136,27 @@ describe('action item lifecycle', () => {
 
     expect(revoked.mcpApprovedAt).toBeUndefined()
     expect(revoked.updatedAt).toBeTruthy()
+  })
+
+  it('updates tool hints and clears stale MCP approval when the tool changes', () => {
+    const stored = database()
+    const action = createActionItemFromSuggestion(stored, 'note-1', 0)
+    const approved = setActionItemMcpApproval(stored, action.id, true)
+
+    expect(approved.mcpApprovedAt).toBeTruthy()
+
+    const updated = setActionItemToolHint(stored, action.id, ' calendar.create_event ')
+
+    expect(updated.toolHint).toBe('calendar.create_event')
+    expect(updated.mcpApprovedAt).toBeUndefined()
+
+    const reapproved = setActionItemMcpApproval(stored, action.id, true)
+
+    expect(reapproved.mcpApprovedAt).toBeTruthy()
+
+    const cleared = setActionItemToolHint(stored, action.id, '')
+
+    expect(cleared.toolHint).toBeUndefined()
+    expect(cleared.mcpApprovedAt).toBeUndefined()
   })
 })

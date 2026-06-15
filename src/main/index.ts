@@ -11,6 +11,7 @@ import {
   removeActionItemsForNote,
   setActionItemMcpApproval,
   setActionItemStatus,
+  setActionItemToolHint,
   syncActionNoteTitle
 } from './actions'
 import { AppCommand } from './commands'
@@ -402,6 +403,12 @@ function registerIpcHandlers(): void {
   ipcMain.handle('actions:setMcpApproval', async (_, actionId: string, approved: unknown) => {
     return mutateDatabase((database) => {
       return setActionItemMcpApproval(database, actionId, approved === true)
+    })
+  })
+
+  ipcMain.handle('actions:setToolHint', async (_, actionId: string, toolHint: unknown) => {
+    return mutateDatabase((database) => {
+      return setActionItemToolHint(database, actionId, typeof toolHint === 'string' ? toolHint : '')
     })
   })
 
