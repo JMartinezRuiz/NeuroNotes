@@ -93,6 +93,27 @@ describe('verify-qwen script options', () => {
     })
   })
 
+  it('prefers the Neuronotes payload when Qwen emits earlier JSON fragments', () => {
+    expect(
+      parseJson(`<think>{"scratch": true}</think>
+Texto previo {"scratch": true}
+{
+  "title": "Contrato Qwen",
+  "summary": "Verifica el contrato JSON aunque haya texto extra.",
+  "category": "Proyecto",
+  "tags": ["qwen", "json"],
+  "related": [],
+  "suggestedActions": []
+}
+Texto posterior {no-json}`)
+    ).toMatchObject({
+      title: 'Contrato Qwen',
+      summary: 'Verifica el contrato JSON aunque haya texto extra.',
+      category: 'Proyecto',
+      tags: ['qwen', 'json']
+    })
+  })
+
   it('builds a non-thinking JSON chat probe request for Qwen 3.5', () => {
     expect(buildChatPayload('qwen3.5:0.8b')).toMatchObject({
       model: 'qwen3.5:0.8b',

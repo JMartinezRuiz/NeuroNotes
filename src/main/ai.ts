@@ -422,27 +422,115 @@ ${context}`
 
 function parseJson(text: string): AiPayload {
   const clean = text
-    .replace(/<think>[\s\S]*?<\/think>/g, '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<\/?think>/gi, '')
     .replace(/```(?:json)?/gi, '')
     .trim()
-  const start = clean.indexOf('{')
-  const end = clean.lastIndexOf('}')
+  const candidates = extractJsonObjectCandidates(clean)
+  let firstPayload: AiPayload | undefined
 
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error('Qwen no devolvio JSON valido')
+  for (const candidate of candidates) {
+    const payload = parseJsonCandidate(candidate)
+
+    if (!payload) {
+      continue
+    }
+
+    firstPayload ??= payload
+
+    if (isLikelyAiPayload(payload)) {
+      return payload
+    }
   }
 
-  const candidate = clean.slice(start, end + 1)
+  if (firstPayload) {
+    return firstPayload
+  }
 
+  throw new Error('Qwen no devolvio JSON valido')
+}
+
+function parseJsonCandidate(value: string): AiPayload | undefined {
   try {
-    return JSON.parse(candidate) as AiPayload
+    return toAiPayload(JSON.parse(value))
   } catch {
-    return JSON.parse(repairJsonCandidate(candidate)) as AiPayload
+    try {
+      return toAiPayload(JSON.parse(repairJsonCandidate(value)))
+    } catch {
+      return undefined
+    }
   }
+}
+
+function extractJsonObjectCandidates(value: string): string[] {
+  const candidates: string[] = []
+
+  for (let start = value.indexOf('{'); start !== -1; start = value.indexOf('{', start + 1)) {
+    const end = findBalancedJsonObjectEnd(value, start)
+
+    if (end !== -1) {
+      candidates.push(value.slice(start, end + 1))
+    }
+  }
+
+  return candidates
+}
+
+function findBalancedJsonObjectEnd(value: string, start: number): number {
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index]
+
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (char === '\\') {
+        escaped = true
+      } else if (char === '"') {
+        inString = false
+      }
+      continue
+    }
+
+    if (char === '"') {
+      inString = true
+    } else if (char === '{') {
+      depth += 1
+    } else if (char === '}') {
+      depth -= 1
+
+      if (depth === 0) {
+        return index
+      }
+    }
+  }
+
+  return -1
 }
 
 function repairJsonCandidate(value: string): string {
   return value.replace(/,\s*([}\]])/g, '$1')
+}
+
+function toAiPayload(value: unknown): AiPayload | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as AiPayload) : undefined
+}
+
+function isLikelyAiPayload(payload: AiPayload): boolean {
+  return [
+    'title',
+    'summary',
+    'category',
+    'tags',
+    'related',
+    'linkSuggestions',
+    'actions',
+    'suggestedActions',
+    'actionSuggestions'
+  ].some((key) => Object.prototype.hasOwnProperty.call(payload, key))
 }
 
 function sanitizeAiPayload(payload: AiPayload, allNotes: NoteRecord[]): Omit<AnalysisResult, 'status' | 'error' | 'analysisRun'> {

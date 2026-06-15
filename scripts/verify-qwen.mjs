@@ -237,27 +237,107 @@ Forma exacta:
 
 function parseJson(text) {
   const clean = text
-    .replace(/<think>[\s\S]*?<\/think>/g, '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<\/?think>/gi, '')
     .replace(/```(?:json)?/gi, '')
     .trim()
-  const start = clean.indexOf('{')
-  const end = clean.lastIndexOf('}')
+  const candidates = extractJsonObjectCandidates(clean)
+  let firstPayload
 
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error('The model did not return a JSON object')
+  for (const candidate of candidates) {
+    const payload = parseJsonCandidate(candidate)
+
+    if (!payload) {
+      continue
+    }
+
+    firstPayload ??= payload
+
+    if (isLikelyProbePayload(payload)) {
+      return payload
+    }
   }
 
-  const candidate = clean.slice(start, end + 1)
+  if (firstPayload) {
+    return firstPayload
+  }
 
+  throw new Error('The model did not return a JSON object')
+}
+
+function parseJsonCandidate(value) {
   try {
-    return JSON.parse(candidate)
+    return toJsonObject(JSON.parse(value))
   } catch {
-    return JSON.parse(repairJsonCandidate(candidate))
+    try {
+      return toJsonObject(JSON.parse(repairJsonCandidate(value)))
+    } catch {
+      return undefined
+    }
   }
+}
+
+function extractJsonObjectCandidates(value) {
+  const candidates = []
+
+  for (let start = value.indexOf('{'); start !== -1; start = value.indexOf('{', start + 1)) {
+    const end = findBalancedJsonObjectEnd(value, start)
+
+    if (end !== -1) {
+      candidates.push(value.slice(start, end + 1))
+    }
+  }
+
+  return candidates
+}
+
+function findBalancedJsonObjectEnd(value, start) {
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index]
+
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (char === '\\') {
+        escaped = true
+      } else if (char === '"') {
+        inString = false
+      }
+      continue
+    }
+
+    if (char === '"') {
+      inString = true
+    } else if (char === '{') {
+      depth += 1
+    } else if (char === '}') {
+      depth -= 1
+
+      if (depth === 0) {
+        return index
+      }
+    }
+  }
+
+  return -1
 }
 
 function repairJsonCandidate(value) {
   return value.replace(/,\s*([}\]])/g, '$1')
+}
+
+function toJsonObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : undefined
+}
+
+function isLikelyProbePayload(payload) {
+  return ['title', 'summary', 'category', 'tags', 'related', 'suggestedActions'].some((key) =>
+    Object.prototype.hasOwnProperty.call(payload, key)
+  )
 }
 
 function validateProbeAnalysis(payload) {

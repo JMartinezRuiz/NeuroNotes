@@ -376,6 +376,46 @@ describe('analyzeNote', () => {
     })
   })
 
+  it('skips non-analysis JSON fragments before the real Qwen payload', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            message: {
+              role: 'assistant',
+              content: `<think>{"scratch": true, "step": "draft"}</think>
+Texto previo con datos internos {"scratch": true}
+{
+  "title": "Contrato JSON",
+  "summary": "Qwen devolvio un payload valido despues de texto extra.",
+  "category": "Proyecto",
+  "tags": ["qwen", "json"],
+  "related": [],
+  "suggestedActions": []
+}
+Texto posterior {no-json}`
+            }
+          }),
+          { status: 200 }
+        )
+      )
+    )
+
+    const source = note({
+      id: 'source',
+      content: 'Proyecto Neuronotes: reforzar parser JSON de Qwen para notas automaticas.'
+    })
+
+    await expect(analyzeNote(source, [source], settings)).resolves.toMatchObject({
+      status: 'qwen',
+      title: 'Contrato JSON',
+      summary: 'Qwen devolvio un payload valido despues de texto extra.',
+      category: 'Proyecto',
+      tags: ['qwen', 'json']
+    })
+  })
+
   it('falls back to local categorization and related-note ranking when Qwen is unavailable', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Ollama no disponible')))
 
