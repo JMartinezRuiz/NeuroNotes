@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { canApplyAnalysisResult, hasContentChanged, isManualRelatedLink, resetAnalysisAfterContentEdit } from '../noteLifecycle'
+import {
+  canApplyAnalysisResult,
+  hasContentChanged,
+  isManualRelatedLink,
+  preserveManualLinksAfterAnalysis,
+  resetAnalysisAfterContentEdit
+} from '../noteLifecycle'
 import { NoteRecord } from '../types'
 
 function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
@@ -101,6 +107,60 @@ describe('hasContentChanged', () => {
     const source = note({ content: 'Contenido estable' })
 
     expect(hasContentChanged(source, 'Contenido estable con una idea nueva')).toBe(true)
+  })
+})
+
+describe('preserveManualLinksAfterAnalysis', () => {
+  it('keeps manual links when fresh AI analysis returns a new related list', () => {
+    const source = note()
+
+    const links = preserveManualLinksAfterAnalysis(source, [
+      {
+        noteId: 'automatic',
+        title: 'Enlace automatico nuevo',
+        score: 0.94,
+        reason: 'Qwen volvio a detectar esta relacion.'
+      },
+      {
+        noteId: 'manual',
+        title: 'Enlace manual actualizado',
+        score: 0.88,
+        reason: 'Qwen intento convertirlo en automatico.'
+      },
+      {
+        noteId: 'fresh',
+        title: 'Nueva sugerencia',
+        score: 0.7,
+        reason: 'Nueva relacion detectada por RAG.'
+      }
+    ])
+
+    expect(links).toEqual([
+      {
+        noteId: 'manual',
+        title: 'Enlace manual actualizado',
+        score: 0.88,
+        reason: 'Enlace manual.'
+      },
+      {
+        noteId: 'manual-backlink',
+        title: 'Backlink manual',
+        score: 0.65,
+        reason: 'Enlace reciproco: Enlace manual.'
+      },
+      {
+        noteId: 'automatic',
+        title: 'Enlace automatico nuevo',
+        score: 0.94,
+        reason: 'Qwen volvio a detectar esta relacion.'
+      },
+      {
+        noteId: 'fresh',
+        title: 'Nueva sugerencia',
+        score: 0.7,
+        reason: 'Nueva relacion detectada por RAG.'
+      }
+    ])
   })
 })
 

@@ -17,7 +17,13 @@ import { buildFineTuneExamples, buildMcpHandoffPayload, fineTuneDatasetToJsonl, 
 import { synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
-import { canApplyAnalysisResult, clearTrainingReview, hasContentChanged, resetAnalysisAfterContentEdit } from './noteLifecycle'
+import {
+  canApplyAnalysisResult,
+  clearTrainingReview,
+  hasContentChanged,
+  preserveManualLinksAfterAnalysis,
+  resetAnalysisAfterContentEdit
+} from './noteLifecycle'
 import { createNoteDraft, listNotes, mutateDatabase, normalizeDatabase, readDatabase } from './storage'
 import { captureWindowState, readWindowState, writeWindowState } from './windowState'
 import {
@@ -751,7 +757,7 @@ async function analyzeNoteSnapshot(note: NoteRecord, database: DatabaseFile, mod
     summary: analysis.summary,
     category: analysis.category,
     tags: analysis.tags,
-    related: analysis.related,
+    related: preserveManualLinksAfterAnalysis(note, analysis.related),
     suggestedActions: analysis.suggestedActions,
     analysisStatus: analysis.status,
     analysisError: analysis.error,

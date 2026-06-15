@@ -85,4 +85,21 @@ describe('createPreviewApi', () => {
       reason: 'Enlace manual.'
     })
   })
+
+  it('keeps manual preview links when a note is analyzed again', async () => {
+    const api = createPreviewApi()
+    const source = await api.createNote('Nota sobre RAG local con Qwen')
+    const target = await api.createNote('Referencia manual estable')
+
+    await api.addManualLink(source.id, target.id)
+    const analyzed = await api.analyzeNote(source.id, 'qwen')
+
+    expect(analyzed.related).toContainEqual(
+      expect.objectContaining({
+        noteId: target.id,
+        title: target.title,
+        reason: 'Enlace manual.'
+      })
+    )
+  })
 })

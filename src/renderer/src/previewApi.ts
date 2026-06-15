@@ -163,6 +163,32 @@ const clampNumber = (value: unknown, min: number, max: number): number =>
   Number.isFinite(value) ? Math.max(min, Math.min(max, Math.round(Number(value)))) : min
 const isManualRelatedLink = (related: NoteRecord['related'][number]): boolean =>
   related.reason === MANUAL_LINK_REASON || related.reason === MANUAL_RECIPROCAL_REASON
+const preservePreviewManualLinksAfterAnalysis = (
+  note: NoteRecord,
+  analysisLinks: NoteRecord['related']
+): NoteRecord['related'] => {
+  const linksById = new Map<string, NoteRecord['related'][number]>()
+
+  for (const link of note.related.filter(isManualRelatedLink)) {
+    linksById.set(link.noteId, link)
+  }
+
+  for (const link of analysisLinks) {
+    const existing = linksById.get(link.noteId)
+    if (existing) {
+      linksById.set(link.noteId, {
+        ...existing,
+        title: link.title || existing.title,
+        score: Math.max(existing.score, link.score)
+      })
+      continue
+    }
+
+    linksById.set(link.noteId, link)
+  }
+
+  return [...linksById.values()].slice(0, 10)
+}
 const resetPreviewAnalysisAfterContentEdit = (note: NoteRecord): void => {
   note.summary = ''
   note.related = note.related.filter(isManualRelatedLink)
@@ -347,7 +373,7 @@ export function createPreviewApi(): Api {
       note.summary = note.content.replace(/\s+/g, ' ').slice(0, 140)
       note.category = note.content.toLowerCase().includes('ui') ? 'Ideas' : 'Proyecto'
       note.tags = Array.from(new Set(note.content.toLowerCase().match(/\b[a-z]{4,}\b/g) ?? [])).slice(0, 4)
-      note.related = notes
+      const analysisLinks = notes
         .filter((candidate) => candidate.id !== note.id)
         .slice(0, 3)
         .map((candidate) => ({
@@ -356,6 +382,7 @@ export function createPreviewApi(): Api {
           score: 0.65,
           reason: 'Relacion simulada para vista previa.'
         }))
+      note.related = preservePreviewManualLinksAfterAnalysis(note, analysisLinks)
       note.suggestedActions = [
         {
           kind: 'task',

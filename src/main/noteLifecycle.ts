@@ -21,6 +21,30 @@ export function isManualRelatedLink(link: RelatedNote): boolean {
   return link.reason === MANUAL_LINK_REASON || link.reason === MANUAL_RECIPROCAL_REASON
 }
 
+export function preserveManualLinksAfterAnalysis(note: NoteRecord, analysisLinks: RelatedNote[]): RelatedNote[] {
+  const linksById = new Map<string, RelatedNote>()
+
+  for (const link of note.related.filter(isManualRelatedLink)) {
+    linksById.set(link.noteId, link)
+  }
+
+  for (const link of analysisLinks) {
+    const existing = linksById.get(link.noteId)
+    if (existing) {
+      linksById.set(link.noteId, {
+        ...existing,
+        title: link.title || existing.title,
+        score: Math.max(existing.score, link.score)
+      })
+      continue
+    }
+
+    linksById.set(link.noteId, link)
+  }
+
+  return [...linksById.values()].slice(0, 10)
+}
+
 export function clearTrainingReview(note: NoteRecord): void {
   note.trainingReviewedAt = undefined
 }
