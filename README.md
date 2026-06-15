@@ -166,9 +166,28 @@ Install dependencies:
 npm install
 ```
 
-Install Ollama and pull the model:
+Windows quick setup for the local Qwen runtime:
 
 ```powershell
+npm run setup:qwen:win
+```
+
+If Ollama is missing, install Ollama with its official Windows installer script, start it, pull the default model, and verify Qwen:
+
+```powershell
+npm run setup:qwen:win:install
+```
+
+If Ollama is already installed and you only need the model:
+
+```powershell
+npm run setup:qwen:win:pull
+```
+
+Manual alternative:
+
+```powershell
+irm https://ollama.com/install.ps1 | iex
 ollama pull qwen3.5:0.8b
 ```
 
