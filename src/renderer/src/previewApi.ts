@@ -214,6 +214,13 @@ export function createPreviewApi(): Api {
     deleteNote: async (id) => {
       notes = notes.filter((note) => note.id !== id)
       actions = actions.filter((action) => action.noteId !== id)
+      return {
+        ok: true,
+        canceled: false,
+        deleted: true,
+        message: 'Nota eliminada',
+        noteId: id
+      }
     },
     addManualLink: async (sourceId, targetId) => {
       const source = notes.find((note) => note.id === sourceId)

@@ -765,10 +765,17 @@ export default function App(): JSX.Element {
 
     setBusy('delete')
     try {
-      await api.deleteNote(selectedNote.id)
+      const result = await api.deleteNote(selectedNote.id)
+
+      if (!result.deleted) {
+        setEditorMessage(result.message)
+        return
+      }
+
       const remaining = notes.filter((note) => note.id !== selectedNote.id)
       await refreshNotes(remaining[0]?.id)
       await refreshActions()
+      setEditorMessage(result.message)
     } finally {
       setBusy(null)
     }

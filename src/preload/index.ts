@@ -7,6 +7,7 @@ import {
   AiRuntimeStartResult,
   AnalyzePendingResult,
   AppSettings,
+  DeleteNoteResult,
   LibraryExportResult,
   LibraryImportResult,
   NoteMarkdownExportResult,
@@ -20,7 +21,7 @@ const api = {
   createNote: (content: string): Promise<NoteRecord> => ipcRenderer.invoke('notes:create', content),
   updateNote: (id: string, updates: Partial<Pick<NoteRecord, 'content' | 'title' | 'category' | 'tags'>>): Promise<NoteRecord> =>
     ipcRenderer.invoke('notes:update', id, updates),
-  deleteNote: (id: string): Promise<void> => ipcRenderer.invoke('notes:delete', id),
+  deleteNote: (id: string): Promise<DeleteNoteResult> => ipcRenderer.invoke('notes:delete', id),
   addManualLink: (sourceId: string, targetId: string): Promise<NoteRecord> =>
     ipcRenderer.invoke('notes:addManualLink', sourceId, targetId),
   removeLink: (sourceId: string, targetId: string): Promise<NoteRecord> =>

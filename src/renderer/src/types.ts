@@ -135,6 +135,14 @@ export interface AnalyzePendingResult {
   lastUpdatedId?: string
 }
 
+export interface DeleteNoteResult {
+  ok: boolean
+  canceled: boolean
+  deleted: boolean
+  message: string
+  noteId: string
+}
+
 export interface LibraryExportResult {
   ok: boolean
   canceled: boolean

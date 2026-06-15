@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
-import type { MenuItemConstructorOptions } from 'electron'
+import type { MenuItemConstructorOptions, MessageBoxOptions } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -24,6 +24,7 @@ import {
   AppSettings,
   ActionItemStatus,
   DatabaseFile,
+  DeleteNoteResult,
   LibraryExportResult,
   LibraryImportResult,
   NoteMarkdownExportResult,
@@ -243,7 +244,39 @@ function registerIpcHandlers(): void {
     })
   })
 
-  ipcMain.handle('notes:delete', async (_, id: string) => {
+  ipcMain.handle('notes:delete', async (event, id: string) => {
+    const database = await readDatabase()
+    const note = database.notes.find((item) => item.id === id)
+
+    if (!note) {
+      throw new Error('Nota no encontrada')
+    }
+
+    const parent = BrowserWindow.fromWebContents(event.sender) ?? undefined
+    const confirmationOptions: MessageBoxOptions = {
+      type: 'warning',
+      buttons: ['Cancelar', 'Eliminar'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+      title: 'Eliminar nota',
+      message: `Eliminar "${note.title}"`,
+      detail: 'La nota, sus enlaces y sus acciones locales se eliminaran de Neuronotes.'
+    }
+    const confirmation = parent
+      ? await dialog.showMessageBox(parent, confirmationOptions)
+      : await dialog.showMessageBox(confirmationOptions)
+
+    if (confirmation.response !== 1) {
+      return {
+        ok: false,
+        canceled: true,
+        deleted: false,
+        message: 'Eliminacion cancelada',
+        noteId: id
+      } satisfies DeleteNoteResult
+    }
+
     await mutateDatabase((database) => {
       database.notes = database.notes
         .filter((note) => note.id !== id)
@@ -253,6 +286,14 @@ function registerIpcHandlers(): void {
       }))
       removeActionItemsForNote(database, id)
     })
+
+    return {
+      ok: true,
+      canceled: false,
+      deleted: true,
+      message: 'Nota eliminada',
+      noteId: id
+    } satisfies DeleteNoteResult
   })
 
   ipcMain.handle('actions:list', async () => {
