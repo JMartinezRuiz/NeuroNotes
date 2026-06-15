@@ -172,6 +172,9 @@ function aiActionLabel(health: AiHealth): string {
   if (health.status === 'ready') {
     return 'Modelo listo'
   }
+  if (health.status === 'ollama-not-installed') {
+    return 'Instalar Ollama'
+  }
   if (health.status === 'ollama-missing') {
     return 'Activar Ollama'
   }
@@ -715,7 +718,7 @@ export default function App(): JSX.Element {
           setHealth((current) => ({
             ...current,
             ok: false,
-            status: 'ollama-missing',
+            status: result.reason === 'not-installed' ? 'ollama-not-installed' : 'ollama-missing',
             message: result.message
           }))
         }
@@ -1574,7 +1577,9 @@ export default function App(): JSX.Element {
                     ? 'Listo para resumir, categorizar y enlazar notas.'
                     : health.ollamaAvailable
                       ? 'Ollama responde, pero falta el modelo configurado.'
-                      : 'Instala Ollama para activar Qwen local.')}
+                      : health.status === 'ollama-not-installed'
+                        ? 'Ollama no esta instalado. Copia el setup o abre la descarga.'
+                        : 'Inicia Ollama para activar Qwen local.')}
                 </small>
                 <div className="ai-setup-steps">
                   {aiSetupStatus.map((step) => (

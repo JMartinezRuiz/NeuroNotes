@@ -81,7 +81,7 @@ export interface AppSettings {
   ragExcerptLength: number
 }
 
-export type AiHealthStatus = 'ready' | 'ollama-missing' | 'model-missing' | 'error'
+export type AiHealthStatus = 'ready' | 'ollama-not-installed' | 'ollama-missing' | 'model-missing' | 'error'
 
 export interface AiHealth {
   ok: boolean

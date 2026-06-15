@@ -25,7 +25,11 @@ export function aiSetupSteps(
       id: 'ollama',
       label: 'Ollama',
       state: health.ollamaAvailable ? 'ready' : 'action',
-      detail: health.ollamaAvailable ? 'Runtime local activo.' : 'Instala o inicia Ollama.'
+      detail: health.ollamaAvailable
+        ? 'Runtime local activo.'
+        : health.status === 'ollama-not-installed'
+          ? 'Instala Ollama.'
+          : 'Inicia Ollama.'
     },
     {
       id: 'model',

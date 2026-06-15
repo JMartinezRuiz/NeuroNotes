@@ -35,13 +35,42 @@ function diagnostics(overrides: Partial<AiDiagnosticsResult> = {}): AiDiagnostic
 }
 
 describe('aiSetupSteps', () => {
-  it('asks for Ollama and model setup when the runtime is missing', () => {
+  it('asks for Ollama installation and model setup when the runtime is not installed', () => {
+    expect(aiSetupSteps(health({ status: 'ollama-not-installed', message: 'Ollama no esta instalado' }))).toEqual([
+      {
+        id: 'ollama',
+        label: 'Ollama',
+        state: 'action',
+        detail: 'Instala Ollama.'
+      },
+      {
+        id: 'model',
+        label: 'Modelo',
+        state: 'action',
+        detail: 'Descarga qwen3.5:0.8b.'
+      },
+      {
+        id: 'contract',
+        label: 'JSON',
+        state: 'fallback',
+        detail: 'Pendiente hasta activar Qwen.'
+      },
+      {
+        id: 'analysis',
+        label: 'Analisis',
+        state: 'fallback',
+        detail: 'Fallback local activo.'
+      }
+    ])
+  })
+
+  it('asks to start Ollama when the executable exists but the runtime is missing', () => {
     expect(aiSetupSteps(health())).toEqual([
       {
         id: 'ollama',
         label: 'Ollama',
         state: 'action',
-        detail: 'Instala o inicia Ollama.'
+        detail: 'Inicia Ollama.'
       },
       {
         id: 'model',

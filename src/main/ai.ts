@@ -54,7 +54,11 @@ interface AiPayload {
   actionSuggestions?: unknown
 }
 
-export async function checkOllama(settings: AppSettings): Promise<AiHealth> {
+interface CheckOllamaOptions {
+  findExecutable?: () => Promise<string | undefined>
+}
+
+export async function checkOllama(settings: AppSettings, options: CheckOllamaOptions = {}): Promise<AiHealth> {
   try {
     const response = await fetchWithTimeout(
       `${settings.ollamaUrl}/api/tags`,
@@ -106,10 +110,16 @@ export async function checkOllama(settings: AppSettings): Promise<AiHealth> {
       installedModels
     }
   } catch (error) {
+    const executablePath = await (options.findExecutable ?? findOllamaExecutable)()
+    const status = classifyOllamaConnectionFailure(settings.ollamaUrl, executablePath)
+
     return {
       ok: false,
-      status: 'ollama-missing',
-      message: formatOllamaConnectionError(error, settings.ollamaUrl),
+      status,
+      message:
+        status === 'ollama-not-installed'
+          ? 'Ollama no esta instalado'
+          : formatOllamaConnectionError(error, settings.ollamaUrl),
       model: settings.model,
       ollamaUrl: settings.ollamaUrl,
       ollamaAvailable: false,
@@ -298,6 +308,17 @@ export async function analyzeNote(
       analysisRun: createAnalysisRun('local', settings, startedAt, ragContext.items)
     }
   }
+}
+
+export function classifyOllamaConnectionFailure(
+  endpoint: string,
+  executablePath?: string
+): Extract<AiHealth['status'], 'ollama-not-installed' | 'ollama-missing'> {
+  if (executablePath) {
+    return 'ollama-missing'
+  }
+
+  return isLocalOllamaEndpoint(endpoint) ? 'ollama-not-installed' : 'ollama-missing'
 }
 
 async function analyzeWithQwen(
@@ -638,6 +659,15 @@ function formatOllamaConnectionError(error: unknown, ollamaUrl: string): string 
   }
 
   return error.message || `Ollama no disponible en ${ollamaUrl}`
+}
+
+function isLocalOllamaEndpoint(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint)
+    return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname)
+  } catch {
+    return false
+  }
 }
 
 function normalizeSuggestedActions(value: unknown): SuggestedAction[] {

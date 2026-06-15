@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { analyzeNote, checkOllama, resolveOllamaHostEnv, runAiDiagnostics } from '../ai'
+import { analyzeNote, checkOllama, classifyOllamaConnectionFailure, resolveOllamaHostEnv, runAiDiagnostics } from '../ai'
 import { AppSettings, NoteRecord } from '../types'
 
 const settings: AppSettings = {
@@ -75,10 +75,21 @@ describe('checkOllama', () => {
     })
   })
 
-  it('reports Ollama as missing when the local API cannot be reached', async () => {
+  it('reports Ollama as not installed when the local API cannot be reached and no executable exists', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED')))
 
-    await expect(checkOllama(settings)).resolves.toMatchObject({
+    await expect(checkOllama(settings, { findExecutable: async () => undefined })).resolves.toMatchObject({
+      ok: false,
+      status: 'ollama-not-installed',
+      message: 'Ollama no esta instalado',
+      ollamaAvailable: false
+    })
+  })
+
+  it('reports Ollama as missing when an executable exists but the local API cannot be reached', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED')))
+
+    await expect(checkOllama(settings, { findExecutable: async () => 'C:\\Ollama\\ollama.exe' })).resolves.toMatchObject({
       ok: false,
       status: 'ollama-missing',
       message: 'Ollama no disponible en http://127.0.0.1:11434',
@@ -97,7 +108,7 @@ describe('checkOllama', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const health = checkOllama(settings)
+    const health = checkOllama(settings, { findExecutable: async () => 'C:\\Ollama\\ollama.exe' })
     await vi.advanceTimersByTimeAsync(3500)
 
     await expect(health).resolves.toMatchObject({
@@ -106,6 +117,17 @@ describe('checkOllama', () => {
       message: 'Ollama no respondio en 3.5 s',
       ollamaAvailable: false
     })
+  })
+})
+
+describe('classifyOllamaConnectionFailure', () => {
+  it('separates missing local installation from an unavailable runtime', () => {
+    expect(classifyOllamaConnectionFailure('http://127.0.0.1:11434')).toBe('ollama-not-installed')
+    expect(classifyOllamaConnectionFailure('http://localhost:11434')).toBe('ollama-not-installed')
+    expect(classifyOllamaConnectionFailure('http://127.0.0.1:11434', 'C:\\Ollama\\ollama.exe')).toBe(
+      'ollama-missing'
+    )
+    expect(classifyOllamaConnectionFailure('http://192.168.1.25:11434')).toBe('ollama-missing')
   })
 })
 
