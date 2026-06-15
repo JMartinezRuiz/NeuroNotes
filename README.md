@@ -42,6 +42,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Qwen prompts include the note reference date and current title/category/tags, improving time-sensitive actions and metadata-aware categorization.
 - Local fallback analyzer when Ollama/Qwen is unavailable.
 - Single-note analysis uses the local analyzer immediately when Qwen is not ready, and Qwen can upgrade those notes later.
+- The note analysis button labels Qwen upgrades explicitly when a local fallback note can be reprocessed by the ready model.
 - Local fallback analyzer normalizes Spanish accents for category, tag, and action heuristics.
 - Local fallback analyzer preserves user tags and infers topic tags such as Qwen, RAG, MCP, tasks, reminders, health, finance, and learning signals.
 - Manual pending-note analysis can use the local fallback before Qwen is ready without contacting Ollama; when Qwen becomes available, fallback notes can be upgraded through the Qwen pending flow.

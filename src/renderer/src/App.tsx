@@ -36,7 +36,13 @@ import {
   pendingAnalysisResultMessage,
   shouldAutoAnalyzePending
 } from './analysisAutomation'
-import { analysisResultMessage, quickCaptureProgressMessage, quickCaptureResultMessage } from './analysisMessages'
+import {
+  analysisActionLabel,
+  analysisActionTitle,
+  analysisResultMessage,
+  quickCaptureProgressMessage,
+  quickCaptureResultMessage
+} from './analysisMessages'
 import { aiSetupSteps } from './aiSetupReadiness'
 import { formatFineTuneExampleCount, isFineTuneReviewable, summarizeFineTuneReadiness } from './fineTuneReadiness'
 import { createPreviewApi } from './previewApi'
@@ -228,6 +234,12 @@ export default function App(): JSX.Element {
   const [bootstrapped, setBootstrapped] = useState(false)
 
   const selectedNote = notes.find((note) => note.id === selectedId) ?? notes[0] ?? null
+  const selectedAnalysisAction = selectedNote
+    ? {
+        label: analysisActionLabel(selectedNote, health.ok),
+        title: analysisActionTitle(selectedNote, health.ok)
+      }
+    : null
   const fineTuneReviewable = selectedNote ? isFineTuneReviewable(selectedNote) : false
   const fineTuneReadiness = useMemo(() => summarizeFineTuneReadiness(notes), [notes])
   const fineTuneReviewBusy = selectedNote ? busy === `trainingReview:${selectedNote.id}` : false
@@ -1663,9 +1675,14 @@ export default function App(): JSX.Element {
                   {busy === 'save' ? <Loader2 className="spin" size={17} /> : <Save size={17} />}
                   Guardar
                 </button>
-                <button type="button" onClick={() => runAnalysis()} disabled={busy === 'analyze'} title="Analizar">
+                <button
+                  type="button"
+                  onClick={() => runAnalysis()}
+                  disabled={busy === 'analyze'}
+                  title={selectedAnalysisAction?.title ?? 'Analizar'}
+                >
                   {busy === 'analyze' ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
-                  Analizar
+                  {selectedAnalysisAction?.label ?? 'Analizar'}
                 </button>
                 <button
                   type="button"

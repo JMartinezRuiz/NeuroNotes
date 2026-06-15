@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { analysisResultMessage, quickCaptureProgressMessage, quickCaptureResultMessage } from '../analysisMessages'
+import {
+  analysisActionLabel,
+  analysisActionTitle,
+  analysisResultMessage,
+  quickCaptureProgressMessage,
+  quickCaptureResultMessage
+} from '../analysisMessages'
 
 describe('analysisResultMessage', () => {
   it('describes Qwen, local fallback, and stale analysis outcomes', () => {
@@ -23,5 +29,18 @@ describe('quick capture messages', () => {
 
   it('combines creation and analysis result messages', () => {
     expect(quickCaptureResultMessage({ analysisStatus: 'qwen' }, 'qwen')).toBe('Nota creada. Analisis Qwen listo.')
+  })
+})
+
+describe('analysis action text', () => {
+  it('makes Qwen upgrade actions explicit for local fallback notes', () => {
+    expect(analysisActionLabel({ analysisStatus: 'fallback' }, true)).toBe('Actualizar Qwen')
+    expect(analysisActionTitle({ analysisStatus: 'fallback' }, true)).toContain('Actualizar esta nota con Qwen')
+  })
+
+  it('labels analysis actions by the runtime that will be used', () => {
+    expect(analysisActionLabel({ analysisStatus: 'idle' }, true)).toBe('Analizar Qwen')
+    expect(analysisActionLabel({ analysisStatus: 'idle' }, false)).toBe('Analizar local')
+    expect(analysisActionLabel({ analysisStatus: 'fallback' }, false)).toBe('Reanalizar local')
   })
 })

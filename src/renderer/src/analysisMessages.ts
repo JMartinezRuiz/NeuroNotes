@@ -23,6 +23,38 @@ export function analysisResultMessage(
   return 'La nota cambio durante el analisis. Vuelve a analizarla para actualizar la IA.'
 }
 
+export function analysisActionLabel(note: Pick<NoteRecord, 'analysisStatus'>, qwenReady: boolean): string {
+  if (qwenReady && note.analysisStatus === 'fallback') {
+    return 'Actualizar Qwen'
+  }
+
+  if (qwenReady) {
+    return 'Analizar Qwen'
+  }
+
+  if (note.analysisStatus === 'fallback') {
+    return 'Reanalizar local'
+  }
+
+  return 'Analizar local'
+}
+
+export function analysisActionTitle(note: Pick<NoteRecord, 'analysisStatus'>, qwenReady: boolean): string {
+  if (qwenReady && note.analysisStatus === 'fallback') {
+    return 'Actualizar esta nota con Qwen usando RAG local'
+  }
+
+  if (qwenReady) {
+    return 'Analizar esta nota con Qwen usando RAG local'
+  }
+
+  if (note.analysisStatus === 'fallback') {
+    return 'Qwen no esta listo; reanalizar con fallback local'
+  }
+
+  return 'Analizar esta nota con fallback local'
+}
+
 export function quickCaptureProgressMessage(autoAnalyze: boolean, engine: AnalysisMessageEngine): string {
   if (!autoAnalyze) {
     return 'Nota creada.'
