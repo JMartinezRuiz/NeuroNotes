@@ -55,3 +55,7 @@ export function commandFromKeyboardShortcut(input: KeyboardShortcutInput): AppCo
 
   return undefined
 }
+
+export function shouldSubmitQuickCapture(input: KeyboardShortcutInput): boolean {
+  return input.key === 'Enter' && (input.ctrlKey || input.metaKey) && !input.altKey && !input.shiftKey
+}

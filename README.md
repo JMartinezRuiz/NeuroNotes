@@ -30,6 +30,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Search covers note text plus AI-generated and saved actions, related-note titles, tool hints, and stored RAG audit context.
 - Accent-insensitive search and tag normalization for Spanish notes.
 - Native desktop menu with keyboard shortcuts for capture, search, save, analysis, export, settings, and note/network views.
+- Quick capture can submit the current note with `Ctrl+Enter` or `Cmd+Enter` while plain Enter remains available for multiline notes.
 - Native confirmation before deleting notes.
 - Automatic and manual note analysis.
 - Auto-analysis covers new and pending edited notes: it uses local fallback when Qwen is unavailable and can upgrade those notes once Qwen becomes ready.

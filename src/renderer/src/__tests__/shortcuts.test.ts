@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { commandFromKeyboardShortcut } from '../shortcuts'
+import { commandFromKeyboardShortcut, shouldSubmitQuickCapture } from '../shortcuts'
 
 const shortcut = (key: string, overrides: Partial<Parameters<typeof commandFromKeyboardShortcut>[0]> = {}) =>
   commandFromKeyboardShortcut({
+    altKey: false,
+    ctrlKey: true,
+    key,
+    metaKey: false,
+    shiftKey: false,
+    ...overrides
+  })
+
+const shortcutSubmit = (key: string, overrides: Partial<Parameters<typeof shouldSubmitQuickCapture>[0]> = {}) =>
+  shouldSubmitQuickCapture({
     altKey: false,
     ctrlKey: true,
     key,
@@ -30,5 +40,19 @@ describe('commandFromKeyboardShortcut', () => {
   it('ignores non-primary and alt-modified shortcuts', () => {
     expect(shortcut('n', { ctrlKey: false })).toBeUndefined()
     expect(shortcut('n', { altKey: true })).toBeUndefined()
+  })
+})
+
+describe('shouldSubmitQuickCapture', () => {
+  it('allows primary enter to submit quick notes', () => {
+    expect(shortcutSubmit('Enter')).toBe(true)
+    expect(shortcutSubmit('Enter', { ctrlKey: false, metaKey: true })).toBe(true)
+  })
+
+  it('keeps plain and modified enter available for multiline input', () => {
+    expect(shortcutSubmit('Enter', { ctrlKey: false })).toBe(false)
+    expect(shortcutSubmit('Enter', { shiftKey: true })).toBe(false)
+    expect(shortcutSubmit('Enter', { altKey: true })).toBe(false)
+    expect(shortcutSubmit('n')).toBe(false)
   })
 })

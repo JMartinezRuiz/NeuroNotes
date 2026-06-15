@@ -63,7 +63,7 @@ import {
   summarizeMcpActionReadiness
 } from './mcpActionReadiness'
 import { normalizeSearchText, noteMatchesSearch } from './search'
-import { commandFromKeyboardShortcut } from './shortcuts'
+import { commandFromKeyboardShortcut, shouldSubmitQuickCapture } from './shortcuts'
 import { summarizeRagBudget } from './ragBudget'
 import {
   ActionItem,
@@ -1330,6 +1330,15 @@ export default function App(): JSX.Element {
               if (captureMessage) {
                 setCaptureMessage('')
               }
+            }}
+            onKeyDown={(event) => {
+              if (!shouldSubmitQuickCapture(event)) {
+                return
+              }
+
+              event.preventDefault()
+              event.stopPropagation()
+              event.currentTarget.form?.requestSubmit()
             }}
             placeholder="Nota rapida"
             rows={4}
