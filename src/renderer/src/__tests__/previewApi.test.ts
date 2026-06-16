@@ -111,6 +111,11 @@ describe('createPreviewApi', () => {
       summary: 'Preparar reminder MCP para local',
       category: 'Trabajo',
       tags: ['cliente', 'rag'],
+      suggestedActions: [
+        expect.objectContaining({ kind: 'task', toolHint: 'task.create' }),
+        expect.objectContaining({ kind: 'reminder', toolHint: 'reminder.create' }),
+        expect.objectContaining({ kind: 'mcp', toolHint: 'mcp.workflow.prepare' })
+      ],
       analysisStatus: 'idle'
     })
   })

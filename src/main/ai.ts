@@ -19,6 +19,7 @@ import {
   SuggestedAction,
   SuggestedActionKind
 } from './types'
+import { inferSuggestedActions } from './actionSuggestions'
 import { buildRagContextBundle, rankRelatedNotes } from './linking'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
 
@@ -862,43 +863,6 @@ function normalizeSuggestedActionKind(value: unknown): SuggestedActionKind | und
   }
 
   return undefined
-}
-
-function inferSuggestedActions(content: string): SuggestedAction[] {
-  const text = normalizeAnalyzerText(content)
-  const actions: SuggestedAction[] = []
-
-  if (/(pendiente|tarea|hacer|preparar|crear|revisar|enviar|llamar)/.test(text)) {
-    actions.push({
-      kind: 'task',
-      title: 'Crear tarea desde la nota',
-      detail: 'La nota contiene lenguaje accionable que puede convertirse en una tarea local o MCP.',
-      toolHint: 'task.create',
-      confidence: 0.7
-    })
-  }
-
-  if (/(recordar|manana|cita|reunion|fecha|deadline|vencimiento)/.test(text)) {
-    actions.push({
-      kind: 'reminder',
-      title: 'Preparar recordatorio',
-      detail: 'La nota menciona tiempo, reunion o vencimiento; puede mapearse a una herramienta de recordatorios.',
-      toolHint: 'reminder.create',
-      confidence: 0.66
-    })
-  }
-
-  if (/(investigar|buscar|leer|comparar|referencia|documento|paper|fuente)/.test(text)) {
-    actions.push({
-      kind: 'research',
-      title: 'Buscar contexto adicional',
-      detail: 'La nota parece necesitar investigacion o documentos relacionados.',
-      toolHint: 'documents.search',
-      confidence: 0.64
-    })
-  }
-
-  return actions.slice(0, 3)
 }
 
 function createAnalysisRun(

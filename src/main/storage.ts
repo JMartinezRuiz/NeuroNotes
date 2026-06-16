@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { copyFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { inferSuggestedActions } from './actionSuggestions'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
 import {
   ActionItem,
@@ -284,7 +285,7 @@ export function createNoteDraft(content: string): NoteRecord {
     category: inferDraftCategory(trimmedContent, tags),
     tags,
     related: [],
-    suggestedActions: [],
+    suggestedActions: inferSuggestedActions(trimmedContent),
     analysisStatus: 'idle',
     createdAt: now,
     updatedAt: now

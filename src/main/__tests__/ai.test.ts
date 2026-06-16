@@ -525,12 +525,16 @@ Texto posterior {no-json}`
           title: 'Plan MCP local'
         })
       ],
-      suggestedActions: [
+      suggestedActions: expect.arrayContaining([
         expect.objectContaining({
           kind: 'task',
           toolHint: 'task.create'
+        }),
+        expect.objectContaining({
+          kind: 'mcp',
+          toolHint: 'mcp.workflow.prepare'
         })
-      ]
+      ])
     })
     expect(analysis.error).toBeUndefined()
     expect(fetchMock).not.toHaveBeenCalled()
