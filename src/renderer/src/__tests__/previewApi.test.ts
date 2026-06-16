@@ -156,6 +156,49 @@ describe('createPreviewApi', () => {
     ])
   })
 
+  it('seeds preview related links from explicit wiki and mention references', async () => {
+    const api = createPreviewApi()
+    const created = await api.createNote('Cruzar [[Roadmap Neuronotes]] con @preview-ui para contexto local')
+
+    expect(created.related).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          noteId: 'preview-roadmap',
+          score: 0.97,
+          reason: 'Referencia explicita en la nota.'
+        }),
+        expect.objectContaining({
+          noteId: 'preview-ui',
+          score: 0.97,
+          reason: 'Referencia explicita en la nota.'
+        })
+      ])
+    )
+  })
+
+  it('reseeds preview explicit links after content edits', async () => {
+    const api = createPreviewApi()
+    const created = await api.createNote('Nota temporal sin relacion clara')
+
+    const updated = await api.updateNote(created.id, {
+      content: 'Ahora conecta con [[Roadmap Neuronotes]] para continuar el producto.'
+    })
+    const notes = await api.listNotes()
+
+    expect(updated.related).toContainEqual(
+      expect.objectContaining({
+        noteId: 'preview-roadmap',
+        reason: 'Referencia explicita en la nota.'
+      })
+    )
+    expect(notes.find((note) => note.id === 'preview-roadmap')?.related).toContainEqual(
+      expect.objectContaining({
+        noteId: created.id,
+        reason: 'Enlace reciproco: Referencia explicita en la nota.'
+      })
+    )
+  })
+
   it('preserves preview initial related links when analysis does not return them', async () => {
     const api = createPreviewApi()
     const created = await api.createNote('Roadmap producto notas automaticas con #roadmap y resumen local')

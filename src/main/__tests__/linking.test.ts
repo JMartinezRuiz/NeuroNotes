@@ -347,6 +347,56 @@ describe('seedInitialRelatedLinks', () => {
     ])
     expect(unrelated.related).toEqual([])
   })
+
+  it('can reseed explicit local links after an edited note keeps manual links', () => {
+    const source = note({
+      id: 'source',
+      title: 'Nota editada',
+      category: 'Ideas',
+      content: 'Actualizar con [[Roadmap Neuronotes]] para continuar.',
+      related: [
+        {
+          noteId: 'manual',
+          title: 'Decision manual',
+          score: 0.72,
+          reason: 'Enlace manual.'
+        }
+      ]
+    })
+    const manual = note({
+      id: 'manual',
+      title: 'Decision manual',
+      content: 'Referencia curada por el usuario.'
+    })
+    const roadmap = note({
+      id: 'roadmap',
+      title: 'Roadmap Neuronotes',
+      category: 'Proyecto',
+      content: 'Plan de producto para notas con IA local.'
+    })
+    const now = '2026-06-15T00:09:00.000Z'
+
+    const changedIds = seedInitialRelatedLinks(source, [source, manual, roadmap], now, { explicitOnly: true })
+
+    expect(changedIds).toEqual(expect.arrayContaining(['source', 'roadmap']))
+    expect(source.related).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        noteId: 'manual',
+        reason: 'Enlace manual.'
+      }),
+      expect.objectContaining({
+        noteId: 'roadmap',
+        score: 0.97,
+        reason: 'Referencia explicita en la nota.'
+      })
+    ]))
+    expect(roadmap.related).toContainEqual(
+      expect.objectContaining({
+        noteId: 'source',
+        reason: 'Enlace reciproco: Referencia explicita en la nota.'
+      })
+    )
+  })
 })
 
 describe('synchronizeRelatedGraph', () => {

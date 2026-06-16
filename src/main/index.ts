@@ -298,13 +298,14 @@ function registerIpcHandlers(): void {
   ipcMain.handle('notes:update', async (_, id: string, updates: Partial<Pick<NoteRecord, 'content' | 'title' | 'category' | 'tags'>>) => {
     return mutateDatabase((database) => {
       const note = database.notes.find((item) => item.id === id)
+      let contentChanged = false
 
       if (!note) {
         throw new Error('Nota no encontrada')
       }
 
       if (typeof updates.content === 'string') {
-        const contentChanged = hasContentChanged(note, updates.content)
+        contentChanged = hasContentChanged(note, updates.content)
         note.content = updates.content.trim()
         if (contentChanged) {
           resetAnalysisAfterContentEdit(note)
@@ -327,6 +328,9 @@ function registerIpcHandlers(): void {
       }
 
       note.updatedAt = new Date().toISOString()
+      if (contentChanged) {
+        seedInitialRelatedLinks(note, database.notes, note.updatedAt, { explicitOnly: true })
+      }
       syncActionNoteTitle(database, note)
       synchronizeRelatedGraph(database.notes, note.id)
       return note

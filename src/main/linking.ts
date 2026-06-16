@@ -44,6 +44,7 @@ const MAX_RELATED_NOTES = 6
 const MAX_INITIAL_RELATED_NOTES = 3
 const MIN_RELATED_SCORE = 0.08
 const EXPLICIT_LINK_SCORE = 0.97
+const EXPLICIT_LINK_REASON = 'Referencia explicita en la nota.'
 const DEFAULT_RAG_MAX_NOTES = 5
 const DEFAULT_RAG_EXCERPT_LENGTH = 550
 
@@ -125,6 +126,10 @@ const CONCEPT_ALIASES = new Map<string, string>([
 export interface RagContextOptions {
   maxNotes?: number
   excerptLength?: number
+}
+
+export interface SeedInitialRelatedOptions {
+  explicitOnly?: boolean
 }
 
 type RagSourceNote = Pick<NoteRecord, 'id' | 'content' | 'tags' | 'category'> &
@@ -309,9 +314,12 @@ export function buildRagContextBundle(
 export function seedInitialRelatedLinks(
   note: NoteRecord,
   notes: NoteRecord[],
-  now = new Date().toISOString()
+  now = new Date().toISOString(),
+  options: SeedInitialRelatedOptions = {}
 ): string[] {
-  const ranked = rankRelatedNotes(note, notes).slice(0, MAX_INITIAL_RELATED_NOTES)
+  const ranked = rankRelatedNotes(note, notes)
+    .filter((related) => !options.explicitOnly || related.reason === EXPLICIT_LINK_REASON)
+    .slice(0, MAX_INITIAL_RELATED_NOTES)
 
   if (ranked.length === 0) {
     return []
@@ -525,7 +533,7 @@ function relatedReason(signals: {
   conceptOverlap: number
 }): string {
   if (signals.explicitReference) {
-    return 'Referencia explicita en la nota.'
+    return EXPLICIT_LINK_REASON
   }
 
   if (signals.tagOverlap > 0 && signals.phraseOverlap > 0) {

@@ -330,6 +330,8 @@ const previewSuggestedActions = (content: string): NoteRecord['suggestedActions'
   return actions.slice(0, 4)
 }
 const PREVIEW_LINK_STOPWORDS = new Set(['para', 'sobre', 'notas', 'nota', 'local', 'desde', 'entre', 'con'])
+const PREVIEW_EXPLICIT_LINK_SCORE = 0.97
+const PREVIEW_EXPLICIT_LINK_REASON = 'Referencia explicita en la nota.'
 const previewLinkTokens = (value: string): Set<string> =>
   new Set(
     normalizePreviewText(value)
@@ -337,34 +339,97 @@ const previewLinkTokens = (value: string): Set<string> =>
       .split(/\s+/)
       .filter((token) => token.length > 3 && !PREVIEW_LINK_STOPWORDS.has(token))
   )
-const previewInitialRelatedLinks = (note: NoteRecord): NoteRecord['related'] => {
-  const sourceTokens = previewLinkTokens(`${note.title} ${note.summary} ${note.content} ${note.tags.join(' ')}`)
+const previewInitialRelatedLinks = (note: NoteRecord, options: { explicitOnly?: boolean } = {}): NoteRecord['related'] => {
+  const sourceTokens = previewLinkTokens(`${note.title} ${note.summary} ${note.content} ${note.tags.join(' ')} ${note.category}`)
   const sourceTags = new Set(note.tags)
+  const explicitTargets = previewExplicitLinkTargets(note.content)
 
   return notes
+    .filter((candidate) => candidate.id !== note.id)
     .map((candidate) => {
       const candidateTokens = previewLinkTokens(
-        `${candidate.title} ${candidate.summary} ${candidate.content} ${candidate.tags.join(' ')}`
+        `${candidate.title} ${candidate.summary} ${candidate.content} ${candidate.tags.join(' ')} ${candidate.category}`
       )
       const tokenOverlap = [...sourceTokens].filter((token) => candidateTokens.has(token)).length
       const tagOverlap = candidate.tags.filter((tag) => sourceTags.has(normalizePreviewText(tag))).length
       const categoryBoost = note.category !== 'Inbox' && note.category === candidate.category ? 0.08 : 0
-      const score = Math.min(1, tokenOverlap * 0.06 + tagOverlap * 0.22 + categoryBoost)
+      const explicitReference = previewMatchesExplicitTarget(candidate, explicitTargets)
+      const rankedScore = Math.min(1, tokenOverlap * 0.06 + tagOverlap * 0.22 + categoryBoost)
+      const score = explicitReference ? Math.max(PREVIEW_EXPLICIT_LINK_SCORE, rankedScore) : rankedScore
 
       return {
         noteId: candidate.id,
         title: candidate.title,
         score,
         reason:
-          tagOverlap > 0
+          explicitReference
+            ? PREVIEW_EXPLICIT_LINK_REASON
+            : tagOverlap > 0
             ? 'Relacion local inicial por etiquetas y contenido.'
             : 'Relacion local inicial por contenido cercano.'
       }
     })
-    .filter((related) => related.score >= 0.12)
+    .filter((related) => related.score >= 0.12 && (!options.explicitOnly || related.reason === PREVIEW_EXPLICIT_LINK_REASON))
     .sort((left, right) => right.score - left.score)
     .slice(0, 3)
 }
+const seedPreviewInitialRelatedLinks = (note: NoteRecord, options: { explicitOnly?: boolean } = {}): void => {
+  const byId = new Map<string, NoteRecord['related'][number]>()
+
+  for (const related of note.related.filter(isManualRelatedLink)) {
+    byId.set(related.noteId, related)
+  }
+
+  for (const related of previewInitialRelatedLinks(note, options)) {
+    const existing = byId.get(related.noteId)
+
+    if (existing) {
+      byId.set(related.noteId, {
+        ...existing,
+        title: related.title || existing.title,
+        score: Math.max(existing.score, related.score)
+      })
+      continue
+    }
+
+    byId.set(related.noteId, related)
+  }
+
+  note.related = [...byId.values()].slice(0, 3)
+}
+const previewExplicitLinkTargets = (content: string): Set<string> => {
+  const targets = new Set<string>()
+
+  for (const match of content.matchAll(/\[\[([^\]\r\n]{1,120})\]\]/g)) {
+    const label = normalizePreviewExplicitTarget(match[1].split('|')[0] ?? '')
+
+    if (label) {
+      targets.add(label)
+    }
+  }
+
+  for (const match of content.matchAll(/(?:^|[\s([])@([\p{L}\p{N}][\p{L}\p{N}_-]{1,80})/gu)) {
+    const label = normalizePreviewExplicitTarget(match[1])
+
+    if (label) {
+      targets.add(label)
+    }
+  }
+
+  return targets
+}
+const previewMatchesExplicitTarget = (candidate: NoteRecord, targets: Set<string>): boolean => {
+  if (targets.size === 0) {
+    return false
+  }
+
+  return [candidate.title, candidate.id].some((value) => targets.has(normalizePreviewExplicitTarget(value)))
+}
+const normalizePreviewExplicitTarget = (value: string): string =>
+  normalizePreviewText(value)
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
 const syncPreviewInitialBacklinks = (source: NoteRecord): void => {
   for (const related of source.related) {
     const target = notes.find((note) => note.id === related.noteId)
@@ -574,7 +639,7 @@ export function createPreviewApi(): Api {
         createdAt: now,
         updatedAt: now
       }
-      note.related = previewInitialRelatedLinks(note)
+      seedPreviewInitialRelatedLinks(note)
       syncPreviewInitialBacklinks(note)
 
       notes = [note, ...notes]
@@ -584,13 +649,14 @@ export function createPreviewApi(): Api {
       const note = notes.find((item) => item.id === id)
       const now = new Date().toISOString()
       let needsGraphSync = false
+      let contentChanged = false
 
       if (!note) {
         throw new Error('Nota no encontrada')
       }
 
       if (typeof updates.content === 'string') {
-        const contentChanged = updates.content !== note.content
+        contentChanged = updates.content !== note.content
         note.content = updates.content
         if (contentChanged) {
           resetPreviewAnalysisAfterContentEdit(note)
@@ -628,6 +694,9 @@ export function createPreviewApi(): Api {
       }
 
       note.updatedAt = now
+      if (contentChanged) {
+        seedPreviewInitialRelatedLinks(note, { explicitOnly: true })
+      }
       if (needsGraphSync) {
         syncPreviewRelatedGraph(note, now)
       }

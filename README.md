@@ -61,7 +61,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Pending analysis results report how many notes finished with Qwen, local fallback, failures, or stale skipped updates.
 - RAG context generation from locally related notes before Qwen analysis, prioritizing user-curated manual links before TF-IDF-style lexical matches, with stored excerpts and scores for auditability.
 - RAG ranking expands lightweight Spanish/English concept aliases such as `cliente/customer`, `recordatorio/reminder`, `RAG/retrieval`, and `MCP/workflow` so related notes can connect without exact wording.
-- Explicit note references such as `[[Roadmap Neuronotes]]` or `@roadmap-neuronotes` are treated as strong local link signals and can seed backlinks before Qwen runs.
+- Explicit note references such as `[[Roadmap Neuronotes]]` or `@roadmap-neuronotes` are treated as strong local link signals on new or edited notes and can seed backlinks before Qwen runs.
 - Initial local links are preserved through analysis until Qwen/local analysis confirms the same relationship or replaces the reason with stronger evidence.
 - Automatic summaries, categories, tags, and related-note suggestions.
 - Editing note content clears stale AI summaries, suggested actions, and automatic links while preserving manual links.
