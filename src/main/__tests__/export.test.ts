@@ -92,7 +92,7 @@ describe('noteToMarkdown', () => {
     expect(markdown).toContain('- RAG IDs: note\\-2')
     expect(markdown).toContain('## Nota')
     expect(markdown).toContain('Crear una app de notas con Qwen local.')
-    expect(markdown).toContain('- Interfaz minimalista: Comparte contexto de producto. (82%)')
+    expect(markdown).toContain('- [Auto] Interfaz minimalista: Comparte contexto de producto\\. (82%)')
     expect(markdown).toContain('## Acciones sugeridas')
     expect(markdown).toContain('- Crear tarea (task, 75%) [task\\.create]: Convertir esta nota en una tarea local\\.')
     expect(markdown).toContain('## Plan local')

@@ -1,4 +1,5 @@
 import { ActionItem, DatabaseFile, NOTE_CATEGORIES, NoteRecord, RagContextItem, SuggestedAction } from './types'
+import { linkProvenance } from '../shared/linkProvenance'
 
 const MCP_HANDOFF_SCHEMA = 'neuronotes.mcp-handoff.v1'
 const FINE_TUNE_EXAMPLE_SCHEMA = 'neuronotes.finetune-example.v1'
@@ -144,7 +145,13 @@ export function noteToMarkdown(note: NoteRecord, localActions: ActionItem[] = []
   const tags = note.tags.length > 0 ? note.tags.map((tag) => `#${tag}`).join(' ') : 'Sin etiquetas'
   const related = note.related.length > 0
     ? note.related
-        .map((item) => `- ${escapeMarkdown(item.title)}: ${item.reason} (${Math.round(item.score * 100)}%)`)
+        .map((item) => {
+          const provenance = linkProvenance(item.reason)
+          const label = escapeMarkdown(provenance.label)
+          const title = escapeMarkdown(item.title)
+          const reason = escapeMarkdown(item.reason)
+          return `- [${label}] ${title}: ${reason} (${Math.round(item.score * 100)}%)`
+        })
         .join('\n')
     : '- Sin notas enlazadas'
   const actions = note.suggestedActions.length > 0

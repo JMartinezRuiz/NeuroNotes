@@ -86,6 +86,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Manual link and unlink controls.
 - Incoming backlinks are visible in the note inspector, so notes that are referenced by other notes do not appear isolated.
 - Linked-note rows show provenance badges for manual links, explicit references, local seeded links, RAG context, and incoming backlinks so automatic connections are easier to audit.
+- Markdown note exports preserve the same link provenance labels, so exported notes keep audit context outside the app.
 - Graph view for direct links, backlinks, and library connection counts.
 - The network view highlights isolated notes and can reanalyze them to try to generate AI/RAG links.
 - MCP graph inspection exposes deduplicated note edges, backlinks, and isolated notes for local hosts.
