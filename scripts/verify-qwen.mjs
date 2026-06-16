@@ -2,7 +2,7 @@
 
 import { spawn } from 'node:child_process'
 import { constants } from 'node:fs'
-import { access } from 'node:fs/promises'
+import { access, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -11,17 +11,24 @@ const DEFAULT_ENDPOINT = 'http://127.0.0.1:11434'
 const DEFAULT_TIMEOUT_MS = 600000
 const DEFAULT_START_TIMEOUT_MS = 15000
 const DEFAULT_CONTEXT_WINDOW = 4096
+const DB_FILE = 'neuronotes.json'
 
 function parseArgs(argv) {
+  const envModel = process.env.NEURONOTES_MODEL?.trim()
+  const envEndpoint = process.env.OLLAMA_URL?.trim()
   const options = {
-    endpoint: process.env.OLLAMA_URL || DEFAULT_ENDPOINT,
-    model: process.env.NEURONOTES_MODEL || DEFAULT_MODEL,
+    endpoint: envEndpoint || DEFAULT_ENDPOINT,
+    model: envModel || DEFAULT_MODEL,
+    dbPath: process.env.NEURONOTES_DB_PATH || '',
+    userDataPath: process.env.NEURONOTES_USER_DATA || '',
     pull: false,
     start: false,
     json: false,
     timeoutMs: DEFAULT_TIMEOUT_MS,
     startTimeoutMs: DEFAULT_START_TIMEOUT_MS,
-    help: false
+    help: false,
+    modelPinned: Boolean(envModel),
+    endpointPinned: Boolean(envEndpoint)
   }
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -37,14 +44,28 @@ function parseArgs(argv) {
       options.json = true
     } else if (arg === '--endpoint') {
       options.endpoint = readValue(argv, index, arg)
+      options.endpointPinned = true
       index += 1
     } else if (arg.startsWith('--endpoint=')) {
       options.endpoint = arg.slice('--endpoint='.length)
+      options.endpointPinned = true
     } else if (arg === '--model') {
       options.model = readValue(argv, index, arg)
+      options.modelPinned = true
       index += 1
     } else if (arg.startsWith('--model=')) {
       options.model = arg.slice('--model='.length)
+      options.modelPinned = true
+    } else if (arg === '--db') {
+      options.dbPath = readValue(argv, index, arg)
+      index += 1
+    } else if (arg.startsWith('--db=')) {
+      options.dbPath = arg.slice('--db='.length)
+    } else if (arg === '--user-data') {
+      options.userDataPath = readValue(argv, index, arg)
+      index += 1
+    } else if (arg.startsWith('--user-data=')) {
+      options.userDataPath = arg.slice('--user-data='.length)
     } else if (arg === '--timeout-ms') {
       options.timeoutMs = Number(readValue(argv, index, arg))
       index += 1
@@ -62,6 +83,8 @@ function parseArgs(argv) {
 
   options.endpoint = normalizeEndpoint(options.endpoint)
   options.model = options.model.trim() || DEFAULT_MODEL
+  options.dbPath = options.dbPath.trim()
+  options.userDataPath = options.userDataPath.trim()
   options.timeoutMs = Number.isFinite(options.timeoutMs) && options.timeoutMs > 0 ? options.timeoutMs : DEFAULT_TIMEOUT_MS
   options.startTimeoutMs =
     Number.isFinite(options.startTimeoutMs) && options.startTimeoutMs > 0
@@ -99,11 +122,75 @@ Options:
   --pull              Pull the configured model if it is missing.
   --model <name>      Ollama model to verify. Default: ${DEFAULT_MODEL}
   --endpoint <url>    Ollama endpoint. Default: ${DEFAULT_ENDPOINT}
+  --db <path>         Read model and endpoint from a Neuronotes database file.
+  --user-data <dir>   Read settings from <dir>\\${DB_FILE}.
   --timeout-ms <ms>   Request timeout. Default: ${DEFAULT_TIMEOUT_MS}
   --start-timeout-ms <ms>
                       Time to wait for Ollama after --start. Default: ${DEFAULT_START_TIMEOUT_MS}
   --json              Print machine-readable result JSON.
 `
+}
+
+async function applyDatabaseSettings(options) {
+  const dbPath = resolveDatabaseSettingsPath(options)
+
+  if (!dbPath) {
+    return options
+  }
+
+  const settings = await readDatabaseSettings(dbPath)
+
+  if (!settings) {
+    return options
+  }
+
+  return {
+    ...options,
+    model: options.modelPinned ? options.model : settings.model || options.model,
+    endpoint: options.endpointPinned ? options.endpoint : normalizeEndpoint(settings.ollamaUrl || options.endpoint),
+    settingsSource: dbPath
+  }
+}
+
+function resolveDatabaseSettingsPath(options) {
+  if (options.dbPath) {
+    return options.dbPath
+  }
+
+  if (options.userDataPath) {
+    return path.join(options.userDataPath, DB_FILE)
+  }
+
+  return ''
+}
+
+async function readDatabaseSettings(dbPath) {
+  let raw
+
+  try {
+    raw = await readFile(dbPath, 'utf8')
+  } catch {
+    return undefined
+  }
+
+  try {
+    const parsed = JSON.parse(raw)
+    const settings = parsed?.settings
+
+    if (!settings || typeof settings !== 'object') {
+      return undefined
+    }
+
+    return {
+      model: typeof settings.model === 'string' && settings.model.trim() ? settings.model.trim() : '',
+      ollamaUrl:
+        typeof settings.ollamaUrl === 'string' && settings.ollamaUrl.trim()
+          ? settings.ollamaUrl.trim().replace(/\/$/, '')
+          : ''
+    }
+  } catch {
+    return undefined
+  }
 }
 
 async function requestJson(url, init = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
@@ -717,6 +804,7 @@ async function main() {
   }
 
   try {
+    options = await applyDatabaseSettings(options)
     const result = await verifyQwen(options)
 
     if (options.json) {
@@ -750,6 +838,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
 }
 
 export {
+  applyDatabaseSettings,
   buildChatPayload,
   buildProbePrompt,
   parseArgs,

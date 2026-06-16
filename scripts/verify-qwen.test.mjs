@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import {
+  applyDatabaseSettings,
   buildChatPayload,
   classifyOllamaConnectionFailure,
   parseArgs,
@@ -33,6 +37,67 @@ describe('verify-qwen script options', () => {
       model: 'qwen3.5:0.8b',
       startTimeoutMs: 25000
     })
+  })
+
+  it('loads model and endpoint from a Neuronotes database when requested', async () => {
+    const tempDir = await mkdtemp(path.join(tmpdir(), 'neuronotes-qwen-settings-'))
+    const dbPath = path.join(tempDir, 'neuronotes.json')
+
+    try {
+      await writeFile(
+        dbPath,
+        JSON.stringify({
+          settings: {
+            model: 'qwen3.5:0.8b-custom',
+            ollamaUrl: 'http://127.0.0.1:11435/'
+          }
+        }),
+        'utf8'
+      )
+
+      await expect(applyDatabaseSettings(parseArgs(['--db', dbPath]))).resolves.toMatchObject({
+        model: 'qwen3.5:0.8b-custom',
+        endpoint: 'http://127.0.0.1:11435',
+        settingsSource: dbPath
+      })
+      await expect(applyDatabaseSettings(parseArgs(['--user-data', tempDir]))).resolves.toMatchObject({
+        model: 'qwen3.5:0.8b-custom',
+        endpoint: 'http://127.0.0.1:11435',
+        settingsSource: dbPath
+      })
+    } finally {
+      await rm(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps explicit verifier options ahead of database settings', async () => {
+    const tempDir = await mkdtemp(path.join(tmpdir(), 'neuronotes-qwen-settings-'))
+    const dbPath = path.join(tempDir, 'neuronotes.json')
+
+    try {
+      await writeFile(
+        dbPath,
+        JSON.stringify({
+          settings: {
+            model: 'qwen3.5:0.8b-db',
+            ollamaUrl: 'http://127.0.0.1:11435'
+          }
+        }),
+        'utf8'
+      )
+
+      await expect(
+        applyDatabaseSettings(
+          parseArgs(['--db', dbPath, '--model', 'qwen3.5:0.8b-cli', '--endpoint', 'http://127.0.0.1:11436'])
+        )
+      ).resolves.toMatchObject({
+        model: 'qwen3.5:0.8b-cli',
+        endpoint: 'http://127.0.0.1:11436',
+        settingsSource: dbPath
+      })
+    } finally {
+      await rm(tempDir, { recursive: true, force: true })
+    }
   })
 
   it('builds OLLAMA_HOST for local runtime startup', () => {

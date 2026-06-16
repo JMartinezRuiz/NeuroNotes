@@ -329,6 +329,18 @@ npm run verify:qwen:json
 npm run verify:qwen:start:json
 ```
 
+To verify the same model and Ollama endpoint saved by the installed desktop app:
+
+```powershell
+node scripts/verify-qwen.mjs --user-data "$env:APPDATA\Neuronotes" --start --json
+```
+
+The verifier can also read an explicit database file:
+
+```powershell
+node scripts/verify-qwen.mjs --db "$env:APPDATA\Neuronotes\neuronotes.json" --start --json
+```
+
 Run the desktop app:
 
 ```powershell
