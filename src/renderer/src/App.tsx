@@ -90,6 +90,9 @@ import {
 } from './types'
 
 type NeuronotesApi = NonNullable<Window['neuronotes']>
+type McpHandoffPreview = Awaited<ReturnType<NeuronotesApi['previewMcpHandoff']>>
+type McpHandoffPreviewAction = McpHandoffPreview['actions'][number]
+type McpDraftField = { label: string; value: string }
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error'
 type WorkspaceView = 'note' | 'network' | 'plan'
 
@@ -168,6 +171,82 @@ function suggestedToolHintForKind(kind: SuggestedActionKind): string {
   }
 
   return 'mcp.workflow.prepare'
+}
+
+function mcpDraftStatusLabel(action: McpHandoffPreviewAction): string {
+  if (!action.toolCallDraft.toolName) {
+    return 'Sin tool'
+  }
+
+  return action.approval.state === 'approved' ? 'Aprobado' : 'Por revisar'
+}
+
+function formatMcpDraftValue(value: unknown): string {
+  if (typeof value === 'number') {
+    return value.toFixed(2)
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === 'string') {
+          return item
+        }
+
+        if (item && typeof item === 'object' && 'title' in item) {
+          return String(item.title)
+        }
+
+        return ''
+      })
+      .filter(Boolean)
+      .join(', ')
+  }
+
+  return typeof value === 'string' ? value : ''
+}
+
+function mcpDraftFields(action: McpHandoffPreviewAction): McpDraftField[] {
+  const args = action.toolCallDraft.arguments
+  const toolFields: Array<[string, unknown]> = [
+    ['Tool', action.toolCallDraft.toolName ?? 'Sin toolHint'],
+    ['Nota', action.sourceNote.title]
+  ]
+
+  if (args.taskTitle || args.taskDetail) {
+    toolFields.push(['Tarea', args.taskTitle], ['Detalle', args.taskDetail])
+  }
+
+  if (args.eventTitle || args.eventNotes || args.timeText) {
+    toolFields.push(['Evento', args.eventTitle], ['Cuando', args.timeText], ['Notas', args.eventNotes])
+  }
+
+  if (args.subject || args.body || args.recipientHint) {
+    toolFields.push(['Asunto', args.subject], ['Para', args.recipientHint], ['Cuerpo', args.body])
+  }
+
+  if (args.message) {
+    toolFields.push(['Mensaje', args.message], ['Para', args.recipientHint])
+  }
+
+  if (args.callTitle || args.agenda) {
+    toolFields.push(['Llamada', args.callTitle], ['Para', args.recipientHint], ['Agenda', args.agenda])
+  }
+
+  if (args.query) {
+    toolFields.push(['Busqueda', args.query])
+  }
+
+  if (args.workflowGoal) {
+    toolFields.push(['Workflow', args.workflowGoal])
+  }
+
+  toolFields.push(['RAG', `${args.ragContext.length} contexto`], ['Links', `${args.relatedNotes.length} notas`])
+
+  return toolFields
+    .map(([label, value]) => ({ label, value: formatMcpDraftValue(value) }))
+    .filter((field) => field.value.trim().length > 0)
+    .slice(0, 8)
 }
 
 function actionIdentity(action: { kind: SuggestedActionKind; title: string; detail: string }): string {
@@ -287,7 +366,9 @@ export default function App(): JSX.Element {
   const [editorMessage, setEditorMessage] = useState<string>('')
   const [libraryMessage, setLibraryMessage] = useState<string>('')
   const [mcpConfig, setMcpConfig] = useState<McpConnectionConfig | null>(null)
+  const [mcpHandoffPreview, setMcpHandoffPreview] = useState<McpHandoffPreview | null>(null)
   const [mcpMessage, setMcpMessage] = useState<string>('')
+  const [mcpPreviewMessage, setMcpPreviewMessage] = useState<string>('')
   const [setupCommandMessage, setSetupCommandMessage] = useState<string>('')
   const [diagnosticsMessage, setDiagnosticsMessage] = useState<string>('')
   const [analysisQueueMessage, setAnalysisQueueMessage] = useState<string>('')
@@ -361,6 +442,27 @@ export default function App(): JSX.Element {
     ],
     [mcpReadinessSummary]
   )
+  const mcpPreviewSourceKey = useMemo(
+    () =>
+      [
+        settings.model,
+        settings.ollamaUrl,
+        actions
+          .map((action) =>
+            [
+              action.id,
+              action.status,
+              action.toolHint ?? '',
+              action.mcpApprovedAt ?? '',
+              action.updatedAt
+            ].join(':')
+          )
+          .join('|'),
+        notes.map((note) => `${note.id}:${note.updatedAt}:${note.related.length}:${note.analysisRun?.analyzedAt ?? ''}`).join('|')
+      ].join('::'),
+    [actions, notes, settings.model, settings.ollamaUrl]
+  )
+  const mcpPreviewActions = useMemo(() => mcpHandoffPreview?.actions.slice(0, 4) ?? [], [mcpHandoffPreview])
   const actionNotesById = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes])
   const savedSuggestedActionKeys = useMemo(
     () => new Set(selectedActionItems.map((action) => actionIdentity(action))),
@@ -574,6 +676,39 @@ export default function App(): JSX.Element {
 
     void loadMcpConfig()
   }, [settingsOpen, mcpConfig])
+
+  useEffect(() => {
+    if (!bootstrapped || workspaceView !== 'plan') {
+      return
+    }
+
+    let canceled = false
+
+    setMcpPreviewMessage('Calculando handoff MCP')
+
+    void api
+      .previewMcpHandoff()
+      .then((preview) => {
+        if (canceled) {
+          return
+        }
+
+        setMcpHandoffPreview(preview)
+        setMcpPreviewMessage('')
+      })
+      .catch(() => {
+        if (canceled) {
+          return
+        }
+
+        setMcpHandoffPreview(null)
+        setMcpPreviewMessage('Preview MCP no disponible')
+      })
+
+    return () => {
+      canceled = true
+    }
+  }, [api, bootstrapped, mcpPreviewSourceKey, workspaceView])
 
   useEffect(() => {
     if (
@@ -2100,6 +2235,46 @@ export default function App(): JSX.Element {
                   {busy === 'exportMcp' ? <Loader2 className="spin" size={16} /> : <Network size={16} />}
                   Exportar MCP JSON
                 </button>
+                <div className="mcp-preview-panel" aria-label="Preview handoff MCP">
+                  <div className="mcp-preview-metrics">
+                    <span>
+                      <strong>{mcpHandoffPreview?.actionCount ?? 0}</strong>
+                      borradores
+                    </span>
+                    <span>
+                      <strong>{mcpHandoffPreview?.approvedActionCount ?? 0}</strong>
+                      aprobados
+                    </span>
+                  </div>
+                  {mcpPreviewMessage ? <p className="muted">{mcpPreviewMessage}</p> : null}
+                  {mcpPreviewActions.length > 0 ? (
+                    <div className="mcp-preview-list">
+                      {mcpPreviewActions.map((previewAction) => (
+                        <article className="mcp-preview-row" key={previewAction.id}>
+                          <header>
+                            <span>
+                              <strong>{previewAction.title}</strong>
+                              <small>{previewAction.sourceNote.title}</small>
+                            </span>
+                            <code data-mcp-readiness={previewAction.approval.state === 'approved' ? 'ready' : 'needs-approval'}>
+                              {mcpDraftStatusLabel(previewAction)}
+                            </code>
+                          </header>
+                          <dl>
+                            {mcpDraftFields(previewAction).map((field) => (
+                              <div key={`${previewAction.id}:${field.label}`}>
+                                <dt>{field.label}</dt>
+                                <dd>{field.value}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted">Sin acciones abiertas en el handoff.</p>
+                  )}
+                </div>
               </section>
 
               <section>

@@ -1,3 +1,5 @@
+import type { LinkProvenance } from '../shared/linkProvenance'
+
 export type AnalysisStatus = 'idle' | 'qwen' | 'fallback' | 'error'
 
 export interface RelatedNote {
@@ -230,6 +232,106 @@ export interface FineTuneDatasetExportResult {
   message: string
   path?: string
   examples: number
+}
+
+export interface HandoffRelatedNote {
+  noteId: string
+  title: string
+  score: number
+  reason: string
+  provenance: LinkProvenance
+}
+
+export interface McpHandoffPayload {
+  schema: string
+  exportedAt: string
+  execution: {
+    mode: string
+    requiresUserApproval: boolean
+    sideEffects: string
+  }
+  model: string
+  ollamaUrl: string
+  actionCount: number
+  approvedActionCount: number
+  doneActionCount: number
+  toolSummary: Array<{
+    toolHint: string
+    actionCount: number
+    kinds: string[]
+    sourceNoteIds: string[]
+  }>
+  kindSummary: Array<{
+    kind: string
+    actionCount: number
+  }>
+  actions: Array<{
+    id: string
+    kind: string
+    status: string
+    title: string
+    detail: string
+    toolHint: string | null
+    confidence: number
+    approval: {
+      required: boolean
+      state: 'approved' | 'needs-review'
+      approvedAt: string | null
+    }
+    toolCallDraft: {
+      status: 'ready-for-review' | 'needs-tool-selection'
+      toolName: string | null
+      arguments: {
+        kind: string
+        title: string
+        detail: string
+        confidence: number
+        sourceNoteId: string
+        sourceNoteTitle: string
+        sourceNoteSummary: string
+        sourceNoteCategory: string
+        sourceNoteTags: string[]
+        relatedNoteIds: string[]
+        relatedNotes: HandoffRelatedNote[]
+        ragContext: RagContextItem[]
+        requiresUserReview: boolean
+        draftCompleteness: 'ready' | 'needs-tool-selection'
+        taskTitle?: string
+        taskDetail?: string
+        eventTitle?: string
+        eventNotes?: string
+        timeText?: string
+        subject?: string
+        body?: string
+        recipientHint?: string
+        message?: string
+        callTitle?: string
+        agenda?: string
+        query?: string
+        workflowGoal?: string
+        safetyNote?: string
+      }
+    }
+    createdAt: string
+    updatedAt: string
+    sourceNote: {
+      id: string
+      title: string
+      summary: string
+      category: string
+      tags: string[]
+      contentExcerpt: string
+      relatedNoteIds: string[]
+      relatedNotes: HandoffRelatedNote[]
+      analysis: {
+        provider: string
+        model: string
+        analyzedAt: string
+        ragNoteIds: string[]
+        ragContext: RagContextItem[]
+      } | null
+    }
+  }>
 }
 
 export interface DatabaseFile {

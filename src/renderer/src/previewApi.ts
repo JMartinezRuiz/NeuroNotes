@@ -1,6 +1,7 @@
 import { NeuronotesApi } from '../../preload'
 import { buildQwenWindowsSetupCommand } from '../../shared/qwenSetup'
 import { isFineTuneReviewable } from './fineTuneReadiness'
+import { linkProvenance } from './linkProvenance'
 import {
   ActionItem,
   ActionItemStatus,
@@ -9,10 +10,13 @@ import {
   AiRuntimePrepareResult,
   AppSettings,
   NoteRecord,
+  RagContextItem,
   RagPreviewResult
 } from './types'
 
 type Api = NeuronotesApi
+type McpHandoffPreview = Awaited<ReturnType<Api['previewMcpHandoff']>>
+type McpHandoffPreviewAction = McpHandoffPreview['actions'][number]
 
 const createPreviewSettings = (): AppSettings => ({
   model: 'qwen3.5:0.8b',
@@ -217,6 +221,244 @@ const previewMcpConfig = () => {
       2
     )}\n`
   }
+}
+const buildPreviewMcpHandoffPayload = (): McpHandoffPreview => {
+  const notesById = new Map(notes.map((note) => [note.id, note]))
+  const openActions = actions
+    .filter((action) => action.status === 'open' && notesById.has(action.noteId))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+  const payloadActions = openActions.map((action): McpHandoffPreviewAction => {
+    const note = notesById.get(action.noteId)
+
+    if (!note) {
+      throw new Error('Accion sin nota fuente')
+    }
+
+    const relatedNotes = previewHandoffRelatedNotes(note)
+
+    return {
+      id: action.id,
+      kind: action.kind,
+      status: action.status,
+      title: action.title,
+      detail: action.detail,
+      toolHint: action.toolHint ?? null,
+      confidence: action.confidence,
+      approval: {
+        required: true,
+        state: action.mcpApprovedAt ? 'approved' : 'needs-review',
+        approvedAt: action.mcpApprovedAt ?? null
+      },
+      toolCallDraft: previewToolCallDraft(action, note, relatedNotes),
+      createdAt: action.createdAt,
+      updatedAt: action.updatedAt,
+      sourceNote: {
+        id: note.id,
+        title: note.title,
+        summary: note.summary,
+        category: note.category,
+        tags: note.tags,
+        contentExcerpt: note.content.replace(/\s+/g, ' ').trim().slice(0, 1200),
+        relatedNoteIds: note.related.map((related) => related.noteId),
+        relatedNotes,
+        analysis: note.analysisRun
+          ? {
+              provider: note.analysisRun.provider,
+              model: note.analysisRun.model,
+              analyzedAt: note.analysisRun.analyzedAt,
+              ragNoteIds: note.analysisRun.ragNoteIds,
+              ragContext: note.analysisRun.ragContext ?? []
+            }
+          : null
+      }
+    }
+  })
+
+  return {
+    schema: 'neuronotes.mcp-handoff.v1',
+    exportedAt: new Date().toISOString(),
+    execution: {
+      mode: 'manual-user-approved',
+      requiresUserApproval: true,
+      sideEffects: 'none-export-only'
+    },
+    model: settings.model,
+    ollamaUrl: settings.ollamaUrl,
+    actionCount: payloadActions.length,
+    approvedActionCount: payloadActions.filter((action) => action.approval.state === 'approved').length,
+    doneActionCount: actions.filter((action) => action.status === 'done').length,
+    toolSummary: previewToolSummary(payloadActions),
+    kindSummary: previewKindSummary(payloadActions),
+    actions: payloadActions
+  }
+}
+const previewToolCallDraft = (
+  action: ActionItem,
+  note: NoteRecord,
+  relatedNotes: McpHandoffPreviewAction['sourceNote']['relatedNotes']
+): McpHandoffPreviewAction['toolCallDraft'] => {
+  const status = action.toolHint ? 'ready-for-review' : 'needs-tool-selection'
+  const ragContext = note.analysisRun?.ragContext ?? []
+
+  return {
+    status,
+    toolName: action.toolHint ?? null,
+    arguments: previewToolArguments(action, note, relatedNotes, ragContext, status)
+  }
+}
+const previewToolArguments = (
+  action: ActionItem,
+  note: NoteRecord,
+  relatedNotes: McpHandoffPreviewAction['sourceNote']['relatedNotes'],
+  ragContext: RagContextItem[],
+  draftStatus: McpHandoffPreviewAction['toolCallDraft']['status']
+): McpHandoffPreviewAction['toolCallDraft']['arguments'] => {
+  const base: McpHandoffPreviewAction['toolCallDraft']['arguments'] = {
+    kind: action.kind,
+    title: action.title,
+    detail: action.detail,
+    confidence: action.confidence,
+    sourceNoteId: note.id,
+    sourceNoteTitle: note.title,
+    sourceNoteSummary: note.summary,
+    sourceNoteCategory: note.category,
+    sourceNoteTags: note.tags,
+    relatedNoteIds: note.related.map((related) => related.noteId),
+    relatedNotes,
+    ragContext: ragContext ?? [],
+    requiresUserReview: true,
+    draftCompleteness: draftStatus === 'ready-for-review' ? 'ready' : 'needs-tool-selection'
+  }
+
+  if (action.toolHint === 'task.create') {
+    return {
+      ...base,
+      taskTitle: action.title,
+      taskDetail: action.detail
+    }
+  }
+
+  if (action.toolHint === 'calendar.create_event') {
+    return {
+      ...base,
+      eventTitle: action.title,
+      eventNotes: action.detail,
+      timeText: previewExtractTimeText(`${action.title} ${action.detail} ${note.content}`)
+    }
+  }
+
+  if (action.toolHint === 'reminder.create') {
+    return {
+      ...base,
+      taskTitle: action.title,
+      taskDetail: action.detail,
+      timeText: previewExtractTimeText(`${action.title} ${action.detail} ${note.content}`)
+    }
+  }
+
+  if (action.toolHint === 'email.compose') {
+    return {
+      ...base,
+      subject: action.title,
+      body: action.detail,
+      recipientHint: previewExtractRecipientHint(`${note.content} ${action.title} ${action.detail}`)
+    }
+  }
+
+  if (action.toolHint === 'message.send') {
+    return {
+      ...base,
+      message: action.detail,
+      recipientHint: previewExtractRecipientHint(`${note.content} ${action.title} ${action.detail}`)
+    }
+  }
+
+  if (action.toolHint === 'phone.call') {
+    return {
+      ...base,
+      callTitle: action.title,
+      agenda: action.detail,
+      recipientHint: previewExtractRecipientHint(`${note.content} ${action.title} ${action.detail}`)
+    }
+  }
+
+  if (action.toolHint === 'documents.search') {
+    return {
+      ...base,
+      query: [action.title, action.detail, note.title, note.tags.join(' ')].filter(Boolean).join(' ')
+    }
+  }
+
+  if (action.toolHint === 'mcp.workflow.prepare') {
+    return {
+      ...base,
+      workflowGoal: action.detail || action.title,
+      safetyNote: 'Borrador local: requiere aprobacion del usuario antes de ejecutar cualquier herramienta externa.'
+    }
+  }
+
+  return base
+}
+const previewHandoffRelatedNotes = (note: NoteRecord): McpHandoffPreviewAction['sourceNote']['relatedNotes'] =>
+  note.related.map((related) => ({
+    noteId: related.noteId,
+    title: related.title,
+    score: related.score,
+    reason: related.reason,
+    provenance: linkProvenance(related.reason)
+  }))
+const previewToolSummary = (payloadActions: McpHandoffPreviewAction[]): McpHandoffPreview['toolSummary'] => {
+  const summary = new Map<string, { actionCount: number; kinds: Set<string>; sourceNoteIds: Set<string> }>()
+
+  for (const action of payloadActions) {
+    const toolHint = action.toolHint ?? 'unassigned'
+    const current = summary.get(toolHint) ?? {
+      actionCount: 0,
+      kinds: new Set<string>(),
+      sourceNoteIds: new Set<string>()
+    }
+
+    current.actionCount += 1
+    current.kinds.add(action.kind)
+    current.sourceNoteIds.add(action.sourceNote.id)
+    summary.set(toolHint, current)
+  }
+
+  return [...summary.entries()]
+    .map(([toolHint, entry]) => ({
+      toolHint,
+      actionCount: entry.actionCount,
+      kinds: [...entry.kinds].sort((left, right) => left.localeCompare(right)),
+      sourceNoteIds: [...entry.sourceNoteIds].sort((left, right) => left.localeCompare(right))
+    }))
+    .sort((left, right) => right.actionCount - left.actionCount || left.toolHint.localeCompare(right.toolHint))
+}
+const previewKindSummary = (payloadActions: McpHandoffPreviewAction[]): McpHandoffPreview['kindSummary'] => {
+  const summary = new Map<string, number>()
+
+  for (const action of payloadActions) {
+    summary.set(action.kind, (summary.get(action.kind) ?? 0) + 1)
+  }
+
+  return [...summary.entries()]
+    .map(([kind, actionCount]) => ({ kind, actionCount }))
+    .sort((left, right) => right.actionCount - left.actionCount || left.kind.localeCompare(right.kind))
+}
+const previewExtractTimeText = (value: string): string => {
+  const text = value.replace(/\s+/g, ' ').trim()
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const match = normalized.match(
+    /\b(hoy|manana|pasado manana|esta semana|proxima semana|deadline|vencimiento|fecha|cita|reunion|meeting|agenda|agendar)\b(?:[^.!\n]{0,80})?/i
+  )
+
+  return match?.[0]?.trim() ?? ''
+}
+const previewExtractRecipientHint = (value: string): string => {
+  const text = value.replace(/\s+/g, ' ').trim()
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const match = normalized.match(/\b(?:a|para|con|al|a la|a el)\s+([A-Za-z0-9][^.,;:\n]{1,60})/i)
+
+  return match?.[1]?.trim() ?? ''
 }
 const isPreviewPending = (note: NoteRecord, mode: 'qwen' | 'local'): boolean => {
   if (note.content.trim().length === 0) {
@@ -1168,6 +1410,7 @@ export function createPreviewApi(): Api {
       await navigator.clipboard?.writeText(config.writeHostConfigJson)
       return config
     },
+    previewMcpHandoff: async () => buildPreviewMcpHandoffPayload(),
     exportMcpHandoff: async () => ({
       ok: true,
       canceled: false,

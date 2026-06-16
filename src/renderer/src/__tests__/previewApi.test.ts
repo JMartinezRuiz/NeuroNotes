@@ -109,6 +109,31 @@ describe('createPreviewApi', () => {
     expect(copied.writeArgs).toContain('--write')
   })
 
+  it('previews structured MCP handoff drafts in browser mode', async () => {
+    const api = createPreviewApi()
+    const preview = await api.previewMcpHandoff()
+
+    expect(preview).toMatchObject({
+      schema: 'neuronotes.mcp-handoff.v1',
+      model: 'qwen3.5:0.8b',
+      actionCount: 1,
+      approvedActionCount: 1
+    })
+    expect(preview.actions[0]).toMatchObject({
+      id: 'preview-action-roadmap',
+      toolCallDraft: {
+        status: 'ready-for-review',
+        toolName: 'task.create',
+        arguments: expect.objectContaining({
+          taskTitle: 'Definir plan MCP',
+          taskDetail: 'Convertir el roadmap en una lista de tareas para la integracion MCP.',
+          requiresUserReview: true,
+          draftCompleteness: 'ready'
+        })
+      }
+    })
+  })
+
   it('supports local and Qwen modes for single-note analysis', async () => {
     const api = createPreviewApi()
 

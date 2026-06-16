@@ -806,6 +806,12 @@ function registerIpcHandlers(): void {
     } satisfies McpHandoffExportResult
   })
 
+  ipcMain.handle('mcp:previewHandoff', async () => {
+    const database = await readDatabase()
+
+    return buildMcpHandoffPayload(database)
+  })
+
   ipcMain.handle('mcp:getConfig', async () => {
     return buildMcpConnectionConfig({
       databasePath: databasePaths().data,

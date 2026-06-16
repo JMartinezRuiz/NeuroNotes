@@ -1465,6 +1465,131 @@ button:disabled {
   font-size: 16px;
 }
 
+.mcp-preview-panel {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.mcp-preview-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mcp-preview-metrics span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mcp-preview-metrics strong {
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.mcp-preview-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mcp-preview-row {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(247, 245, 239, 0.72);
+}
+
+.mcp-preview-row header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+}
+
+.mcp-preview-row header span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mcp-preview-row strong,
+.mcp-preview-row small,
+.mcp-preview-row dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mcp-preview-row strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.mcp-preview-row small,
+.mcp-preview-row dt {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.mcp-preview-row code {
+  width: fit-content;
+  max-width: 118px;
+  padding: 4px 6px;
+  overflow: hidden;
+  border-radius: 6px;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mcp-preview-row code[data-mcp-readiness='ready'] {
+  color: var(--accent-strong);
+  background: #dff4ea;
+}
+
+.mcp-preview-row code[data-mcp-readiness='needs-approval'] {
+  color: var(--amber);
+  background: #fff0d8;
+}
+
+.mcp-preview-row dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.mcp-preview-row dl div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+
+.mcp-preview-row dt,
+.mcp-preview-row dd {
+  margin: 0;
+}
+
+.mcp-preview-row dd {
+  color: var(--ink);
+  font-size: 11px;
+}
+
 .network-header h2 {
   margin: 0;
   font-size: 30px;
