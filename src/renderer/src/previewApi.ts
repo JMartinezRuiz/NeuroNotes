@@ -155,7 +155,7 @@ const previewMcpConfig = () => {
   return {
     schema: 'neuronotes.mcp-config.v1',
     serverName: 'neuronotes',
-    writeServerName: 'neuronotes-capture',
+    writeServerName: 'neuronotes-write',
     command,
     args,
     writeArgs,
@@ -176,7 +176,7 @@ const previewMcpConfig = () => {
     writeHostConfigJson: `${JSON.stringify(
       {
         mcpServers: {
-          'neuronotes-capture': {
+          'neuronotes-write': {
             command,
             args: writeArgs
           }

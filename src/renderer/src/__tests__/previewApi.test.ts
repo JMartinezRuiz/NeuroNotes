@@ -55,7 +55,7 @@ describe('createPreviewApi', () => {
     })
     expect(JSON.parse(config.writeHostConfigJson)).toEqual({
       mcpServers: {
-        'neuronotes-capture': {
+        'neuronotes-write': {
           command: 'node',
           args: [
             'C:\\Program Files\\Neuronotes\\resources\\mcp\\neuronotes-mcp.mjs',

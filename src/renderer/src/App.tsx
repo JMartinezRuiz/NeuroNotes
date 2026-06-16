@@ -1194,9 +1194,9 @@ export default function App(): JSX.Element {
     try {
       const config = await api.copyMcpWriteConfig()
       setMcpConfig(config)
-      setMcpMessage('Configuracion MCP de captura copiada.')
+      setMcpMessage('Configuracion MCP de escritura local copiada.')
     } catch (error) {
-      setMcpMessage(error instanceof Error ? error.message : 'No se pudo copiar la configuracion MCP de captura')
+      setMcpMessage(error instanceof Error ? error.message : 'No se pudo copiar la configuracion MCP de escritura local')
     } finally {
       setBusy(null)
     }
@@ -1727,7 +1727,7 @@ export default function App(): JSX.Element {
               <div className="mcp-card-header">
                 <span>
                   <strong>MCP local</strong>
-                  <small>{mcpMessage || 'Configura lectura segura o captura opt-in desde hosts MCP locales.'}</small>
+                  <small>{mcpMessage || 'Configura lectura segura o escritura local opt-in desde hosts MCP locales.'}</small>
                 </span>
                 <button
                   type="button"
@@ -1742,10 +1742,10 @@ export default function App(): JSX.Element {
                   type="button"
                   onClick={copyMcpWriteConfig}
                   disabled={busy === 'copyMcpConfig' || busy === 'copyMcpWriteConfig'}
-                  title="Copiar configuracion MCP para capturar notas"
+                  title="Copiar configuracion MCP para crear notas y acciones locales"
                 >
                   {busy === 'copyMcpWriteConfig' ? <Loader2 className="spin" size={16} /> : <Plus size={16} />}
-                  Copiar captura
+                  Copiar escritura
                 </button>
               </div>
               <div className="mcp-mode-grid">
@@ -1759,8 +1759,8 @@ export default function App(): JSX.Element {
                 </section>
                 <section>
                   <span>
-                    <strong>Captura</strong>
-                    <small>Crea notas nuevas pendientes de analisis; no ejecuta herramientas externas.</small>
+                    <strong>Escritura local</strong>
+                    <small>Crea notas pendientes y acciones sin aprobar; no ejecuta herramientas externas.</small>
                   </span>
                   <code>{mcpConfig ? `${mcpConfig.command} ${mcpConfig.writeArgs.map((arg) => `"${arg}"`).join(' ')}` : 'Cargando...'}</code>
                   <pre>{mcpConfig?.writeHostConfigJson.trim() ?? '{ "mcpServers": {} }'}</pre>

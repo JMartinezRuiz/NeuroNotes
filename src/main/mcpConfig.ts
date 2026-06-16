@@ -4,7 +4,7 @@ import { McpConnectionConfig } from './types'
 
 const MCP_CONFIG_SCHEMA = 'neuronotes.mcp-config.v1'
 const MCP_SERVER_NAME = 'neuronotes'
-const MCP_WRITE_SERVER_NAME = 'neuronotes-capture'
+const MCP_WRITE_SERVER_NAME = 'neuronotes-write'
 
 export function buildMcpConnectionConfig(options: {
   databasePath: string

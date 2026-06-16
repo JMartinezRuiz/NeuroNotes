@@ -19,7 +19,7 @@ describe('buildMcpConnectionConfig', () => {
     expect(config).toMatchObject({
       schema: 'neuronotes.mcp-config.v1',
       serverName: 'neuronotes',
-      writeServerName: 'neuronotes-capture',
+      writeServerName: 'neuronotes-write',
       command: 'node',
       args: [
         'C:\\Program Files\\Neuronotes\\resources\\mcp\\neuronotes-mcp.mjs',
@@ -50,7 +50,7 @@ describe('buildMcpConnectionConfig', () => {
     expect(config.hostConfigJson.endsWith('\n')).toBe(true)
     expect(JSON.parse(config.writeHostConfigJson)).toEqual({
       mcpServers: {
-        'neuronotes-capture': {
+        'neuronotes-write': {
           command: 'node',
           args: [
             'C:\\Program Files\\Neuronotes\\resources\\mcp\\neuronotes-mcp.mjs',

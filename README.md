@@ -204,12 +204,12 @@ Read-only context access:
 }
 ```
 
-Opt-in note capture for trusted hosts:
+Opt-in local write mode for trusted hosts:
 
 ```json
 {
   "mcpServers": {
-    "neuronotes-capture": {
+    "neuronotes-write": {
       "command": "node",
       "args": [
         "<Neuronotes install dir>\\resources\\mcp\\neuronotes-mcp.mjs",
