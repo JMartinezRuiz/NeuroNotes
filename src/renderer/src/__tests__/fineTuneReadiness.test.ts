@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  fineTuneExampleQuality,
+  fineTuneQualityDetail,
+  fineTuneQualityLabel,
   formatFineTuneExampleCount,
   isFineTuneReviewable,
   noteMatchesFineTuneReviewFilter,
@@ -57,6 +60,7 @@ describe('summarizeFineTuneReadiness', () => {
       reviewedExamples: 0,
       pendingReviewNotes: 0,
       reviewableNotes: 0,
+      qualityCounts: { high: 0, medium: 0, low: 0 },
       status: 'empty',
       message: 'Analiza y aprueba notas para crear dataset Qwen.'
     })
@@ -91,9 +95,72 @@ describe('summarizeFineTuneReadiness', () => {
       reviewableNotes: 3,
       reviewedQwenExamples: 1,
       reviewedLocalExamples: 1,
+      qualityCounts: { high: 0, medium: 0, low: 2 },
       status: 'ready',
       message: '2 ejemplos listos para JSONL; 1 nota por aprobar.'
     })
+  })
+})
+
+describe('fineTuneExampleQuality', () => {
+  it('scores Qwen examples with stored RAG context as high quality', () => {
+    const quality = fineTuneExampleQuality(
+      note({
+        related: [
+          {
+            noteId: 'note-2',
+            title: 'Arquitectura MCP',
+            score: 0.82,
+            reason: 'Comparte Qwen y MCP.'
+          }
+        ],
+        suggestedActions: [
+          {
+            kind: 'task',
+            title: 'Probar MCP',
+            detail: 'Validar handoff local.',
+            confidence: 0.8
+          }
+        ],
+        analysisRun: {
+          provider: 'qwen',
+          model: 'qwen3.5:0.8b',
+          analyzedAt: '2026-06-15T00:01:00.000Z',
+          durationMs: 1200,
+          ragNoteIds: ['note-2'],
+          ragContext: [
+            {
+              noteId: 'note-2',
+              title: 'Arquitectura MCP',
+              category: 'Proyecto',
+              tags: ['mcp'],
+              score: 0.82,
+              reason: 'Comparte Qwen y MCP.',
+              excerpt: 'Contexto de prueba.'
+            }
+          ]
+        }
+      })
+    )
+
+    expect(quality).toMatchObject({
+      level: 'high',
+      score: 1,
+      warnings: []
+    })
+    expect(fineTuneQualityLabel(quality.level)).toBe('Alta')
+  })
+
+  it('warns when an example comes from fallback without RAG context', () => {
+    const quality = fineTuneExampleQuality(note({ analysisStatus: 'fallback' }))
+
+    expect(quality).toMatchObject({
+      level: 'low',
+      score: 0.25
+    })
+    expect(quality.warnings).toContain('Ejemplo basado en fallback local; revisarlo antes de usarlo para ajustar Qwen.')
+    expect(quality.warnings).toContain('No incluye contexto RAG ni enlaces relacionados.')
+    expect(fineTuneQualityDetail(quality)).toContain('Calidad Baja (25%).')
   })
 })
 

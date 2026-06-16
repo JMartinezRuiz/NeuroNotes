@@ -1811,6 +1811,7 @@ button:disabled {
 .training-review-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 8px;
   padding: 10px;
   border: 1px solid var(--line);
@@ -1821,6 +1822,14 @@ button:disabled {
 .training-review-card[data-reviewed='true'] {
   border-color: rgba(31, 122, 100, 0.24);
   background: rgba(232, 247, 240, 0.58);
+}
+
+.training-review-card[data-quality='medium'] {
+  border-color: rgba(185, 111, 32, 0.22);
+}
+
+.training-review-card[data-quality='low'] {
+  border-color: rgba(180, 61, 47, 0.22);
 }
 
 .training-review-card > span {
@@ -1846,11 +1855,55 @@ button:disabled {
   font-size: 11px;
 }
 
+.training-quality {
+  width: max-content;
+  max-width: 100%;
+  padding: 3px 7px;
+  overflow: hidden;
+  border: 1px solid rgba(122, 135, 126, 0.18);
+  border-radius: 999px;
+  background: rgba(247, 245, 239, 0.72);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.training-quality[data-quality='high'] {
+  color: var(--accent-strong);
+  border-color: rgba(31, 122, 100, 0.22);
+  background: rgba(232, 247, 240, 0.78);
+}
+
+.training-quality[data-quality='medium'] {
+  color: var(--amber);
+  border-color: rgba(185, 111, 32, 0.2);
+  background: rgba(255, 247, 229, 0.78);
+}
+
+.training-quality[data-quality='low'] {
+  color: var(--danger);
+  border-color: rgba(180, 61, 47, 0.2);
+  background: rgba(255, 237, 232, 0.78);
+}
+
+.training-review-card .training-warning {
+  overflow: visible;
+  color: var(--danger);
+  line-height: 1.35;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .training-review-card button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  align-self: start;
   min-width: 82px;
   min-height: 30px;
   padding: 0 9px;

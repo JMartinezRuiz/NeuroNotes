@@ -72,8 +72,8 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - MCP connection config is available from the app settings panel, including separate host-ready JSON for read-only access and opt-in note capture.
 - Fine-tuning dataset JSONL export from user-reviewed analyzed notes, for future local Qwen tuning experiments without sending data outside the machine.
 - Fine-tuning examples mirror the runtime Qwen contract, including allowed categories, no-reasoning JSON output, note metadata, reference date, and stored RAG context.
-- Fine-tuning exports and MCP readiness include per-example quality signals, warning when an approved example comes from local fallback or lacks stored RAG context.
-- Fine-tuning readiness summary in settings, showing reviewed JSONL examples and analyzed notes still awaiting approval.
+- Fine-tuning review, exports, and MCP readiness include per-example quality signals, warning when an example comes from local fallback or lacks stored RAG context.
+- Fine-tuning readiness summary in settings, showing reviewed JSONL examples, high-quality examples, and analyzed notes still awaiting approval.
 - Reciprocal note graph synchronization, including review invalidation when automatic relationships change.
 - Manual link and unlink controls.
 - Incoming backlinks are visible in the note inspector, so notes that are referenced by other notes do not appear isolated.

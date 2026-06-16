@@ -2,6 +2,20 @@ import { NoteRecord } from './types'
 
 export type FineTuneReadinessStatus = 'empty' | 'needs-review' | 'ready'
 export type FineTuneReviewFilter = 'all' | 'pending-review' | 'reviewed'
+export type FineTuneQualityLevel = 'high' | 'medium' | 'low'
+
+export interface FineTuneExampleQuality {
+  level: FineTuneQualityLevel
+  score: number
+  reasons: string[]
+  warnings: string[]
+}
+
+export interface FineTuneQualityCounts {
+  high: number
+  medium: number
+  low: number
+}
 
 export interface FineTuneReadinessSummary {
   reviewedExamples: number
@@ -9,6 +23,7 @@ export interface FineTuneReadinessSummary {
   reviewableNotes: number
   reviewedQwenExamples: number
   reviewedLocalExamples: number
+  qualityCounts: FineTuneQualityCounts
   status: FineTuneReadinessStatus
   message: string
 }
@@ -92,9 +107,85 @@ export function summarizeFineTuneReadiness(notes: NoteRecord[]): FineTuneReadine
     reviewableNotes: reviewableNotes.length,
     reviewedQwenExamples: reviewedNotes.filter((note) => note.analysisStatus === 'qwen').length,
     reviewedLocalExamples: reviewedNotes.filter((note) => note.analysisStatus === 'fallback').length,
+    qualityCounts: fineTuneQualityCounts(reviewedNotes),
     status,
     message: fineTuneMessage(status, reviewedExamples, pendingReviewNotes)
   }
+}
+
+export function fineTuneExampleQuality(note: NoteRecord): FineTuneExampleQuality {
+  const reasons: string[] = []
+  const warnings: string[] = []
+  let score = 0
+
+  if (note.analysisStatus === 'qwen' && note.analysisRun?.provider === 'qwen') {
+    score += 0.35
+    reasons.push('Analisis generado por Qwen.')
+  } else {
+    warnings.push('Ejemplo basado en fallback local; revisarlo antes de usarlo para ajustar Qwen.')
+  }
+
+  if (note.analysisRun?.ragContext?.length) {
+    score += 0.25
+    reasons.push('Incluye contexto RAG auditado.')
+  } else if (note.related.length > 0) {
+    score += 0.12
+    warnings.push('Usa enlaces relacionados como contexto; no hay RAG auditado guardado.')
+  } else {
+    warnings.push('No incluye contexto RAG ni enlaces relacionados.')
+  }
+
+  if (note.summary.trim()) {
+    score += 0.15
+    reasons.push('Incluye resumen revisable.')
+  } else {
+    warnings.push('No incluye resumen.')
+  }
+
+  if (note.tags.length > 0) {
+    score += 0.1
+    reasons.push('Incluye etiquetas.')
+  } else {
+    warnings.push('No incluye etiquetas.')
+  }
+
+  if (note.related.length > 0) {
+    score += 0.1
+    reasons.push('Incluye enlaces a notas relacionadas.')
+  }
+
+  if (note.suggestedActions.length > 0) {
+    score += 0.05
+    reasons.push('Incluye acciones sugeridas.')
+  }
+
+  const roundedScore = Math.min(1, Number(score.toFixed(2)))
+
+  return {
+    level: roundedScore >= 0.75 ? 'high' : roundedScore >= 0.5 ? 'medium' : 'low',
+    score: roundedScore,
+    reasons,
+    warnings
+  }
+}
+
+export function fineTuneQualityLabel(level: FineTuneQualityLevel): string {
+  if (level === 'high') {
+    return 'Alta'
+  }
+
+  if (level === 'medium') {
+    return 'Media'
+  }
+
+  return 'Baja'
+}
+
+export function fineTuneQualityDetail(quality: FineTuneExampleQuality): string {
+  const reasons = quality.reasons.length ? `Senales: ${quality.reasons.join(' ')}` : 'Sin senales de calidad.'
+  const warnings = quality.warnings.length ? `Advertencias: ${quality.warnings.join(' ')}` : 'Sin advertencias.'
+
+  return `Calidad ${fineTuneQualityLabel(quality.level)} (${Math.round(quality.score * 100)}%). ${reasons} ${warnings}`
 }
 
 function fineTuneStatus(reviewedExamples: number, pendingReviewNotes: number): FineTuneReadinessStatus {
@@ -135,4 +226,14 @@ export function formatFineTuneExampleCount(count: number): string {
 
 function formatNoteCount(count: number): string {
   return count === 1 ? '1 nota' : `${count} notas`
+}
+
+function fineTuneQualityCounts(notes: NoteRecord[]): FineTuneQualityCounts {
+  return notes.reduce(
+    (counts, note) => {
+      counts[fineTuneExampleQuality(note).level] += 1
+      return counts
+    },
+    { high: 0, medium: 0, low: 0 } satisfies FineTuneQualityCounts
+  )
 }

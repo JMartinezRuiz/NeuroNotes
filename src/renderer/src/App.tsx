@@ -50,6 +50,9 @@ import {
 import { aiSetupSteps } from './aiSetupReadiness'
 import {
   FineTuneReviewFilter,
+  fineTuneExampleQuality,
+  fineTuneQualityDetail,
+  fineTuneQualityLabel,
   formatFineTuneExampleCount,
   isFineTuneReviewable,
   noteMatchesFineTuneReviewFilter,
@@ -281,6 +284,8 @@ export default function App(): JSX.Element {
     : null
   const fineTuneReviewable = selectedNote ? isFineTuneReviewable(selectedNote) : false
   const fineTuneReadiness = useMemo(() => summarizeFineTuneReadiness(notes), [notes])
+  const selectedFineTuneQuality =
+    selectedNote && (fineTuneReviewable || selectedNote.trainingReviewedAt) ? fineTuneExampleQuality(selectedNote) : null
   const fineTuneReviewBusy = selectedNote ? busy === `trainingReview:${selectedNote.id}` : false
   const selectedActionItems = useMemo(
     () => (selectedNote ? actions.filter((action) => action.noteId === selectedNote.id) : []),
@@ -1781,7 +1786,7 @@ export default function App(): JSX.Element {
                 <div
                   className="dataset-readiness"
                   data-status={fineTuneReadiness.status}
-                  title={`Dataset fine-tuning: ${fineTuneReadiness.reviewedQwenExamples} Qwen, ${fineTuneReadiness.reviewedLocalExamples} local.`}
+                  title={`Dataset fine-tuning: ${fineTuneReadiness.reviewedQwenExamples} Qwen, ${fineTuneReadiness.reviewedLocalExamples} local, calidad alta ${fineTuneReadiness.qualityCounts.high}, media ${fineTuneReadiness.qualityCounts.medium}, baja ${fineTuneReadiness.qualityCounts.low}.`}
                 >
                   <span>
                     <strong>{fineTuneReadiness.reviewedExamples}</strong>
@@ -1790,6 +1795,10 @@ export default function App(): JSX.Element {
                   <span>
                     <strong>{fineTuneReadiness.pendingReviewNotes}</strong>
                     por aprobar
+                  </span>
+                  <span>
+                    <strong>{fineTuneReadiness.qualityCounts.high}</strong>
+                    alta calidad
                   </span>
                 </div>
               </div>
@@ -2281,7 +2290,11 @@ export default function App(): JSX.Element {
                   <h3>Fine-tuning</h3>
                   <span>{selectedNote.trainingReviewedAt ? 'OK' : '0'}</span>
                 </div>
-                <div className="training-review-card" data-reviewed={selectedNote.trainingReviewedAt ? 'true' : 'false'}>
+                <div
+                  className="training-review-card"
+                  data-reviewed={selectedNote.trainingReviewedAt ? 'true' : 'false'}
+                  data-quality={selectedFineTuneQuality?.level ?? 'none'}
+                >
                   <span>
                     <strong>
                       {selectedNote.trainingReviewedAt
@@ -2295,8 +2308,27 @@ export default function App(): JSX.Element {
                         ? formatDate(selectedNote.trainingReviewedAt)
                         : selectedNote.analysisStatus === 'idle'
                           ? 'Sin ejemplo'
-                          : 'Dataset Qwen'}
+                          : selectedNote.analysisStatus === 'fallback'
+                            ? 'Dataset local'
+                            : selectedNote.analysisStatus === 'qwen'
+                              ? 'Dataset Qwen'
+                              : 'Sin ejemplo'}
                     </small>
+                    {selectedFineTuneQuality ? (
+                      <code
+                        className="training-quality"
+                        data-quality={selectedFineTuneQuality.level}
+                        title={fineTuneQualityDetail(selectedFineTuneQuality)}
+                      >
+                        {fineTuneQualityLabel(selectedFineTuneQuality.level)}{' '}
+                        {Math.round(selectedFineTuneQuality.score * 100)}%
+                      </code>
+                    ) : null}
+                    {selectedFineTuneQuality?.warnings[0] ? (
+                      <small className="training-warning" title={fineTuneQualityDetail(selectedFineTuneQuality)}>
+                        {selectedFineTuneQuality.warnings[0]}
+                      </small>
+                    ) : null}
                   </span>
                   <button
                     type="button"
