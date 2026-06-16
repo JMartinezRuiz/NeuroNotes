@@ -5,13 +5,15 @@ import { ActionItem, ActionItemStatus, AiDiagnosticsResult, AiHealth, AppSetting
 
 type Api = NeuronotesApi
 
-const settings: AppSettings = {
+const createPreviewSettings = (): AppSettings => ({
   model: 'qwen3.5:0.8b',
   ollamaUrl: 'http://127.0.0.1:11434',
   autoAnalyze: true,
   ragMaxNotes: 5,
   ragExcerptLength: 550
-}
+})
+
+let settings: AppSettings = createPreviewSettings()
 
 let aiDiagnostics: AiDiagnosticsResult | null = null
 
@@ -27,7 +29,7 @@ const PREVIEW_DRAFT_CATEGORY_SIGNALS: Array<{ category: string; pattern: RegExp 
   { category: 'Personal', pattern: /\b(personal|vida|hogar|home|familia)\b/ }
 ]
 
-let notes: NoteRecord[] = [
+const createPreviewNotes = (): NoteRecord[] => [
   {
     id: 'preview-roadmap',
     title: 'Roadmap Neuronotes',
@@ -125,7 +127,7 @@ let notes: NoteRecord[] = [
   }
 ]
 
-let actions: ActionItem[] = [
+const createPreviewActions = (): ActionItem[] => [
   {
     id: 'preview-action-roadmap',
     noteId: 'preview-roadmap',
@@ -141,6 +143,16 @@ let actions: ActionItem[] = [
     updatedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString()
   }
 ]
+
+let notes: NoteRecord[] = createPreviewNotes()
+let actions: ActionItem[] = createPreviewActions()
+
+const resetPreviewState = (): void => {
+  settings = createPreviewSettings()
+  aiDiagnostics = null
+  notes = createPreviewNotes()
+  actions = createPreviewActions()
+}
 
 const sortNotes = (): NoteRecord[] => [...notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 const sortActions = (): ActionItem[] =>
@@ -454,6 +466,8 @@ const makeId = (): string => {
 }
 
 export function createPreviewApi(): Api {
+  resetPreviewState()
+
   return {
     listNotes: async () => sortNotes(),
     createNote: async (content: string) => {

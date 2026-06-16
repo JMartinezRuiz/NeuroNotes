@@ -2,6 +2,29 @@ import { describe, expect, it } from 'vitest'
 import { createPreviewApi } from '../previewApi'
 
 describe('createPreviewApi', () => {
+  it('starts each preview instance from a clean seeded state', async () => {
+    const first = createPreviewApi()
+    await first.createNote('Preparar tarea MCP temporal #Cliente')
+    await first.updateSettings({
+      model: 'custom-preview-model',
+      ragMaxNotes: 0
+    })
+    await first.runAiDiagnostics()
+
+    const second = createPreviewApi()
+
+    await expect(second.listNotes()).resolves.toMatchObject([
+      { id: 'preview-roadmap' },
+      { id: 'preview-ui' }
+    ])
+    await expect(second.listActions()).resolves.toMatchObject([{ id: 'preview-action-roadmap' }])
+    await expect(second.getSettings()).resolves.toMatchObject({
+      model: 'qwen3.5:0.8b',
+      ragMaxNotes: 5
+    })
+    await expect(second.getAiDiagnostics()).resolves.toBeNull()
+  })
+
   it('mirrors the missing Ollama install state used by the setup UI', async () => {
     const api = createPreviewApi()
 
