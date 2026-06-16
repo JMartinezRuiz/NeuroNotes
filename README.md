@@ -285,6 +285,18 @@ If Ollama is already installed and you only need the model:
 npm run setup:qwen:win:pull
 ```
 
+To run the setup against the same Qwen model and Ollama endpoint saved by the installed desktop app:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-qwen-win.ps1 -UserDataPath "$env:APPDATA\Neuronotes" -PullModel
+```
+
+To inspect which model and endpoint the setup script will use without installing, starting, or pulling anything:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-qwen-win.ps1 -UserDataPath "$env:APPDATA\Neuronotes" -PrintConfig
+```
+
 Manual alternative:
 
 ```powershell
