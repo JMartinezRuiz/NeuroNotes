@@ -127,6 +127,22 @@ export interface McpHandoffPayload {
         relatedNoteIds: string[]
         relatedNotes: HandoffRelatedNote[]
         ragContext: RagContextItem[]
+        requiresUserReview: boolean
+        draftCompleteness: 'ready' | 'needs-tool-selection'
+        taskTitle?: string
+        taskDetail?: string
+        eventTitle?: string
+        eventNotes?: string
+        timeText?: string
+        subject?: string
+        body?: string
+        recipientHint?: string
+        message?: string
+        callTitle?: string
+        agenda?: string
+        query?: string
+        workflowGoal?: string
+        safetyNote?: string
       }
     }
     createdAt: string
@@ -455,25 +471,108 @@ function buildKindSummary(actions: McpHandoffPayload['actions']): McpHandoffPayl
 function buildToolCallDraft(action: ActionItem, note: NoteRecord): McpHandoffPayload['actions'][number]['toolCallDraft'] {
   const ragContext = note.analysisRun?.ragContext ?? []
   const relatedNotes = handoffRelatedNotes(note)
+  const status = action.toolHint ? 'ready-for-review' : 'needs-tool-selection'
 
   return {
-    status: action.toolHint ? 'ready-for-review' : 'needs-tool-selection',
+    status,
     toolName: action.toolHint ?? null,
-    arguments: {
-      kind: action.kind,
-      title: action.title,
-      detail: action.detail,
-      confidence: action.confidence,
-      sourceNoteId: note.id,
-      sourceNoteTitle: note.title,
-      sourceNoteSummary: note.summary,
-      sourceNoteCategory: note.category,
-      sourceNoteTags: note.tags,
-      relatedNoteIds: note.related.map((related) => related.noteId),
-      relatedNotes,
-      ragContext
+    arguments: buildToolArguments(action, note, relatedNotes, ragContext, status)
+  }
+}
+
+function buildToolArguments(
+  action: ActionItem,
+  note: NoteRecord,
+  relatedNotes: HandoffRelatedNote[],
+  ragContext: RagContextItem[],
+  draftCompleteness: 'ready-for-review' | 'needs-tool-selection'
+): McpHandoffPayload['actions'][number]['toolCallDraft']['arguments'] {
+  const completeness = draftCompleteness === 'ready-for-review' ? 'ready' : 'needs-tool-selection'
+  const base: McpHandoffPayload['actions'][number]['toolCallDraft']['arguments'] = {
+    kind: action.kind,
+    title: action.title,
+    detail: action.detail,
+    confidence: action.confidence,
+    sourceNoteId: note.id,
+    sourceNoteTitle: note.title,
+    sourceNoteSummary: note.summary,
+    sourceNoteCategory: note.category,
+    sourceNoteTags: note.tags,
+    relatedNoteIds: note.related.map((related) => related.noteId),
+    relatedNotes,
+    ragContext,
+    requiresUserReview: true,
+    draftCompleteness: completeness
+  }
+
+  if (action.toolHint === 'task.create') {
+    return {
+      ...base,
+      taskTitle: action.title,
+      taskDetail: action.detail
     }
   }
+
+  if (action.toolHint === 'calendar.create_event') {
+    return {
+      ...base,
+      eventTitle: action.title,
+      eventNotes: action.detail,
+      timeText: extractTimeText(`${action.title} ${action.detail} ${note.content}`)
+    }
+  }
+
+  if (action.toolHint === 'reminder.create') {
+    return {
+      ...base,
+      taskTitle: action.title,
+      taskDetail: action.detail,
+      timeText: extractTimeText(`${action.title} ${action.detail} ${note.content}`)
+    }
+  }
+
+  if (action.toolHint === 'email.compose') {
+    return {
+      ...base,
+      subject: action.title,
+      body: action.detail,
+      recipientHint: extractRecipientHint(`${note.content} ${action.title} ${action.detail}`)
+    }
+  }
+
+  if (action.toolHint === 'message.send') {
+    return {
+      ...base,
+      message: action.detail,
+      recipientHint: extractRecipientHint(`${note.content} ${action.title} ${action.detail}`)
+    }
+  }
+
+  if (action.toolHint === 'phone.call') {
+    return {
+      ...base,
+      callTitle: action.title,
+      agenda: action.detail,
+      recipientHint: extractRecipientHint(`${note.content} ${action.title} ${action.detail}`)
+    }
+  }
+
+  if (action.toolHint === 'documents.search') {
+    return {
+      ...base,
+      query: [action.title, action.detail, note.title, note.tags.join(' ')].filter(Boolean).join(' ')
+    }
+  }
+
+  if (action.toolHint === 'mcp.workflow.prepare') {
+    return {
+      ...base,
+      workflowGoal: action.detail || action.title,
+      safetyNote: 'Borrador local: requiere aprobacion del usuario antes de ejecutar cualquier herramienta externa.'
+    }
+  }
+
+  return base
 }
 
 function handoffRelatedNotes(note: NoteRecord): HandoffRelatedNote[] {
@@ -484,6 +583,24 @@ function handoffRelatedNotes(note: NoteRecord): HandoffRelatedNote[] {
     reason: related.reason,
     provenance: linkProvenance(related.reason)
   }))
+}
+
+function extractTimeText(value: string): string {
+  const text = value.replace(/\s+/g, ' ').trim()
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const match = normalized.match(
+    /\b(hoy|manana|pasado manana|esta semana|proxima semana|deadline|vencimiento|fecha|cita|reunion|meeting|agenda|agendar)\b(?:[^.!\n]{0,80})?/i
+  )
+
+  return match?.[0]?.trim() ?? ''
+}
+
+function extractRecipientHint(value: string): string {
+  const text = value.replace(/\s+/g, ' ').trim()
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const match = normalized.match(/\b(?:a|para|con|al|a la|a el)\s+([A-Za-z0-9][^.,;:\n]{1,60})/i)
+
+  return match?.[1]?.trim() ?? ''
 }
 
 function isFineTuneCandidate(note: NoteRecord): boolean {

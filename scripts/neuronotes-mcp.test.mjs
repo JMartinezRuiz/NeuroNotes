@@ -969,6 +969,10 @@ describe('neuronotes MCP server', () => {
             toolName: 'reminder.create',
             arguments: expect.objectContaining({
               sourceNoteId: 'note-health',
+              taskTitle: 'Crear recordatorio',
+              timeText: expect.stringContaining('manana'),
+              requiresUserReview: true,
+              draftCompleteness: 'ready',
               relatedNoteIds: ['note-project'],
               relatedNotes: [
                 {

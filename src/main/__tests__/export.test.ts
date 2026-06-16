@@ -318,6 +318,84 @@ describe('buildMcpHandoffPayload', () => {
     expect(payload.actions[0].sourceNote.contentExcerpt).toContain('Crear una app de notas con Qwen local.')
   })
 
+  it('adds tool-specific draft arguments for MCP handoff review', () => {
+    const now = '2026-06-15T00:00:00.000Z'
+    const sourceNote = {
+      ...note(),
+      id: 'note-actions',
+      title: 'Seguimiento cliente',
+      content: 'Agendar reunion con Cliente manana y enviar correo con resumen del roadmap.',
+      summary: 'Seguimiento con cliente sobre roadmap.',
+      tags: ['cliente', 'roadmap']
+    }
+    const database: DatabaseFile = {
+      version: 1,
+      notes: [sourceNote],
+      settings: { ...DEFAULT_SETTINGS },
+      actions: [
+        {
+          id: 'calendar-action',
+          noteId: sourceNote.id,
+          noteTitle: sourceNote.title,
+          kind: 'reminder',
+          title: 'Crear evento de calendario',
+          detail: 'Agendar reunion con cliente manana.',
+          toolHint: 'calendar.create_event',
+          mcpApprovedAt: now,
+          confidence: 0.72,
+          status: 'open',
+          createdAt: now,
+          updatedAt: now
+        },
+        {
+          id: 'email-action',
+          noteId: sourceNote.id,
+          noteTitle: sourceNote.title,
+          kind: 'task',
+          title: 'Preparar correo',
+          detail: 'Enviar correo con resumen del roadmap.',
+          toolHint: 'email.compose',
+          mcpApprovedAt: now,
+          confidence: 0.72,
+          status: 'open',
+          createdAt: now,
+          updatedAt: now
+        }
+      ]
+    }
+
+    const payload = buildMcpHandoffPayload(database, now)
+
+    expect(payload.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'calendar-action',
+          toolCallDraft: expect.objectContaining({
+            toolName: 'calendar.create_event',
+            arguments: expect.objectContaining({
+              eventTitle: 'Crear evento de calendario',
+              eventNotes: 'Agendar reunion con cliente manana.',
+              timeText: expect.stringContaining('manana'),
+              requiresUserReview: true,
+              draftCompleteness: 'ready'
+            })
+          })
+        }),
+        expect.objectContaining({
+          id: 'email-action',
+          toolCallDraft: expect.objectContaining({
+            toolName: 'email.compose',
+            arguments: expect.objectContaining({
+              subject: 'Preparar correo',
+              body: 'Enviar correo con resumen del roadmap.',
+              recipientHint: expect.stringContaining('Cliente')
+            })
+          })
+        })
+      ])
+    )
+  })
+
   it('serializes the MCP handoff as formatted JSON', () => {
     const now = '2026-06-15T00:00:00.000Z'
     const database: DatabaseFile = {

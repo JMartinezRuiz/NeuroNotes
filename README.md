@@ -79,6 +79,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Saved actions can have their MCP `toolHint` filled or corrected before approval, and changing it clears stale approval.
 - Plan view now shows and filters MCP handoff readiness per action, separating ready tool-call drafts, items that still need approval, items missing a tool hint, and completed actions.
 - MCP handoff JSON export for open local actions, including tool summaries, action-kind summaries, tool hints, source-note context, structured related-note provenance, and stored RAG snippets without executing external tools.
+- MCP handoff tool-call drafts include review-only arguments tailored to common tool hints such as `task.create`, `calendar.create_event`, `email.compose`, `message.send`, `phone.call`, `documents.search`, and `mcp.workflow.prepare`.
 - Read-only MCP stdio server for local hosts that need to search notes, read note context, inspect analysis queues, list open action intents, build MCP handoff packages, and inspect library/fine-tuning readiness.
 - Opt-in MCP write mode for trusted local hosts that need to capture new notes or local action intents into Neuronotes without executing external tools.
 - MCP-captured notes use the same local draft seeding as quick capture: clean title, draft summary, tags, category, suggested action intents, and initial related-note/backlink suggestions before later Qwen analysis.
