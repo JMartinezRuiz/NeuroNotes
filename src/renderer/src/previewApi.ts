@@ -213,6 +213,10 @@ const clampNumber = (value: unknown, min: number, max: number): number =>
   Number.isFinite(value) ? Math.max(min, Math.min(max, Math.round(Number(value)))) : min
 const isManualRelatedLink = (related: NoteRecord['related'][number]): boolean =>
   related.reason === MANUAL_LINK_REASON || related.reason === MANUAL_RECIPROCAL_REASON
+const isInitialPreviewLink = (related: NoteRecord['related'][number]): boolean =>
+  related.reason.startsWith('Relacion local inicial') || related.reason.startsWith('Enlace reciproco: Relacion local inicial')
+const isPreservedPreviewLink = (related: NoteRecord['related'][number]): boolean =>
+  isManualRelatedLink(related) || isInitialPreviewLink(related)
 const normalizePreviewText = (value: string): string =>
   value
     .trim()
@@ -385,13 +389,13 @@ const preservePreviewManualLinksAfterAnalysis = (
 ): NoteRecord['related'] => {
   const linksById = new Map<string, NoteRecord['related'][number]>()
 
-  for (const link of note.related.filter(isManualRelatedLink)) {
+  for (const link of note.related.filter(isPreservedPreviewLink)) {
     linksById.set(link.noteId, link)
   }
 
   for (const link of analysisLinks) {
     const existing = linksById.get(link.noteId)
-    if (existing) {
+    if (existing && isManualRelatedLink(existing)) {
       linksById.set(link.noteId, {
         ...existing,
         title: link.title || existing.title,

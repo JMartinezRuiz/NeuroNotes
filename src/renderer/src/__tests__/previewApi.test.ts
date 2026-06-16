@@ -133,6 +133,26 @@ describe('createPreviewApi', () => {
     ])
   })
 
+  it('preserves preview initial related links when analysis does not return them', async () => {
+    const api = createPreviewApi()
+    const created = await api.createNote('Roadmap producto notas automaticas con #roadmap y resumen local')
+
+    expect(created.related[0]?.reason).toContain('Relacion local inicial')
+
+    await api.createNote('Senal distinta uno para ocupar el analisis simulado')
+    await api.createNote('Senal distinta dos para ocupar el analisis simulado')
+    await api.createNote('Senal distinta tres para ocupar el analisis simulado')
+
+    const analyzed = await api.analyzeNote(created.id, 'qwen')
+
+    expect(analyzed.related).toContainEqual(
+      expect.objectContaining({
+        noteId: 'preview-roadmap',
+        reason: expect.stringContaining('Relacion local inicial')
+      })
+    )
+  })
+
   it('marks reviewed notes for fine-tuning export', async () => {
     const api = createPreviewApi()
     const analyzed = await api.analyzeNote('preview-roadmap', 'qwen')

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   canApplyAnalysisResult,
   hasContentChanged,
+  isInitialRelatedLink,
   isManualRelatedLink,
   preserveManualLinksAfterAnalysis,
   removeDeletedNoteReferences,
@@ -43,6 +44,12 @@ function note(overrides: Partial<NoteRecord> = {}): NoteRecord {
         title: 'Backlink automatico',
         score: 0.6,
         reason: 'Enlace reciproco: Comparte vocabulario relevante.'
+      },
+      {
+        noteId: 'initial',
+        title: 'Enlace inicial',
+        score: 0.55,
+        reason: 'Relacion local inicial por contenido cercano.'
       }
     ],
     suggestedActions: [
@@ -93,6 +100,28 @@ describe('isManualRelatedLink', () => {
     expect(isManualRelatedLink({ noteId: 'a', title: 'A', score: 1, reason: 'Enlace manual.' })).toBe(true)
     expect(isManualRelatedLink({ noteId: 'a', title: 'A', score: 1, reason: 'Enlace reciproco: Enlace manual.' })).toBe(true)
     expect(isManualRelatedLink({ noteId: 'a', title: 'A', score: 1, reason: 'Enlace reciproco: Comparte vocabulario.' })).toBe(false)
+  })
+})
+
+describe('isInitialRelatedLink', () => {
+  it('recognizes direct and reciprocal local initial links', () => {
+    expect(
+      isInitialRelatedLink({
+        noteId: 'a',
+        title: 'A',
+        score: 1,
+        reason: 'Relacion local inicial por etiquetas y contenido.'
+      })
+    ).toBe(true)
+    expect(
+      isInitialRelatedLink({
+        noteId: 'a',
+        title: 'A',
+        score: 1,
+        reason: 'Enlace reciproco: Relacion local inicial por contenido cercano.'
+      })
+    ).toBe(true)
+    expect(isInitialRelatedLink({ noteId: 'a', title: 'A', score: 1, reason: 'Relacion detectada por Qwen.' })).toBe(false)
   })
 })
 
@@ -150,6 +179,12 @@ describe('preserveManualLinksAfterAnalysis', () => {
         reason: 'Enlace reciproco: Enlace manual.'
       },
       {
+        noteId: 'initial',
+        title: 'Enlace inicial',
+        score: 0.55,
+        reason: 'Relacion local inicial por contenido cercano.'
+      },
+      {
         noteId: 'automatic',
         title: 'Enlace automatico nuevo',
         score: 0.94,
@@ -160,6 +195,40 @@ describe('preserveManualLinksAfterAnalysis', () => {
         title: 'Nueva sugerencia',
         score: 0.7,
         reason: 'Nueva relacion detectada por RAG.'
+      }
+    ])
+  })
+
+  it('lets fresh analysis replace the reason for an initial local link', () => {
+    const source = note()
+
+    const links = preserveManualLinksAfterAnalysis(source, [
+      {
+        noteId: 'initial',
+        title: 'Enlace inicial analizado',
+        score: 0.9,
+        reason: 'Qwen confirmo la relacion inicial.'
+      }
+    ])
+
+    expect(links).toEqual([
+      {
+        noteId: 'manual',
+        title: 'Enlace manual',
+        score: 0.72,
+        reason: 'Enlace manual.'
+      },
+      {
+        noteId: 'manual-backlink',
+        title: 'Backlink manual',
+        score: 0.65,
+        reason: 'Enlace reciproco: Enlace manual.'
+      },
+      {
+        noteId: 'initial',
+        title: 'Enlace inicial analizado',
+        score: 0.9,
+        reason: 'Qwen confirmo la relacion inicial.'
       }
     ])
   })
