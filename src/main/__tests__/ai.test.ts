@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { analyzeNote, checkOllama, classifyOllamaConnectionFailure, resolveOllamaHostEnv, runAiDiagnostics } from '../ai'
-import { AppSettings, NoteRecord } from '../types'
+import {
+  analyzeNote,
+  checkOllama,
+  classifyOllamaConnectionFailure,
+  prepareQwenRuntime,
+  resolveOllamaHostEnv,
+  runAiDiagnostics
+} from '../ai'
+import { AiHealth, AppSettings, NoteRecord } from '../types'
 
 const settings: AppSettings = {
   model: 'qwen3.5:0.8b',
@@ -146,6 +153,114 @@ describe('resolveOllamaHostEnv', () => {
 
   it('ignores invalid Ollama URLs', () => {
     expect(resolveOllamaHostEnv('not a url')).toEqual({})
+  })
+})
+
+describe('prepareQwenRuntime', () => {
+  const health = (overrides: Partial<AiHealth>): AiHealth => ({
+    ok: false,
+    status: 'ollama-missing',
+    message: 'Ollama no disponible',
+    model: settings.model,
+    ollamaUrl: settings.ollamaUrl,
+    ollamaAvailable: false,
+    modelInstalled: false,
+    installedModels: [],
+    ...overrides
+  })
+
+  it('reports a missing Ollama installation without trying to pull the model', async () => {
+    const pullModel = vi.fn()
+
+    await expect(
+      prepareQwenRuntime(settings, {
+        startRuntime: async () => ({
+          ok: false,
+          started: false,
+          reason: 'not-installed',
+          message: 'Ollama no esta instalado'
+        }),
+        checkHealth: async () => health({ status: 'ollama-not-installed', message: 'Ollama no esta instalado' }),
+        pullModel
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      stage: 'ollama-not-installed',
+      started: false,
+      pulled: false,
+      message: 'Ollama no esta instalado. Instala Ollama y vuelve a preparar Qwen.'
+    })
+    expect(pullModel).not.toHaveBeenCalled()
+  })
+
+  it('starts Ollama and pulls Qwen when the runtime is available but the model is missing', async () => {
+    const pullModel = vi.fn().mockResolvedValue({
+      ok: true,
+      message: `${settings.model} instalado`,
+      model: settings.model
+    })
+    const checkHealth = vi.fn().mockResolvedValue(
+      health({
+        ok: true,
+        status: 'ready',
+        message: `${settings.model} listo`,
+        ollamaAvailable: true,
+        modelInstalled: true,
+        installedModels: [settings.model]
+      })
+    )
+
+    await expect(
+      prepareQwenRuntime(settings, {
+        startRuntime: async () => ({
+          ok: true,
+          started: true,
+          message: 'Ollama activo. Falta qwen3.5:0.8b',
+          health: health({
+            status: 'model-missing',
+            message: `Falta ${settings.model}`,
+            ollamaAvailable: true
+          })
+        }),
+        pullModel,
+        checkHealth
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      stage: 'ready',
+      started: true,
+      pulled: true,
+      message: `Ollama iniciado y ${settings.model} instalado. Pulsa Probar para validar JSON/RAG.`
+    })
+    expect(pullModel).toHaveBeenCalledOnce()
+    expect(checkHealth).toHaveBeenCalledOnce()
+  })
+
+  it('keeps model download errors actionable', async () => {
+    await expect(
+      prepareQwenRuntime(settings, {
+        startRuntime: async () => ({
+          ok: true,
+          started: false,
+          message: 'Ollama activo. Falta qwen3.5:0.8b',
+          health: health({
+            status: 'model-missing',
+            message: `Falta ${settings.model}`,
+            ollamaAvailable: true
+          })
+        }),
+        pullModel: async () => {
+          throw new Error('pull failed')
+        }
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      stage: 'error',
+      started: false,
+      pulled: false,
+      message: 'pull failed',
+      error: 'pull failed'
+    })
   })
 })
 

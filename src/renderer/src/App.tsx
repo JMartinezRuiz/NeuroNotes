@@ -807,60 +807,39 @@ export default function App(): JSX.Element {
 
   async function prepareAiRuntime(): Promise<void> {
     setDiagnosticsMessage('')
-
-    if (!health.ollamaAvailable) {
-      setBusy('startOllama')
-      setHealth((current) => ({
-        ...current,
-        message: 'Iniciando Ollama...'
-      }))
-
-      try {
-        const result = await api.startAiRuntime()
-
-        if (result.health) {
-          setHealth(result.health)
-        } else {
-          setHealth((current) => ({
-            ...current,
-            ok: false,
-            status: result.reason === 'not-installed' ? 'ollama-not-installed' : 'ollama-missing',
-            message: result.message
-          }))
-        }
-
-        if (!result.ok && result.reason === 'not-installed') {
-          await api.openOllamaDownload()
-        }
-      } catch (error) {
-        setHealth((current) => ({
-          ...current,
-          ok: false,
-          status: 'error',
-          message: error instanceof Error ? error.message : 'No se pudo iniciar Ollama'
-        }))
-      } finally {
-        setBusy(null)
-      }
-      return
-    }
-
-    setBusy('pull')
+    setSetupCommandMessage('')
+    setBusy('prepareAi')
     setHealth((current) => ({
       ...current,
-      message: `Descargando ${settings.model}...`
+      message: 'Preparando Qwen local...'
     }))
 
     try {
-      await api.pullModel()
-      await refreshHealth()
+      const result = await api.prepareAiRuntime()
+
+      if (result.health) {
+        setHealth(result.health)
+      } else {
+        setHealth((current) => ({
+          ...current,
+          ok: false,
+          status: result.stage,
+          message: result.message
+        }))
+      }
+
+      setDiagnosticsMessage(result.message)
+      if (!result.ok && result.stage === 'ollama-not-installed') {
+        await api.openOllamaDownload()
+      }
     } catch (error) {
       setHealth((current) => ({
         ...current,
         ok: false,
         status: 'error',
-        message: error instanceof Error ? error.message : 'No se pudo descargar el modelo'
+        message: error instanceof Error ? error.message : 'No se pudo preparar Qwen'
       }))
+      setDiagnosticsMessage(error instanceof Error ? error.message : 'No se pudo preparar Qwen')
     } finally {
       setBusy(null)
     }
@@ -1818,10 +1797,10 @@ export default function App(): JSX.Element {
                 <button
                   type="button"
                   onClick={prepareAiRuntime}
-                  disabled={busy === 'pull' || busy === 'startOllama' || health.status === 'ready'}
+                  disabled={busy === 'prepareAi' || health.status === 'ready'}
                   title={aiActionLabel(health)}
                 >
-                  {busy === 'pull' || busy === 'startOllama' ? (
+                  {busy === 'prepareAi' ? (
                     <Loader2 className="spin" size={16} />
                   ) : health.status === 'ollama-missing' ? (
                     <RefreshCw size={16} />

@@ -40,6 +40,17 @@ describe('createPreviewApi', () => {
       reason: 'not-installed',
       message: 'Ollama no esta instalado'
     })
+
+    await expect(api.prepareAiRuntime()).resolves.toMatchObject({
+      ok: false,
+      stage: 'ollama-not-installed',
+      started: false,
+      pulled: false,
+      message: 'Ollama no esta instalado. Instala Ollama y vuelve a preparar Qwen.',
+      health: {
+        status: 'ollama-not-installed'
+      }
+    })
   })
 
   it('copies the same complete Qwen setup flow shown by the desktop app', async () => {

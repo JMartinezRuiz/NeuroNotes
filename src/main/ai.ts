@@ -5,6 +5,7 @@ import path from 'node:path'
 import {
   AiHealth,
   AiDiagnosticsResult,
+  AiRuntimePrepareResult,
   AiRuntimeStartResult,
   AnalysisMode,
   AnalysisProvider,
@@ -63,6 +64,12 @@ interface AiPayload {
 
 interface CheckOllamaOptions {
   findExecutable?: () => Promise<string | undefined>
+}
+
+interface PrepareQwenRuntimeOptions {
+  startRuntime?: (settings: AppSettings) => Promise<AiRuntimeStartResult>
+  pullModel?: (settings: AppSettings) => Promise<PullModelResult>
+  checkHealth?: (settings: AppSettings) => Promise<AiHealth>
 }
 
 export async function checkOllama(settings: AppSettings, options: CheckOllamaOptions = {}): Promise<AiHealth> {
@@ -221,6 +228,66 @@ export async function startOllamaRuntime(settings: AppSettings): Promise<AiRunti
   }
 }
 
+export async function prepareQwenRuntime(
+  settings: AppSettings,
+  options: PrepareQwenRuntimeOptions = {}
+): Promise<AiRuntimePrepareResult> {
+  const startRuntime = options.startRuntime ?? startOllamaRuntime
+  const pullModel = options.pullModel ?? pullQwenModel
+  const checkHealth = options.checkHealth ?? checkOllama
+  let started = false
+  let pulled = false
+
+  const startResult = await startRuntime(settings)
+  started = startResult.started
+  let health = startResult.health
+
+  if (!health) {
+    health = await checkHealth(settings)
+  }
+
+  if (!health.ollamaAvailable) {
+    return {
+      ok: false,
+      stage: health.status,
+      started,
+      pulled,
+      health,
+      message:
+        health.status === 'ollama-not-installed'
+          ? 'Ollama no esta instalado. Instala Ollama y vuelve a preparar Qwen.'
+          : health.message
+    }
+  }
+
+  if (!health.modelInstalled) {
+    try {
+      await pullModel(settings)
+      pulled = true
+      health = await checkHealth(settings)
+    } catch (error) {
+      return {
+        ok: false,
+        stage: 'error',
+        started,
+        pulled,
+        health,
+        message: error instanceof Error ? error.message : `No se pudo descargar ${settings.model}`,
+        error: error instanceof Error ? error.message : 'No se pudo descargar el modelo'
+      }
+    }
+  }
+
+  return {
+    ok: health.ok,
+    stage: health.status,
+    started,
+    pulled,
+    health,
+    message: qwenPrepareMessage(settings.model, health, { started, pulled })
+  }
+}
+
 export async function runAiDiagnostics(settings: AppSettings): Promise<AiDiagnosticsResult> {
   const startedAt = Date.now()
   const createdAt = new Date().toISOString()
@@ -315,6 +382,30 @@ export async function analyzeNote(
       analysisRun: createAnalysisRun('local', settings, startedAt, ragContext.items)
     }
   }
+}
+
+function qwenPrepareMessage(
+  model: string,
+  health: AiHealth,
+  activity: Pick<AiRuntimePrepareResult, 'started' | 'pulled'>
+): string {
+  if (!health.ok) {
+    return health.message
+  }
+
+  if (activity.started && activity.pulled) {
+    return `Ollama iniciado y ${model} instalado. Pulsa Probar para validar JSON/RAG.`
+  }
+
+  if (activity.pulled) {
+    return `${model} instalado. Pulsa Probar para validar JSON/RAG.`
+  }
+
+  if (activity.started) {
+    return `Ollama iniciado. ${model} listo. Pulsa Probar para validar JSON/RAG.`
+  }
+
+  return `${model} listo. Pulsa Probar para validar JSON/RAG.`
 }
 
 export function classifyOllamaConnectionFailure(

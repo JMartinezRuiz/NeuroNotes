@@ -6,6 +6,7 @@ import {
   ActionItemStatus,
   AiDiagnosticsResult,
   AiHealth,
+  AiRuntimePrepareResult,
   AppSettings,
   NoteRecord,
   RagPreviewResult
@@ -695,6 +696,15 @@ const previewHealth = (): AiHealth => ({
   installedModels: []
 })
 
+const previewPrepareRuntime = (): AiRuntimePrepareResult => ({
+  ok: false,
+  stage: 'ollama-not-installed',
+  started: false,
+  pulled: false,
+  message: 'Ollama no esta instalado. Instala Ollama y vuelve a preparar Qwen.',
+  health: previewHealth()
+})
+
 const makeId = (): string => {
   if (globalThis.crypto?.randomUUID) {
     return globalThis.crypto.randomUUID()
@@ -1157,6 +1167,7 @@ export function createPreviewApi(): Api {
       reason: 'not-installed',
       message: 'Ollama no esta instalado'
     }),
+    prepareAiRuntime: async () => previewPrepareRuntime(),
     runAiDiagnostics: async () => {
       aiDiagnostics = {
         ok: false,

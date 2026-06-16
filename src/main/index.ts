@@ -3,7 +3,7 @@ import type { MenuItemConstructorOptions, MessageBoxOptions } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { analyzeNote, checkOllama, pullQwenModel, runAiDiagnostics, startOllamaRuntime } from './ai'
+import { analyzeNote, checkOllama, prepareQwenRuntime, pullQwenModel, runAiDiagnostics, startOllamaRuntime } from './ai'
 import {
   createActionItemFromSuggestion,
   deleteActionItem,
@@ -802,6 +802,11 @@ function registerIpcHandlers(): void {
   ipcMain.handle('ai:startRuntime', async () => {
     const database = await readDatabase()
     return startOllamaRuntime(database.settings)
+  })
+
+  ipcMain.handle('ai:prepareRuntime', async () => {
+    const database = await readDatabase()
+    return prepareQwenRuntime(database.settings)
   })
 
   ipcMain.handle('ai:diagnostics', async () => {

@@ -109,6 +109,16 @@ export interface AiRuntimeStartResult {
   health?: AiHealth
 }
 
+export interface AiRuntimePrepareResult {
+  ok: boolean
+  stage: AiHealthStatus
+  started: boolean
+  pulled: boolean
+  message: string
+  health?: AiHealth
+  error?: string
+}
+
 export interface AiDiagnosticsResult {
   ok: boolean
   status: AnalysisStatus
