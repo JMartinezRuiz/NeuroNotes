@@ -156,6 +156,26 @@ describe('createPreviewApi', () => {
     ])
   })
 
+  it('previews RAG context without running analysis', async () => {
+    const api = createPreviewApi()
+    const created = await api.createNote('Roadmap producto notas automaticas con #roadmap y resumen local')
+
+    const preview = await api.previewRagContext(created.id)
+    const stored = await api.listNotes()
+
+    expect(preview).toMatchObject({
+      schema: 'neuronotes.rag-preview.v1',
+      noteId: created.id,
+      model: 'qwen3.5:0.8b'
+    })
+    expect(preview.noteIds).toContain('preview-roadmap')
+    expect(preview.items[0]).toMatchObject({
+      noteId: 'preview-roadmap',
+      title: 'Roadmap Neuronotes'
+    })
+    expect(stored.find((note) => note.id === created.id)?.analysisRun).toBeUndefined()
+  })
+
   it('seeds preview related links from explicit wiki and mention references', async () => {
     const api = createPreviewApi()
     const created = await api.createNote('Cruzar [[Roadmap Neuronotes]] con @preview-ui para contexto local')

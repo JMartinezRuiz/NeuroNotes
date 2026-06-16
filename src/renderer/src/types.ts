@@ -146,6 +146,18 @@ export interface AiSetupCommandResult {
   command: string
 }
 
+export interface RagPreviewResult {
+  schema: 'neuronotes.rag-preview.v1'
+  noteId: string
+  model: string
+  ragMaxNotes: number
+  ragExcerptLength: number
+  noteIds: string[]
+  related: RelatedNote[]
+  items: RagContextItem[]
+  text: string
+}
+
 export type AnalyzePendingMode = 'qwen' | 'local'
 
 export interface AnalyzePendingResult {

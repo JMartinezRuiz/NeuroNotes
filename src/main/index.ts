@@ -22,6 +22,7 @@ import { addManualLink, removeManualLink } from './manualLinks'
 import { buildMcpConnectionConfig, resolveMcpServerPath } from './mcpConfig'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
 import { resolvePreloadPath } from './preloadPath'
+import { previewRagContextForNote } from './ragPreview'
 import {
   canApplyAnalysisResult,
   clearTrainingReview,
@@ -481,6 +482,11 @@ function registerIpcHandlers(): void {
 
       return updated
     })
+  })
+
+  ipcMain.handle('notes:previewRag', async (_, id: string) => {
+    const database = await readDatabase()
+    return previewRagContextForNote(database, id)
   })
 
   ipcMain.handle('notes:analyze', async (_, id: string, requestedMode: unknown) => {

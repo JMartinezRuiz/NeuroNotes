@@ -1,7 +1,15 @@
 import { NeuronotesApi } from '../../preload'
 import { buildQwenWindowsSetupCommand } from '../../shared/qwenSetup'
 import { isFineTuneReviewable } from './fineTuneReadiness'
-import { ActionItem, ActionItemStatus, AiDiagnosticsResult, AiHealth, AppSettings, NoteRecord } from './types'
+import {
+  ActionItem,
+  ActionItemStatus,
+  AiDiagnosticsResult,
+  AiHealth,
+  AppSettings,
+  NoteRecord,
+  RagPreviewResult
+} from './types'
 
 type Api = NeuronotesApi
 
@@ -606,6 +614,75 @@ const removePreviewDeletedNoteReferences = (deletedNoteId: string): void => {
     note.trainingReviewedAt = undefined
   }
 }
+const previewRagContext = (id: string): RagPreviewResult => {
+  const note = notes.find((item) => item.id === id)
+
+  if (!note) {
+    throw new Error('Nota no encontrada')
+  }
+
+  const byId = new Map<string, NoteRecord['related'][number]>()
+
+  for (const related of note.related) {
+    const target = notes.find((candidate) => candidate.id === related.noteId && candidate.id !== note.id)
+
+    if (target) {
+      byId.set(target.id, {
+        noteId: target.id,
+        title: target.title,
+        score: related.score,
+        reason: related.reason
+      })
+    }
+  }
+
+  for (const related of previewInitialRelatedLinks(note)) {
+    const existing = byId.get(related.noteId)
+
+    byId.set(related.noteId, existing ? { ...existing, score: Math.max(existing.score, related.score) } : related)
+  }
+
+  const related = [...byId.values()].slice(0, settings.ragMaxNotes)
+  const items = related
+    .map((item) => {
+      const candidate = notes.find((noteItem) => noteItem.id === item.noteId)
+
+      if (!candidate) {
+        return undefined
+      }
+
+      return {
+        noteId: item.noteId,
+        title: item.title,
+        category: candidate.category,
+        tags: candidate.tags,
+        score: item.score,
+        reason: item.reason,
+        excerpt: candidate.content.replace(/\s+/g, ' ').trim().slice(0, settings.ragExcerptLength)
+      }
+    })
+    .filter((item): item is RagPreviewResult['items'][number] => Boolean(item))
+  const text =
+    items.length === 0
+      ? 'No hay notas relacionadas todavia.'
+      : items
+          .map((item) => {
+            return `ID: ${item.noteId}\nTitulo: ${item.title}\nCategoria: ${item.category}\nEtiquetas: ${item.tags.join(', ')}\nPuntuacion: ${Math.round(item.score * 100)}%\nMotivo: ${item.reason}\nExtracto: ${item.excerpt}`
+          })
+          .join('\n\n')
+
+  return {
+    schema: 'neuronotes.rag-preview.v1',
+    noteId: note.id,
+    model: settings.model,
+    ragMaxNotes: settings.ragMaxNotes,
+    ragExcerptLength: settings.ragExcerptLength,
+    noteIds: items.map((item) => item.noteId),
+    related,
+    items,
+    text
+  }
+}
 
 const previewHealth = (): AiHealth => ({
   ok: false,
@@ -792,6 +869,7 @@ export function createPreviewApi(): Api {
       target.trainingReviewedAt = undefined
       return source
     },
+    previewRagContext: async (id) => previewRagContext(id),
     analyzeNote: async (id, mode = 'qwen') => {
       const note = notes.find((item) => item.id === id)
       const now = new Date().toISOString()

@@ -83,6 +83,7 @@ import {
   McpConnectionConfig,
   NoteRecord,
   NOTE_CATEGORIES,
+  RagPreviewResult,
   SuggestedAction,
   SuggestedActionKind
 } from './types'
@@ -289,6 +290,8 @@ export default function App(): JSX.Element {
   const [setupCommandMessage, setSetupCommandMessage] = useState<string>('')
   const [diagnosticsMessage, setDiagnosticsMessage] = useState<string>('')
   const [analysisQueueMessage, setAnalysisQueueMessage] = useState<string>('')
+  const [ragPreview, setRagPreview] = useState<RagPreviewResult | null>(null)
+  const [ragPreviewMessage, setRagPreviewMessage] = useState<string>('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('note')
   const [bootstrapped, setBootstrapped] = useState(false)
@@ -384,6 +387,11 @@ export default function App(): JSX.Element {
       .filter((note): note is NoteRecord => Boolean(note))
   }, [notes, selectedNote])
   const analysisContextItems = selectedNote?.analysisRun?.ragContext ?? []
+  const ragPreviewItems = ragPreview?.items ?? []
+  const ragPreviewLibraryKey = useMemo(
+    () => notes.map((note) => `${note.id}:${note.updatedAt}:${note.related.length}`).join('|'),
+    [notes]
+  )
   const networkNodes = useMemo(() => {
     const visibleConnections = selectedConnections.slice(0, 8)
 
@@ -614,6 +622,49 @@ export default function App(): JSX.Element {
 
     setManualLinkTargetId(linkableNotes[0]?.id ?? '')
   }, [linkableNotes, manualLinkTargetId])
+
+  useEffect(() => {
+    if (!selectedNote || selectedNote.analysisRun || !selectedNote.content.trim()) {
+      setRagPreview(null)
+      setRagPreviewMessage('')
+      return
+    }
+
+    let canceled = false
+
+    setRagPreview(null)
+    setRagPreviewMessage('Calculando RAG')
+    void api
+      .previewRagContext(selectedNote.id)
+      .then((preview) => {
+        if (canceled || preview.noteId !== selectedNote.id) {
+          return
+        }
+
+        setRagPreview(preview)
+        setRagPreviewMessage(preview.items.length > 0 ? '' : 'Sin contexto RAG')
+      })
+      .catch(() => {
+        if (canceled) {
+          return
+        }
+
+        setRagPreview(null)
+        setRagPreviewMessage('RAG no disponible')
+      })
+
+    return () => {
+      canceled = true
+    }
+  }, [
+    api,
+    ragPreviewLibraryKey,
+    selectedNote?.analysisRun,
+    selectedNote?.content,
+    selectedNote?.id,
+    settings.ragExcerptLength,
+    settings.ragMaxNotes
+  ])
 
   useEffect(() => {
     if (!selectedNote || editingNoteId !== selectedNote.id) {
@@ -2374,6 +2425,37 @@ export default function App(): JSX.Element {
                       ))}
                     </div>
                   ) : null}
+                </section>
+              )}
+
+              {!selectedNote.analysisRun && (ragPreview || ragPreviewMessage) && (
+                <section>
+                  <div className="section-title">
+                    <h3>RAG propuesto</h3>
+                    <span>{ragPreview ? ragPreviewItems.length : '...'}</span>
+                  </div>
+                  {ragPreviewItems.length > 0 ? (
+                    <div className="rag-context-list">
+                      {ragPreviewItems.map((item) => (
+                        <button
+                          type="button"
+                          key={item.noteId}
+                          onClick={() => setSelectedId(item.noteId)}
+                          title="Abrir nota de contexto"
+                        >
+                          <span>
+                            <strong>{item.title}</strong>
+                            <small>
+                              {item.category} - {Math.round(item.score * 100)}%
+                            </small>
+                          </span>
+                          <small>{item.excerpt || item.reason}</small>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted">{ragPreviewMessage || 'Sin contexto RAG'}</p>
+                  )}
                 </section>
               )}
 

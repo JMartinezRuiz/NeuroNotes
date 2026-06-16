@@ -18,7 +18,8 @@ import {
   McpHandoffExportResult,
   NoteMarkdownExportResult,
   NoteRecord,
-  PullModelResult
+  PullModelResult,
+  RagPreviewResult
 } from '../main/types'
 import { AppCommand } from '../main/commands'
 
@@ -34,6 +35,7 @@ const api = {
     ipcRenderer.invoke('notes:addManualLink', sourceId, targetId),
   removeLink: (sourceId: string, targetId: string): Promise<NoteRecord> =>
     ipcRenderer.invoke('notes:removeLink', sourceId, targetId),
+  previewRagContext: (id: string): Promise<RagPreviewResult> => ipcRenderer.invoke('notes:previewRag', id),
   analyzeNote: (id: string, mode: AnalysisMode = 'qwen'): Promise<NoteRecord> => ipcRenderer.invoke('notes:analyze', id, mode),
   analyzePending: (mode: AnalyzePendingMode): Promise<AnalyzePendingResult> =>
     ipcRenderer.invoke('notes:analyzePending', mode),
