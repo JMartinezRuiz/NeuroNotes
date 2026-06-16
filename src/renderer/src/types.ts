@@ -10,6 +10,7 @@ export type AppCommand =
   | 'export-mcp-handoff'
   | 'export-finetune-dataset'
   | 'import-library'
+  | 'import-markdown-library'
   | 'export-library'
   | 'export-library-markdown'
   | 'toggle-settings'
@@ -206,6 +207,16 @@ export interface LibraryMarkdownExportResult {
   path?: string
   notes: number
   files: number
+}
+
+export interface LibraryMarkdownImportResult {
+  ok: boolean
+  canceled: boolean
+  message: string
+  path?: string
+  files: number
+  imported: number
+  skipped: number
 }
 
 export interface LibraryImportResult {

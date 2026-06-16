@@ -8,6 +8,7 @@ export type AppCommand =
   | 'export-mcp-handoff'
   | 'export-finetune-dataset'
   | 'import-library'
+  | 'import-markdown-library'
   | 'export-library'
   | 'export-library-markdown'
   | 'toggle-settings'

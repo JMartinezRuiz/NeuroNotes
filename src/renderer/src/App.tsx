@@ -598,6 +598,7 @@ export default function App(): JSX.Element {
     busy === 'export' ||
     busy === 'exportMarkdownLibrary' ||
     busy === 'import' ||
+    busy === 'importMarkdownLibrary' ||
     busy === 'exportMcp' ||
     busy === 'exportDataset' ||
     busy === 'copyMcpConfig' ||
@@ -928,6 +929,11 @@ export default function App(): JSX.Element {
 
     if (command === 'import-library') {
       await importLibrary()
+      return
+    }
+
+    if (command === 'import-markdown-library') {
+      await importLibraryMarkdown()
       return
     }
 
@@ -1474,6 +1480,20 @@ export default function App(): JSX.Element {
     setBusy('import')
     try {
       const result = await api.importLibrary()
+      setLibraryMessage(result.message)
+      if (result.ok) {
+        await refreshNotes(selectedId ?? undefined)
+        await refreshActions()
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function importLibraryMarkdown(): Promise<void> {
+    setBusy('importMarkdownLibrary')
+    try {
+      const result = await api.importLibraryMarkdown()
       setLibraryMessage(result.message)
       if (result.ok) {
         await refreshNotes(selectedId ?? undefined)
@@ -2146,6 +2166,15 @@ export default function App(): JSX.Element {
                 >
                   {busy === 'import' ? <Loader2 className="spin" size={16} /> : <FileUp size={16} />}
                   Importar
+                </button>
+                <button
+                  type="button"
+                  onClick={importLibraryMarkdown}
+                  disabled={libraryBusy}
+                  title="Importar carpeta Markdown como notas pendientes"
+                >
+                  {busy === 'importMarkdownLibrary' ? <Loader2 className="spin" size={16} /> : <FileUp size={16} />}
+                  Importar MD
                 </button>
                 <button
                   type="button"

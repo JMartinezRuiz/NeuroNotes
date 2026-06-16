@@ -1444,6 +1444,38 @@ export function createPreviewApi(): Api {
       notes: notes.length,
       files: notes.length + 1
     }),
+    importLibraryMarkdown: async () => {
+      const now = new Date().toISOString()
+      const note: NoteRecord = {
+        id: makeId(),
+        title: 'Import Markdown Preview',
+        content: 'Nota importada desde una carpeta Markdown para alimentar Qwen, RAG y MCP local.',
+        summary: 'Nota importada desde Markdown para contexto local.',
+        category: 'Proyecto',
+        tags: ['markdown', 'rag', 'mcp'],
+        related: [],
+        suggestedActions: previewSuggestedActions(
+          'Nota importada desde una carpeta Markdown para alimentar Qwen, RAG y MCP local.'
+        ),
+        analysisStatus: 'idle',
+        createdAt: now,
+        updatedAt: now
+      }
+
+      seedPreviewInitialRelatedLinks(note)
+      syncPreviewInitialBacklinks(note)
+      notes = [note, ...notes]
+
+      return {
+        ok: true,
+        canceled: false,
+        message: 'Importacion Markdown lista: 1 notas nuevas, 1 archivos omitidos',
+        path: 'preview/neuronotes-markdown',
+        files: 2,
+        imported: 1,
+        skipped: 1
+      }
+    },
     importLibrary: async () => ({
       ok: true,
       canceled: false,

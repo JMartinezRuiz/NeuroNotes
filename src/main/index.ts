@@ -1,7 +1,7 @@
 import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, shell, Tray } from 'electron'
 import type { MenuItemConstructorOptions, MessageBoxOptions } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { analyzeNote, checkOllama, prepareQwenRuntime, pullQwenModel, runAiDiagnostics, startOllamaRuntime } from './ai'
 import {
@@ -27,6 +27,12 @@ import {
 import { seedInitialRelatedLinks, synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
 import { buildMcpConnectionConfig, resolveMcpServerPath } from './mcpConfig'
+import {
+  MarkdownImportDraft,
+  MarkdownImportSource,
+  markdownSourcesToDrafts,
+  noteImportSignature
+} from './markdownImport'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
 import { resolvePreloadPath } from './preloadPath'
 import { previewRagContextForNote } from './ragPreview'
@@ -64,6 +70,7 @@ import {
   LibraryExportResult,
   LibraryImportResult,
   LibraryMarkdownExportResult,
+  LibraryMarkdownImportResult,
   McpHandoffExportResult,
   NoteMarkdownExportResult,
   NoteRecord
@@ -202,6 +209,10 @@ function createAppMenu(): void {
         {
           label: 'Importar biblioteca',
           click: () => sendCommand('import-library')
+        },
+        {
+          label: 'Importar carpeta Markdown',
+          click: () => sendCommand('import-markdown-library')
         },
         {
           label: 'Exportar biblioteca',
@@ -771,6 +782,41 @@ function registerIpcHandlers(): void {
     } satisfies LibraryMarkdownExportResult
   })
 
+  ipcMain.handle('library:importMarkdown', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Importar carpeta Markdown',
+      defaultPath: app.getPath('documents'),
+      properties: ['openDirectory']
+    })
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return {
+        ok: false,
+        canceled: true,
+        message: 'Importacion Markdown cancelada',
+        files: 0,
+        imported: 0,
+        skipped: 0
+      } satisfies LibraryMarkdownImportResult
+    }
+
+    const directory = result.filePaths[0]
+    const sources = await readMarkdownSources(directory)
+    const parsed = markdownSourcesToDrafts(sources)
+    const importResult = await mergeMarkdownDrafts(parsed.drafts)
+    const skipped = parsed.skipped + importResult.skipped
+
+    return {
+      ok: true,
+      canceled: false,
+      message: `Importacion Markdown lista: ${importResult.imported} notas nuevas, ${skipped} archivos omitidos`,
+      path: directory,
+      files: sources.length,
+      imported: importResult.imported,
+      skipped
+    } satisfies LibraryMarkdownImportResult
+  })
+
   ipcMain.handle('library:import', async () => {
     const result = await dialog.showOpenDialog({
       title: 'Importar biblioteca de Neuronotes',
@@ -1171,6 +1217,78 @@ async function mergeImportedDatabase(
       actionsImported,
       actionsUpdated,
       actionsSkipped
+    }
+  })
+}
+
+async function readMarkdownSources(directory: string): Promise<MarkdownImportSource[]> {
+  const files = await listMarkdownFiles(directory)
+
+  return Promise.all(
+    files.map(async (filePath) => ({
+      filePath,
+      content: await readFile(filePath, 'utf8')
+    }))
+  )
+}
+
+async function listMarkdownFiles(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true })
+  const files: string[] = []
+
+  for (const entry of entries) {
+    const filePath = path.join(directory, entry.name)
+
+    if (entry.isDirectory()) {
+      if (!entry.name.startsWith('.')) {
+        files.push(...(await listMarkdownFiles(filePath)))
+      }
+      continue
+    }
+
+    if (entry.isFile() && /\.md$/i.test(entry.name)) {
+      files.push(filePath)
+    }
+  }
+
+  return files.sort((left, right) => left.localeCompare(right))
+}
+
+async function mergeMarkdownDrafts(
+  drafts: MarkdownImportDraft[]
+): Promise<Pick<LibraryMarkdownImportResult, 'imported' | 'skipped'>> {
+  return mutateDatabase((database) => {
+    const existingSignatures = new Set(database.notes.map(noteImportSignature))
+    const importedIds: string[] = []
+    let imported = 0
+    let skipped = 0
+
+    for (const draft of drafts) {
+      if (!draft.note.content.trim()) {
+        skipped += 1
+        continue
+      }
+
+      const signature = noteImportSignature(draft.note)
+      if (existingSignatures.has(signature)) {
+        skipped += 1
+        continue
+      }
+
+      database.notes.push(draft.note)
+      existingSignatures.add(signature)
+      seedInitialRelatedLinks(draft.note, database.notes, draft.note.updatedAt)
+      importedIds.push(draft.note.id)
+      imported += 1
+    }
+
+    for (const id of importedIds) {
+      synchronizeRelatedGraph(database.notes, id)
+    }
+
+    return {
+      imported,
+      skipped
     }
   })
 }

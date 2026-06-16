@@ -357,6 +357,26 @@ describe('createPreviewApi', () => {
     })
   })
 
+  it('imports a preview Markdown folder as pending notes', async () => {
+    const api = createPreviewApi()
+
+    await expect(api.importLibraryMarkdown()).resolves.toMatchObject({
+      ok: true,
+      message: 'Importacion Markdown lista: 1 notas nuevas, 1 archivos omitidos',
+      path: 'preview/neuronotes-markdown',
+      files: 2,
+      imported: 1,
+      skipped: 1
+    })
+
+    const notes = await api.listNotes()
+    expect(notes[0]).toMatchObject({
+      title: 'Import Markdown Preview',
+      analysisStatus: 'idle',
+      tags: ['markdown', 'rag', 'mcp']
+    })
+  })
+
   it('applies RAG context settings in preview analysis', async () => {
     const api = createPreviewApi()
     const settings = await api.updateSettings({
