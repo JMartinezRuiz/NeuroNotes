@@ -11,6 +11,7 @@ export type AppCommand =
   | 'export-finetune-dataset'
   | 'import-library'
   | 'export-library'
+  | 'export-library-markdown'
   | 'toggle-settings'
   | 'view-note'
   | 'view-plan'
@@ -196,6 +197,15 @@ export interface LibraryExportResult {
   message: string
   path?: string
   notes: number
+}
+
+export interface LibraryMarkdownExportResult {
+  ok: boolean
+  canceled: boolean
+  message: string
+  path?: string
+  notes: number
+  files: number
 }
 
 export interface LibraryImportResult {

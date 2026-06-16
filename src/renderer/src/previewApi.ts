@@ -1436,6 +1436,14 @@ export function createPreviewApi(): Api {
       path: 'preview/neuronotes-backup.json',
       notes: notes.length
     }),
+    exportLibraryMarkdown: async () => ({
+      ok: true,
+      canceled: false,
+      message: `Biblioteca Markdown exportada (${notes.length} notas, ${notes.length + 1} archivos)`,
+      path: 'preview/neuronotes-markdown',
+      notes: notes.length,
+      files: notes.length + 1
+    }),
     importLibrary: async () => ({
       ok: true,
       canceled: false,

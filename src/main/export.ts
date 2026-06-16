@@ -174,6 +174,33 @@ export function safeMarkdownFileName(title: string): string {
   return `${sanitized || 'nota-neuronotes'}.md`
 }
 
+export interface LibraryMarkdownFile {
+  fileName: string
+  content: string
+}
+
+export function libraryToMarkdownFiles(database: DatabaseFile, exportedAt = new Date().toISOString()): LibraryMarkdownFile[] {
+  const actionsByNoteId = new Map<string, ActionItem[]>()
+
+  for (const action of database.actions) {
+    actionsByNoteId.set(action.noteId, [...(actionsByNoteId.get(action.noteId) ?? []), action])
+  }
+
+  const notes = [...database.notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  const noteFiles = uniqueMarkdownFileNames(notes).map(({ note, fileName }) => ({
+    fileName,
+    content: noteToMarkdown(note, actionsByNoteId.get(note.id) ?? [])
+  }))
+
+  return [
+    {
+      fileName: 'index.md',
+      content: libraryMarkdownIndex(notes, noteFiles, database, exportedAt)
+    },
+    ...noteFiles
+  ]
+}
+
 export function buildMcpHandoffPayload(database: DatabaseFile, exportedAt = new Date().toISOString()): McpHandoffPayload {
   const notesById = new Map(database.notes.map((note) => [note.id, note]))
   const openActions = database.actions
@@ -320,6 +347,83 @@ export function fineTuneDatasetToJsonl(database: DatabaseFile, exportedAt = new 
 
 function escapeMarkdown(value: string): string {
   return value.replace(/([\\`*_{}\[\]()#+\-.!|>])/g, '\\$1')
+}
+
+function uniqueMarkdownFileNames(notes: NoteRecord[]): Array<{ note: NoteRecord; fileName: string }> {
+  const used = new Set<string>()
+
+  return notes.map((note) => {
+    const baseFileName = safeMarkdownFileName(note.title)
+    const stem = baseFileName.replace(/\.md$/i, '')
+    let fileName = baseFileName
+    let suffix = 2
+
+    while (used.has(fileName)) {
+      fileName = `${stem}-${suffix}.md`
+      suffix += 1
+    }
+
+    used.add(fileName)
+
+    return {
+      note,
+      fileName
+    }
+  })
+}
+
+function libraryMarkdownIndex(
+  notes: NoteRecord[],
+  noteFiles: LibraryMarkdownFile[],
+  database: DatabaseFile,
+  exportedAt: string
+): string {
+  const rows =
+    notes.length > 0
+      ? notes
+          .map((note, index) => {
+            const fileName = noteFiles[index]?.fileName ?? safeMarkdownFileName(note.title)
+            const tags = note.tags.length > 0 ? note.tags.map((tag) => `#${escapeMarkdown(tag)}`).join(' ') : 'Sin etiquetas'
+            return `- [${escapeMarkdown(note.title)}](./${fileName}) - ${escapeMarkdown(note.category)} - ${tags} - ${escapeMarkdown(note.analysisStatus)} - ${escapeMarkdown(note.updatedAt)}`
+          })
+          .join('\n')
+      : '- Sin notas'
+  const categories = summarizeCounts(notes.map((note) => note.category))
+  const statuses = summarizeCounts(notes.map((note) => note.analysisStatus))
+
+  return [
+    '# Neuronotes Markdown Export',
+    '',
+    `- Exportado: ${escapeMarkdown(exportedAt)}`,
+    `- Modelo configurado: ${escapeMarkdown(database.settings.model)}`,
+    `- Ollama URL: ${escapeMarkdown(database.settings.ollamaUrl)}`,
+    `- Notas: ${notes.length}`,
+    `- Acciones guardadas: ${database.actions.length}`,
+    `- Categorias: ${categories}`,
+    `- Estado IA: ${statuses}`,
+    '',
+    '## Notas',
+    '',
+    rows,
+    ''
+  ].join('\n')
+}
+
+function summarizeCounts(values: string[]): string {
+  if (values.length === 0) {
+    return 'Sin datos'
+  }
+
+  const counts = new Map<string, number>()
+
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1)
+  }
+
+  return [...counts.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([value, count]) => `${escapeMarkdown(value)} (${count})`)
+    .join(', ')
 }
 
 function formatDuration(durationMs: number): string {

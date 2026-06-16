@@ -184,6 +184,15 @@ export interface LibraryExportResult {
   notes: number
 }
 
+export interface LibraryMarkdownExportResult {
+  ok: boolean
+  canceled: boolean
+  message: string
+  path?: string
+  notes: number
+  files: number
+}
+
 export interface LibraryImportResult {
   ok: boolean
   canceled: boolean

@@ -3,6 +3,7 @@ import {
   buildFineTuneExamples,
   buildMcpHandoffPayload,
   fineTuneDatasetToJsonl,
+  libraryToMarkdownFiles,
   mcpHandoffToJson,
   noteToMarkdown,
   safeMarkdownFileName
@@ -122,6 +123,67 @@ describe('safeMarkdownFileName', () => {
 
   it('uses a fallback for empty titles', () => {
     expect(safeMarkdownFileName(' *** ')).toBe('nota-neuronotes.md')
+  })
+})
+
+describe('libraryToMarkdownFiles', () => {
+  it('exports an index and one Markdown file per note with unique filenames', () => {
+    const now = '2026-06-15T00:00:00.000Z'
+    const first = note({
+      id: 'note-a',
+      title: 'Cliente / Roadmap',
+      updatedAt: '2026-06-15T02:00:00.000Z'
+    })
+    const second = note({
+      id: 'note-b',
+      title: 'Cliente Roadmap',
+      updatedAt: '2026-06-15T01:00:00.000Z',
+      content: 'Segunda nota con el mismo nombre seguro.'
+    })
+    const third = note({
+      id: 'note-c',
+      title: 'Cliente Roadmap 2',
+      updatedAt: '2026-06-15T00:30:00.000Z',
+      content: 'Nota con un sufijo que podria colisionar.'
+    })
+    const database: DatabaseFile = {
+      version: 1,
+      notes: [third, second, first],
+      settings: { ...DEFAULT_SETTINGS },
+      actions: [
+        {
+          id: 'action-1',
+          noteId: first.id,
+          noteTitle: first.title,
+          kind: 'task',
+          title: 'Enviar resumen',
+          detail: 'Preparar resumen para cliente.',
+          toolHint: 'email.compose',
+          confidence: 0.74,
+          status: 'open',
+          createdAt: now,
+          updatedAt: now
+        }
+      ]
+    }
+
+    const files = libraryToMarkdownFiles(database, now)
+
+    expect(files.map((file) => file.fileName)).toEqual([
+      'index.md',
+      'cliente-roadmap.md',
+      'cliente-roadmap-2.md',
+      'cliente-roadmap-2-2.md'
+    ])
+    expect(files[0].content).toContain('# Neuronotes Markdown Export')
+    expect(files[0].content).toContain('- [Cliente / Roadmap](./cliente-roadmap.md) - Proyecto')
+    expect(files[0].content).toContain('- [Cliente Roadmap](./cliente-roadmap-2.md) - Proyecto')
+    expect(files[0].content).toContain('- [Cliente Roadmap 2](./cliente-roadmap-2-2.md) - Proyecto')
+    expect(files[0].content).toContain('- Acciones guardadas: 1')
+    expect(files[1].content).toContain('# Cliente / Roadmap')
+    expect(files[1].content).toContain('Enviar resumen')
+    expect(files[2].content).toContain('Segunda nota con el mismo nombre seguro.')
+    expect(files[3].content).toContain('Nota con un sufijo que podria colisionar.')
   })
 })
 

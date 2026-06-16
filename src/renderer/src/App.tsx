@@ -596,6 +596,7 @@ export default function App(): JSX.Element {
   }, [notes, selectedNote])
   const libraryBusy =
     busy === 'export' ||
+    busy === 'exportMarkdownLibrary' ||
     busy === 'import' ||
     busy === 'exportMcp' ||
     busy === 'exportDataset' ||
@@ -932,6 +933,11 @@ export default function App(): JSX.Element {
 
     if (command === 'export-library') {
       await exportLibrary()
+      return
+    }
+
+    if (command === 'export-library-markdown') {
+      await exportLibraryMarkdown()
       return
     }
 
@@ -1448,6 +1454,16 @@ export default function App(): JSX.Element {
     setBusy('export')
     try {
       const result = await api.exportLibrary()
+      setLibraryMessage(result.message)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function exportLibraryMarkdown(): Promise<void> {
+    setBusy('exportMarkdownLibrary')
+    try {
+      const result = await api.exportLibraryMarkdown()
       setLibraryMessage(result.message)
     } finally {
       setBusy(null)
@@ -2130,6 +2146,15 @@ export default function App(): JSX.Element {
                 >
                   {busy === 'import' ? <Loader2 className="spin" size={16} /> : <FileUp size={16} />}
                   Importar
+                </button>
+                <button
+                  type="button"
+                  onClick={exportLibraryMarkdown}
+                  disabled={libraryBusy}
+                  title="Exportar toda la biblioteca como carpeta Markdown"
+                >
+                  {busy === 'exportMarkdownLibrary' ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
+                  Markdown
                 </button>
                 <button
                   type="button"

@@ -9,6 +9,7 @@ export type AppCommand =
   | 'export-finetune-dataset'
   | 'import-library'
   | 'export-library'
+  | 'export-library-markdown'
   | 'toggle-settings'
   | 'view-note'
   | 'view-plan'

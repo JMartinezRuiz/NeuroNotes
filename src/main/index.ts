@@ -1,7 +1,7 @@
 import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, shell, Tray } from 'electron'
 import type { MenuItemConstructorOptions, MessageBoxOptions } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { analyzeNote, checkOllama, prepareQwenRuntime, pullQwenModel, runAiDiagnostics, startOllamaRuntime } from './ai'
 import {
@@ -16,7 +16,14 @@ import {
 } from './actions'
 import { AppCommand } from './commands'
 import { createDatabaseChangeWatcher, DatabaseChangeWatcher } from './databaseWatcher'
-import { buildFineTuneExamples, buildMcpHandoffPayload, fineTuneDatasetToJsonl, noteToMarkdown, safeMarkdownFileName } from './export'
+import {
+  buildFineTuneExamples,
+  buildMcpHandoffPayload,
+  fineTuneDatasetToJsonl,
+  libraryToMarkdownFiles,
+  noteToMarkdown,
+  safeMarkdownFileName
+} from './export'
 import { seedInitialRelatedLinks, synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
 import { buildMcpConnectionConfig, resolveMcpServerPath } from './mcpConfig'
@@ -56,6 +63,7 @@ import {
   FineTuneDatasetExportResult,
   LibraryExportResult,
   LibraryImportResult,
+  LibraryMarkdownExportResult,
   McpHandoffExportResult,
   NoteMarkdownExportResult,
   NoteRecord
@@ -198,6 +206,10 @@ function createAppMenu(): void {
         {
           label: 'Exportar biblioteca',
           click: () => sendCommand('export-library')
+        },
+        {
+          label: 'Exportar biblioteca Markdown',
+          click: () => sendCommand('export-library-markdown')
         },
         {
           label: 'Exportar handoff MCP',
@@ -724,6 +736,39 @@ function registerIpcHandlers(): void {
       path: result.filePath,
       notes: database.notes.length
     } satisfies LibraryExportResult
+  })
+
+  ipcMain.handle('library:exportMarkdown', async () => {
+    const database = await readDatabase()
+    const result = await dialog.showOpenDialog({
+      title: 'Exportar biblioteca Markdown',
+      defaultPath: app.getPath('documents'),
+      properties: ['openDirectory', 'createDirectory']
+    })
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return {
+        ok: false,
+        canceled: true,
+        message: 'Exportacion Markdown cancelada',
+        notes: database.notes.length,
+        files: 0
+      } satisfies LibraryMarkdownExportResult
+    }
+
+    const targetDirectory = result.filePaths[0]
+    const files = libraryToMarkdownFiles(database)
+    await mkdir(targetDirectory, { recursive: true })
+    await Promise.all(files.map((file) => writeFile(path.join(targetDirectory, file.fileName), file.content, 'utf8')))
+
+    return {
+      ok: true,
+      canceled: false,
+      message: `Biblioteca Markdown exportada (${database.notes.length} notas, ${files.length} archivos)`,
+      path: targetDirectory,
+      notes: database.notes.length,
+      files: files.length
+    } satisfies LibraryMarkdownExportResult
   })
 
   ipcMain.handle('library:import', async () => {

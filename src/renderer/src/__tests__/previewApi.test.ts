@@ -345,6 +345,18 @@ describe('createPreviewApi', () => {
     expect(removed.trainingReviewedAt).toBeUndefined()
   })
 
+  it('exports the preview library as a Markdown folder result', async () => {
+    const api = createPreviewApi()
+
+    await expect(api.exportLibraryMarkdown()).resolves.toMatchObject({
+      ok: true,
+      message: 'Biblioteca Markdown exportada (2 notas, 3 archivos)',
+      path: 'preview/neuronotes-markdown',
+      notes: 2,
+      files: 3
+    })
+  })
+
   it('applies RAG context settings in preview analysis', async () => {
     const api = createPreviewApi()
     const settings = await api.updateSettings({

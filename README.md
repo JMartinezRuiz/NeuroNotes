@@ -102,7 +102,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Analysis audit metadata: provider, model, elapsed time, timestamp, retrieved RAG note IDs, scores, and excerpts.
 - RAG audit view in the inspector showing the context snippets used during analysis.
 - Auto retry of pending notes once Qwen becomes ready, guarded to avoid retry loops.
-- JSON library export/import and per-note Markdown export with AI audit metadata and stored RAG context.
+- JSON library export/import, per-note Markdown export, and full-library Markdown folder export with an index, AI audit metadata, saved actions, links, and stored RAG context.
 
 ## AI Architecture
 
