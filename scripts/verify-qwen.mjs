@@ -10,6 +10,7 @@ const DEFAULT_MODEL = 'qwen3.5:0.8b'
 const DEFAULT_ENDPOINT = 'http://127.0.0.1:11434'
 const DEFAULT_TIMEOUT_MS = 600000
 const DEFAULT_START_TIMEOUT_MS = 15000
+const DEFAULT_CONTEXT_WINDOW = 4096
 
 function parseArgs(argv) {
   const options = {
@@ -197,6 +198,7 @@ function buildChatPayload(model) {
     format: 'json',
     options: {
       temperature: 0.2,
+      num_ctx: DEFAULT_CONTEXT_WINDOW,
       num_predict: 320
     },
     messages: [

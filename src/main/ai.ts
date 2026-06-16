@@ -45,6 +45,7 @@ interface OllamaPullResponse {
 
 const OLLAMA_HEALTH_TIMEOUT_MS = 3500
 const QWEN_GENERATE_TIMEOUT_MS = 45000
+const QWEN_CONTEXT_WINDOW = 4096
 
 interface AiPayload {
   title?: unknown
@@ -351,6 +352,7 @@ async function analyzeWithQwen(
         ],
         options: {
           temperature: 0.2,
+          num_ctx: QWEN_CONTEXT_WINDOW,
           num_predict: 550
         },
       })

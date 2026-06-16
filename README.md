@@ -365,4 +365,4 @@ npm run verify:win-dist
 - The development build is currently unsigned.
 - For public Windows distribution, add a signing certificate and remove `signExecutable: false` from the Electron Builder config.
 - Real Qwen inference requires Ollama installed locally and the `qwen3.5:0.8b` model pulled. Use `npm run verify:qwen` to prove the local runtime can generate a valid Neuronotes analysis.
-- RAG defaults are tuned conservatively for Qwen 0.8B: 5 context notes and 550 characters per excerpt. The settings panel can reduce or expand those limits locally.
+- RAG defaults are tuned conservatively for Qwen 0.8B: 5 context notes, 550 characters per excerpt, and an explicit 4096-token Ollama context window. The settings panel can reduce or expand retrieved-note and excerpt limits locally.

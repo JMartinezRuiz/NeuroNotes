@@ -249,6 +249,7 @@ describe('analyzeNote', () => {
       format: string
       messages: Array<{ content: string; role: string }>
       model: string
+      options: { num_ctx: number; num_predict: number; temperature: number }
       stream: boolean
       think: boolean
     }
@@ -258,6 +259,11 @@ describe('analyzeNote', () => {
       stream: false,
       think: false,
       format: 'json'
+    })
+    expect(body.options).toMatchObject({
+      temperature: 0.2,
+      num_ctx: 4096,
+      num_predict: 550
     })
     expect(body.messages).toEqual([expect.objectContaining({ role: 'user', content: expect.any(String) })])
     expect(body.messages[0].content).toContain('Contexto recuperado:')
