@@ -374,7 +374,7 @@ async function analyzeWithQwen(
     throw new Error('Ollama no devolvio contenido')
   }
 
-  return sanitizeAiPayload(parseJson(content), allNotes)
+  return sanitizeAiPayload(note, parseJson(content), allNotes)
 }
 
 function buildPrompt(note: NoteRecord, context: string): string {
@@ -533,7 +533,11 @@ function isLikelyAiPayload(payload: AiPayload): boolean {
   ].some((key) => Object.prototype.hasOwnProperty.call(payload, key))
 }
 
-function sanitizeAiPayload(payload: AiPayload, allNotes: NoteRecord[]): Omit<AnalysisResult, 'status' | 'error' | 'analysisRun'> {
+function sanitizeAiPayload(
+  note: NoteRecord,
+  payload: AiPayload,
+  allNotes: NoteRecord[]
+): Omit<AnalysisResult, 'status' | 'error' | 'analysisRun'> {
   const existingIds = new Set(allNotes.map((note) => note.id))
   const relatedPayload = Array.isArray(payload.related) ? payload.related : payload.linkSuggestions
   const related = Array.isArray(relatedPayload)
@@ -562,7 +566,7 @@ function sanitizeAiPayload(payload: AiPayload, allNotes: NoteRecord[]): Omit<Ana
     : []
 
   const category = normalizeNoteCategory(payload.category)
-  const tags = normalizeNoteTags(payload.tags).slice(0, 6)
+  const tags = normalizeNoteTags([...userAuthoredTags(note), ...normalizeNoteTags(payload.tags)]).slice(0, 6)
   const suggestedActions = normalizeSuggestedActions(
     firstArray(payload.suggestedActions, payload.actions, payload.actionSuggestions)
   )
@@ -645,7 +649,15 @@ function inferFallbackTags(note: NoteRecord, normalizedText: string): string[] {
   const topicTags = LOCAL_TAG_PATTERNS.filter((item) => item.pattern.test(normalizedText)).map((item) => item.tag)
   const tokenTags = frequentContentTags(normalizedText)
 
-  return normalizeNoteTags([...note.tags, ...topicTags, ...tokenTags]).slice(0, 6)
+  return normalizeNoteTags([...userAuthoredTags(note), ...topicTags, ...tokenTags]).slice(0, 6)
+}
+
+function userAuthoredTags(note: NoteRecord): string[] {
+  return normalizeNoteTags([...note.tags, ...inlineContentTags(note.content)])
+}
+
+function inlineContentTags(content: string): string[] {
+  return [...content.matchAll(/(^|\s)#([\p{L}\p{N}][\p{L}\p{N}_-]{1,39})/gu)].map((match) => match[2])
 }
 
 function frequentContentTags(normalizedText: string): string[] {

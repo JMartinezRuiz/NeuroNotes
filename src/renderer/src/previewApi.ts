@@ -204,6 +204,24 @@ const clampNumber = (value: unknown, min: number, max: number): number =>
   Number.isFinite(value) ? Math.max(min, Math.min(max, Math.round(Number(value)))) : min
 const isManualRelatedLink = (related: NoteRecord['related'][number]): boolean =>
   related.reason === MANUAL_LINK_REASON || related.reason === MANUAL_RECIPROCAL_REASON
+const previewAnalysisTags = (note: NoteRecord): string[] => {
+  const inlineTags = [...note.content.matchAll(/(^|\s)#([\p{L}\p{N}][\p{L}\p{N}_-]{1,39})/gu)].map((match) => match[2])
+  const contentTags = note.content.toLowerCase().match(/\b[a-z]{4,}\b/g) ?? []
+
+  return Array.from(
+    new Set(
+      [...note.tags, ...inlineTags, ...contentTags]
+        .map((tag) =>
+          tag
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+        )
+        .filter(Boolean)
+    )
+  ).slice(0, 6)
+}
 const preservePreviewManualLinksAfterAnalysis = (
   note: NoteRecord,
   analysisLinks: NoteRecord['related']
@@ -429,7 +447,7 @@ export function createPreviewApi(): Api {
 
       note.summary = note.content.replace(/\s+/g, ' ').slice(0, 140)
       note.category = note.content.toLowerCase().includes('ui') ? 'Ideas' : 'Proyecto'
-      note.tags = Array.from(new Set(note.content.toLowerCase().match(/\b[a-z]{4,}\b/g) ?? [])).slice(0, 4)
+      note.tags = previewAnalysisTags(note)
       const analysisLinks = notes
         .filter((candidate) => candidate.id !== note.id)
         .slice(0, 3)
@@ -484,7 +502,7 @@ export function createPreviewApi(): Api {
       for (const note of pending) {
         note.summary = note.content.replace(/\s+/g, ' ').slice(0, 140)
         note.category = note.content.toLowerCase().includes('ui') ? 'Ideas' : 'Proyecto'
-        note.tags = Array.from(new Set(note.content.toLowerCase().match(/\b[a-z]{4,}\b/g) ?? [])).slice(0, 4)
+        note.tags = previewAnalysisTags(note)
         note.suggestedActions = [
           {
             kind: 'mcp',

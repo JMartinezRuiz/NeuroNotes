@@ -188,7 +188,7 @@ describe('analyzeNote', () => {
       title: 'Nota fuente Qwen',
       category: 'Proyecto',
       tags: ['producto'],
-      content: 'Proyecto Neuronotes: usar Qwen 0.8b con RAG para enlazar notas rapidas.'
+      content: 'Proyecto Neuronotes: usar Qwen 0.8b con RAG para enlazar notas rapidas. #Cliente'
     })
     const contextNote = note({
       id: 'context-note',
@@ -203,7 +203,7 @@ describe('analyzeNote', () => {
       title: 'Mapa de notas',
       summary: 'Convierte notas rapidas en una base enlazada.',
       category: 'Proyecto',
-      tags: ['qwen', 'rag', 'notas', 'medico'],
+      tags: ['producto', 'cliente', 'qwen', 'rag', 'notas', 'medico'],
       analysisRun: {
         provider: 'qwen',
         model: 'qwen3.5:0.8b',
@@ -543,14 +543,14 @@ Texto posterior {no-json}`
     const source = note({
       id: 'source',
       tags: ['cliente'],
-      content: 'Cliente pide revisar MCP y RAG para Qwen, preparar automatizacion y enlaces de notas.'
+      content: 'Cliente pide revisar MCP y RAG para Qwen, preparar automatizacion y enlaces de notas. #Prioridad'
     })
 
     const analysis = await analyzeNote(source, [source], settings, 'local')
 
     expect(analysis).toMatchObject({
       status: 'fallback',
-      tags: expect.arrayContaining(['cliente', 'qwen', 'rag', 'mcp', 'tarea'])
+      tags: expect.arrayContaining(['cliente', 'prioridad', 'qwen', 'rag', 'mcp', 'tarea'])
     })
     expect(fetchMock).not.toHaveBeenCalled()
   })

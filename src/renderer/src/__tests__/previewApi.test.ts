@@ -89,6 +89,18 @@ describe('createPreviewApi', () => {
     })
   })
 
+  it('preserves saved tags and inline hashtags during preview analysis', async () => {
+    const api = createPreviewApi()
+    const created = await api.createNote('Preparar flujo MCP con #Cliente y #RAG local')
+    await api.updateNote(created.id, {
+      tags: ['manual']
+    })
+
+    const analyzed = await api.analyzeNote(created.id, 'local')
+
+    expect(analyzed.tags).toEqual(expect.arrayContaining(['manual', 'cliente', 'rag']))
+  })
+
   it('marks reviewed notes for fine-tuning export', async () => {
     const api = createPreviewApi()
     const analyzed = await api.analyzeNote('preview-roadmap', 'qwen')
