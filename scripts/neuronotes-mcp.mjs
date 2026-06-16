@@ -16,6 +16,9 @@ const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 25
 const MAX_GRAPH_NODES = 100
 const MAX_MCP_NOTE_CONTENT_LENGTH = 20000
+const MAX_MCP_ACTION_TITLE_LENGTH = 160
+const MAX_MCP_ACTION_DETAIL_LENGTH = 1200
+const MAX_MCP_TOOL_HINT_LENGTH = 80
 const NOTE_CATEGORIES = ['Inbox', 'Trabajo', 'Proyecto', 'Ideas', 'Aprendizaje', 'Personal', 'Salud', 'Finanzas']
 const CATEGORY_ALIASES = new Map([
   ['entrada', 'Inbox'],
@@ -300,6 +303,54 @@ const WRITE_TOOLS = [
         }
       }
     }
+  },
+  {
+    name: 'neuronotes_create_action',
+    description:
+      'Create a local Neuronotes action intent for an existing note from an authorized MCP host. Requires NEURONOTES_MCP_WRITE=1 or --write and never executes external tools.',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false
+    },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['noteId', 'kind', 'title', 'detail'],
+      properties: {
+        noteId: {
+          type: 'string',
+          description: 'Existing Neuronotes note id that should own the action.'
+        },
+        kind: {
+          type: 'string',
+          enum: ['task', 'reminder', 'research', 'mcp'],
+          description: 'Local action kind.'
+        },
+        title: {
+          type: 'string',
+          maxLength: MAX_MCP_ACTION_TITLE_LENGTH,
+          description: 'Short action title.'
+        },
+        detail: {
+          type: 'string',
+          maxLength: MAX_MCP_ACTION_DETAIL_LENGTH,
+          description: 'Action detail to store locally for later user review.'
+        },
+        toolHint: {
+          type: 'string',
+          maxLength: MAX_MCP_TOOL_HINT_LENGTH,
+          description: 'Optional MCP-style tool hint such as reminder.create. This does not approve or execute the tool.'
+        },
+        confidence: {
+          type: 'number',
+          minimum: 0,
+          maximum: 1,
+          description: 'Optional confidence score from 0 to 1. Defaults to 0.5.'
+        }
+      }
+    }
   }
 ]
 
@@ -419,6 +470,10 @@ export async function callTool(name, args = {}, context = {}) {
 
   if (name === 'neuronotes_create_note') {
     return createNoteFromMcp(database, args, context)
+  }
+
+  if (name === 'neuronotes_create_action') {
+    return createActionFromMcp(database, args, context)
   }
 
   if (name === 'neuronotes_search_notes') {
@@ -1002,6 +1057,118 @@ async function createNoteFromMcp(database, args, context) {
   }
 }
 
+async function createActionFromMcp(database, args, context) {
+  if (!isWriteEnabled(context)) {
+    throw rpcError(
+      -32003,
+      'MCP write mode is disabled. Start the server with NEURONOTES_MCP_WRITE=1 or --write for trusted hosts.'
+    )
+  }
+
+  if (!context.dbPath) {
+    throw rpcError(-32602, 'Database path is required to create actions')
+  }
+
+  const noteId = stringArg(args.noteId)
+  if (!noteId) {
+    throw rpcError(-32602, 'noteId is required')
+  }
+
+  const note = database.notes.find((item) => item.id === noteId)
+  if (!note) {
+    throw rpcError(-32602, `Note not found: ${noteId}`)
+  }
+
+  const kind = normalizeActionKind(args.kind)
+  if (!kind) {
+    throw rpcError(-32602, 'kind must be one of task, reminder, research, or mcp')
+  }
+
+  const title = stringArg(args.title)
+  if (!title) {
+    throw rpcError(-32602, 'title is required')
+  }
+  if (title.length > MAX_MCP_ACTION_TITLE_LENGTH) {
+    throw rpcError(-32602, `title must be ${MAX_MCP_ACTION_TITLE_LENGTH} characters or fewer`)
+  }
+
+  const detail = stringArg(args.detail)
+  if (!detail) {
+    throw rpcError(-32602, 'detail is required')
+  }
+  if (detail.length > MAX_MCP_ACTION_DETAIL_LENGTH) {
+    throw rpcError(-32602, `detail must be ${MAX_MCP_ACTION_DETAIL_LENGTH} characters or fewer`)
+  }
+
+  const toolHint = stringArg(args.toolHint)
+  if (toolHint.length > MAX_MCP_TOOL_HINT_LENGTH) {
+    throw rpcError(-32602, `toolHint must be ${MAX_MCP_TOOL_HINT_LENGTH} characters or fewer`)
+  }
+
+  const draft = {
+    kind,
+    title,
+    detail,
+    confidence: clampNumber(args.confidence, 0, 1, 0.5)
+  }
+  const existing = database.actions.find((action) => sameActionDraft(action, note.id, draft))
+
+  if (existing) {
+    return {
+      schema: 'neuronotes.mcp.write-action.v1',
+      writeMode: 'enabled',
+      created: false,
+      message: 'Accion MCP existente reutilizada; sigue pendiente de revision en Neuronotes.',
+      databasePath: context.dbPath,
+      action: formatMcpCreatedAction(existing, note),
+      next: {
+        status: existing.status,
+        mcpApproval: mcpApproval(existing).state,
+        reason: 'Revisa y aprueba la accion en Neuronotes antes de cualquier handoff MCP externo.'
+      }
+    }
+  }
+
+  const now = new Date().toISOString()
+  const action = {
+    id: randomUUID(),
+    noteId: note.id,
+    noteTitle: note.title,
+    kind,
+    title,
+    detail,
+    confidence: draft.confidence,
+    status: 'open',
+    createdAt: now,
+    updatedAt: now
+  }
+
+  if (toolHint) {
+    action.toolHint = toolHint
+  }
+
+  database.actions.unshift(action)
+
+  const stored = await writeNeuronotesDatabase(context.dbPath, database)
+  const storedNote = stored.notes.find((item) => item.id === note.id) ?? note
+  const created = stored.actions.find((item) => item.id === action.id) ?? action
+
+  return {
+    schema: 'neuronotes.mcp.write-action.v1',
+    writeMode: 'enabled',
+    created: true,
+    message: 'Accion creada desde MCP y guardada para revision local en Neuronotes.',
+    databasePath: context.dbPath,
+    action: formatMcpCreatedAction(created, storedNote),
+    next: {
+      status: created.status,
+      mcpApproval: mcpApproval(created).state,
+      handoff: created.toolHint ? 'ready-for-review' : 'needs-tool-selection',
+      reason: 'Neuronotes no ejecuta herramientas externas; el usuario debe aprobar el handoff MCP primero.'
+    }
+  }
+}
+
 function mcpNoteTitle(value, content) {
   const explicit = stringArg(value)
 
@@ -1025,6 +1192,31 @@ function uniqueNormalizedTags(values) {
   }
 
   return [...unique]
+}
+
+function sameActionDraft(action, noteId, draft) {
+  return (
+    action.noteId === noteId &&
+    action.kind === draft.kind &&
+    action.title.trim().toLowerCase() === draft.title.trim().toLowerCase() &&
+    action.detail.trim().toLowerCase() === draft.detail.trim().toLowerCase()
+  )
+}
+
+function formatMcpCreatedAction(action, note) {
+  return {
+    ...action,
+    approval: mcpApproval(action),
+    toolCallDraft: buildToolCallDraft(action, note),
+    sourceNote: {
+      id: note.id,
+      title: note.title,
+      summary: note.summary,
+      category: note.category,
+      tags: note.tags,
+      analysisStatus: note.analysisStatus
+    }
+  }
 }
 
 function noteGraph(database, args = {}) {
@@ -1418,9 +1610,10 @@ function librarySummary(database, dbPath, context = {}) {
     analysisStatuses: statusCounts,
     actionStatuses: actionCounts,
     execution: {
-      mode: writeEnabled ? 'write-enabled-notes' : 'read-only-context',
+      mode: writeEnabled ? 'write-enabled-local' : 'read-only-context',
       canModifyNotes: writeEnabled,
       canCreateNotes: writeEnabled,
+      canCreateActions: writeEnabled,
       canExecuteExternalTools: false,
       requiresUserApprovalForFollowUp: true
     }

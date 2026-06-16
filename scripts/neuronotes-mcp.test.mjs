@@ -89,7 +89,8 @@ describe('neuronotes MCP server', () => {
       'neuronotes_library_summary',
       'neuronotes_qwen_setup',
       'neuronotes_finetune_readiness',
-      'neuronotes_create_note'
+      'neuronotes_create_note',
+      'neuronotes_create_action'
     ])
   })
 
@@ -1013,12 +1014,118 @@ describe('neuronotes MCP server', () => {
     await expect(callTool('neuronotes_library_summary', {}, { dbPath, writeEnabled: true })).resolves.toMatchObject({
       noteCount: 3,
       execution: {
-        mode: 'write-enabled-notes',
+        mode: 'write-enabled-local',
         canModifyNotes: true,
         canCreateNotes: true,
+        canCreateActions: true,
         canExecuteExternalTools: false
       }
     })
+  })
+
+  it('creates local action intents only when MCP write mode is explicitly enabled', async () => {
+    const args = {
+      noteId: 'note-health',
+      kind: 'task',
+      title: 'Preparar agenda MCP',
+      detail: 'Convertir la nota medica en una tarea local antes del handoff.',
+      toolHint: 'task.create',
+      confidence: 0.72
+    }
+
+    await expect(callTool('neuronotes_create_action', args, { dbPath })).rejects.toThrow('MCP write mode is disabled')
+
+    const created = await callTool('neuronotes_create_action', args, { dbPath, writeEnabled: true })
+
+    expect(created).toMatchObject({
+      schema: 'neuronotes.mcp.write-action.v1',
+      writeMode: 'enabled',
+      created: true,
+      action: {
+        noteId: 'note-health',
+        noteTitle: 'Cita medico',
+        kind: 'task',
+        title: 'Preparar agenda MCP',
+        detail: 'Convertir la nota medica en una tarea local antes del handoff.',
+        toolHint: 'task.create',
+        confidence: 0.72,
+        status: 'open',
+        approval: {
+          required: true,
+          state: 'needs-review',
+          approvedAt: null
+        },
+        toolCallDraft: {
+          status: 'ready-for-review',
+          toolName: 'task.create',
+          arguments: expect.objectContaining({
+            sourceNoteId: 'note-health',
+            relatedNoteIds: ['note-project'],
+            ragContext: [
+              expect.objectContaining({
+                noteId: 'note-project'
+              })
+            ]
+          })
+        },
+        sourceNote: {
+          id: 'note-health',
+          title: 'Cita medico',
+          analysisStatus: 'qwen'
+        }
+      },
+      next: {
+        status: 'open',
+        mcpApproval: 'needs-review',
+        handoff: 'ready-for-review'
+      }
+    })
+
+    const database = await readNeuronotesDatabase(dbPath)
+    expect(database.actions[0]).toMatchObject({
+      id: created.action.id,
+      noteId: 'note-health',
+      noteTitle: 'Cita medico',
+      kind: 'task',
+      title: 'Preparar agenda MCP',
+      toolHint: 'task.create',
+      status: 'open'
+    })
+    expect(database.actions[0].mcpApprovedAt).toBeUndefined()
+
+    const handoff = await callTool('neuronotes_mcp_handoff', {}, { dbPath })
+    expect(handoff).toMatchObject({
+      actionCount: 2,
+      approvedActionCount: 1,
+      actions: expect.arrayContaining([
+        expect.objectContaining({
+          id: created.action.id,
+          approval: {
+            required: true,
+            state: 'needs-review',
+            approvedAt: null
+          },
+          toolCallDraft: expect.objectContaining({
+            status: 'ready-for-review',
+            toolName: 'task.create'
+          })
+        })
+      ])
+    })
+
+    const duplicate = await callTool('neuronotes_create_action', args, { dbPath, writeEnabled: true })
+    const databaseAfterDuplicate = await readNeuronotesDatabase(dbPath)
+
+    expect(duplicate).toMatchObject({
+      created: false,
+      action: {
+        id: created.action.id,
+        approval: {
+          state: 'needs-review'
+        }
+      }
+    })
+    expect(databaseAfterDuplicate.actions).toHaveLength(database.actions.length)
   })
 })
 
