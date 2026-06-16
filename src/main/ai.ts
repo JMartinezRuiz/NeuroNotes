@@ -46,6 +46,8 @@ interface OllamaPullResponse {
 const OLLAMA_HEALTH_TIMEOUT_MS = 3500
 const QWEN_GENERATE_TIMEOUT_MS = 45000
 const QWEN_CONTEXT_WINDOW = 4096
+const QWEN_NOTE_CONTENT_LIMIT = 2400
+const TRUNCATED_NOTE_SUFFIX = '[Contenido truncado para mantener el contexto RAG dentro del presupuesto local.]'
 
 interface AiPayload {
   title?: unknown
@@ -381,6 +383,8 @@ async function analyzeWithQwen(
 }
 
 function buildPrompt(note: NoteRecord, context: string): string {
+  const noteContent = boundedPromptContent(note.content)
+
   return `Eres el motor local de Neuronotes. Analiza la nota nueva y usa el contexto recuperado solo si ayuda.
 
 Devuelve exclusivamente JSON valido con esta forma:
@@ -417,10 +421,20 @@ Categoria actual: ${note.category || 'Inbox'}
 Etiquetas actuales: ${note.tags.join(', ') || 'sin etiquetas'}
 
 Nota nueva:
-${note.content}
+${noteContent}
 
 Contexto recuperado:
 ${context}`
+}
+
+function boundedPromptContent(content: string): string {
+  const clean = content.trim()
+
+  if (clean.length <= QWEN_NOTE_CONTENT_LIMIT) {
+    return clean
+  }
+
+  return `${clean.slice(0, QWEN_NOTE_CONTENT_LIMIT).trimEnd()}\n\n${TRUNCATED_NOTE_SUFFIX}`
 }
 
 function parseJson(text: string): AiPayload {

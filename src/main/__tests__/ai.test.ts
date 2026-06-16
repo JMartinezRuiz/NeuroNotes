@@ -282,6 +282,60 @@ describe('analyzeNote', () => {
     expect(body.messages[0].content).toContain('Etiquetas actuales: producto')
   })
 
+  it('bounds long note content in the Qwen prompt while keeping retrieved context', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          message: {
+            role: 'assistant',
+            content: JSON.stringify({
+              title: 'Nota extensa',
+              summary: 'Resume una nota extensa con contexto RAG.',
+              category: 'Proyecto',
+              tags: ['qwen', 'rag'],
+              related: [{ noteId: 'context-note', reason: 'Comparte el plan RAG local.' }]
+            })
+          }
+        }),
+        { status: 200 }
+      )
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const sentinel = 'sentinel-final-que-no-debe-llegar-al-prompt'
+    const source = note({
+      id: 'source',
+      title: 'Nota larga Qwen',
+      category: 'Proyecto',
+      tags: ['qwen'],
+      content: `${'Proyecto Neuronotes Qwen RAG local con enlaces automaticos. '.repeat(90)}${sentinel}`
+    })
+    const contextNote = note({
+      id: 'context-note',
+      title: 'Contexto RAG local',
+      category: 'Proyecto',
+      tags: ['qwen', 'rag'],
+      content: 'El contexto RAG local ayuda a resumir y enlazar notas de Neuronotes con Qwen.'
+    })
+
+    await expect(analyzeNote(source, [source, contextNote], settings)).resolves.toMatchObject({
+      status: 'qwen',
+      analysisRun: {
+        ragNoteIds: ['context-note']
+      }
+    })
+
+    const [, request] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const body = JSON.parse(String(request.body)) as {
+      messages: Array<{ content: string; role: string }>
+    }
+
+    expect(body.messages[0].content).toContain('Contexto recuperado:')
+    expect(body.messages[0].content).toContain('ID: context-note')
+    expect(body.messages[0].content).toContain('[Contenido truncado')
+    expect(body.messages[0].content).not.toContain(sentinel)
+  })
+
   it('keeps local related-note ranking when Qwen returns no links', async () => {
     vi.stubGlobal(
       'fetch',
