@@ -62,6 +62,7 @@ import {
 } from './fineTuneReadiness'
 import { createPreviewApi } from './previewApi'
 import { GraphConnection, graphConnections, graphEdges, graphIsolatedNotes } from './graph'
+import { linkProvenance } from './linkProvenance'
 import {
   McpActionReadinessFilter,
   actionMatchesMcpReadinessFilter,
@@ -215,6 +216,16 @@ function directionLabel(direction: GraphConnection['direction']): string {
   }
 
   return 'Salida'
+}
+
+function renderLinkProvenance(reason: string, direction?: GraphConnection['direction']): JSX.Element {
+  const provenance = linkProvenance(reason, direction)
+
+  return (
+    <code className="link-provenance" data-tone={provenance.tone} title={provenance.title}>
+      {provenance.label}
+    </code>
+  )
 }
 
 function parseTagInput(value: string): string[] {
@@ -2463,30 +2474,35 @@ export default function App(): JSX.Element {
                 </div>
                 <div className="related-list">
                   {selectedNote.related.length > 0 ? (
-                    selectedNote.related.map((related) => (
-                      <div className="related-item" key={related.noteId}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedId(related.noteId)}
-                          className="related-row"
-                        >
-                          <Link2 size={15} />
-                          <span>
-                            <strong>{related.title}</strong>
-                            <small>{related.reason}</small>
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          className="unlink-button"
-                          onClick={() => removeManualLink(related.noteId)}
-                          disabled={busy === `removeLink:${related.noteId}`}
-                          title="Quitar enlace"
-                        >
-                          {busy === `removeLink:${related.noteId}` ? <Loader2 className="spin" size={14} /> : <Trash2 size={14} />}
-                        </button>
-                      </div>
-                    ))
+                    selectedNote.related.map((related) => {
+                      return (
+                        <div className="related-item" key={related.noteId}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedId(related.noteId)}
+                            className="related-row"
+                          >
+                            <Link2 size={15} />
+                            <span>
+                              <span className="related-heading">
+                                <strong>{related.title}</strong>
+                                {renderLinkProvenance(related.reason)}
+                              </span>
+                              <small>{related.reason}</small>
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            className="unlink-button"
+                            onClick={() => removeManualLink(related.noteId)}
+                            disabled={busy === `removeLink:${related.noteId}`}
+                            title="Quitar enlace"
+                          >
+                            {busy === `removeLink:${related.noteId}` ? <Loader2 className="spin" size={14} /> : <Trash2 size={14} />}
+                          </button>
+                        </div>
+                      )
+                    })
                   ) : (
                     <p className="muted">Sin enlaces todavia.</p>
                   )}
@@ -2509,7 +2525,10 @@ export default function App(): JSX.Element {
                       >
                         <Network size={15} />
                         <span>
-                          <strong>{connection.note.title}</strong>
+                          <span className="related-heading">
+                            <strong>{connection.note.title}</strong>
+                            {renderLinkProvenance(connection.reason, connection.direction)}
+                          </span>
                           <small>{connection.reason}</small>
                         </span>
                       </button>
@@ -2625,7 +2644,10 @@ export default function App(): JSX.Element {
                       >
                         <Network size={15} />
                         <span>
-                          <strong>{connection.note.title}</strong>
+                          <span className="related-heading">
+                            <strong>{connection.note.title}</strong>
+                            {renderLinkProvenance(connection.reason, connection.direction)}
+                          </span>
                           <small>
                             {directionLabel(connection.direction)} - {connection.reason}
                           </small>
