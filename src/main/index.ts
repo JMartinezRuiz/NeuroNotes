@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, shell, Tray } from 'electron'
 import type { MenuItemConstructorOptions, MessageBoxOptions } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -43,6 +43,7 @@ import {
 } from './storage'
 import { captureWindowState, readWindowState, writeWindowState } from './windowState'
 import { registerAppGlobalShortcuts } from './globalShortcuts'
+import { buildTrayMenuTemplate } from './trayMenu'
 import {
   AnalyzePendingResult,
   AnalyzePendingMode,
@@ -60,7 +61,7 @@ import {
   NoteRecord
 } from './types'
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   const userDataPath = app.getPath('userData')
   const windowState = readWindowState(userDataPath)
   const mainWindow = new BrowserWindow({
@@ -103,6 +104,8 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
+
+  return mainWindow
 }
 
 function focusMainWindow(): void {
@@ -133,13 +136,28 @@ function sendCommand(command: AppCommand): void {
   window.webContents.send('app:command', command)
 }
 
-function focusAndSendCommand(command: AppCommand): void {
+function showMainWindow(): void {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
   }
 
   focusMainWindow()
-  sendCommand(command)
+}
+
+function focusAndSendCommand(command: AppCommand): void {
+  const existingWindow = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+
+  if (!existingWindow) {
+    const window = createWindow()
+    window.webContents.once('did-finish-load', () => {
+      focusMainWindow()
+      window.webContents.send('app:command', command)
+    })
+    return
+  }
+
+  focusMainWindow()
+  existingWindow.webContents.send('app:command', command)
 }
 
 function createAppMenu(): void {
@@ -264,8 +282,29 @@ function registerGlobalShortcuts(): void {
   }
 }
 
+function createTray(): void {
+  if (appTray) {
+    return
+  }
+
+  appTray = new Tray(path.join(__dirname, '../../build/icon.ico'))
+  appTray.setToolTip('Neuronotes')
+  appTray.setContextMenu(
+    Menu.buildFromTemplate(
+      buildTrayMenuTemplate({
+        show: showMainWindow,
+        capture: () => focusAndSendCommand('focus-capture'),
+        captureClipboard: () => focusAndSendCommand('capture-clipboard'),
+        quit: () => app.quit()
+      })
+    )
+  )
+  appTray.on('click', showMainWindow)
+}
+
 const singleInstanceLock = app.requestSingleInstanceLock()
 let databaseChangeWatcher: DatabaseChangeWatcher | undefined
+let appTray: Tray | undefined
 
 if (!singleInstanceLock) {
   app.quit()
@@ -292,6 +331,7 @@ if (!singleInstanceLock) {
     }
     createAppMenu()
     createWindow()
+    createTray()
     registerGlobalShortcuts()
 
     app.on('activate', () => {
@@ -317,6 +357,8 @@ if (!singleInstanceLock) {
 
   app.on('will-quit', () => {
     globalShortcut.unregisterAll()
+    appTray?.destroy()
+    appTray = undefined
   })
 }
 

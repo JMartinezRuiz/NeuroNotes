@@ -33,6 +33,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Accent-insensitive search and tag normalization for Spanish notes.
 - Category aliases from Qwen, imports, and MCP capture are normalized across Spanish and English terms such as `project`, `health`, `work`, and `finanzas personales`.
 - Native desktop menu with keyboard shortcuts for capture, search, save, analysis, export, settings, and note/network views.
+- Windows system tray menu for showing the app, starting a quick note, creating a note from the clipboard, and quitting.
 - Global quick-capture shortcuts can focus Neuronotes from Windows: `Ctrl+Alt+N` for a blank note and `Ctrl+Alt+V` for a clipboard note.
 - Quick capture can submit the current note with `Ctrl+Enter` or `Cmd+Enter` while plain Enter remains available for multiline notes.
 - Quick capture can create a new note directly from the system clipboard, then run the same local/Qwen analysis flow.
