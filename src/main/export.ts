@@ -1,5 +1,5 @@
 import { ActionItem, DatabaseFile, NOTE_CATEGORIES, NoteRecord, RagContextItem, SuggestedAction } from './types'
-import { linkProvenance } from '../shared/linkProvenance'
+import { linkProvenance, type LinkProvenance } from '../shared/linkProvenance'
 
 const MCP_HANDOFF_SCHEMA = 'neuronotes.mcp-handoff.v1'
 const FINE_TUNE_EXAMPLE_SCHEMA = 'neuronotes.finetune-example.v1'
@@ -67,6 +67,14 @@ export interface FineTuneExampleQuality {
   warnings: string[]
 }
 
+export interface HandoffRelatedNote {
+  noteId: string
+  title: string
+  score: number
+  reason: string
+  provenance: LinkProvenance
+}
+
 export interface McpHandoffPayload {
   schema: string
   exportedAt: string
@@ -117,6 +125,7 @@ export interface McpHandoffPayload {
         sourceNoteCategory: string
         sourceNoteTags: string[]
         relatedNoteIds: string[]
+        relatedNotes: HandoffRelatedNote[]
         ragContext: RagContextItem[]
       }
     }
@@ -130,6 +139,7 @@ export interface McpHandoffPayload {
       tags: string[]
       contentExcerpt: string
       relatedNoteIds: string[]
+      relatedNotes: HandoffRelatedNote[]
       analysis: {
         provider: string
         model: string
@@ -252,6 +262,7 @@ export function buildMcpHandoffPayload(database: DatabaseFile, exportedAt = new 
     }
 
     const approvalState: 'approved' | 'needs-review' = action.mcpApprovedAt ? 'approved' : 'needs-review'
+    const relatedNotes = handoffRelatedNotes(note)
 
     return {
       id: action.id,
@@ -277,6 +288,7 @@ export function buildMcpHandoffPayload(database: DatabaseFile, exportedAt = new 
         tags: note.tags,
         contentExcerpt: excerpt(note.content, 1200),
         relatedNoteIds: note.related.map((related) => related.noteId),
+        relatedNotes,
         analysis: note.analysisRun
           ? {
               provider: note.analysisRun.provider,
@@ -442,6 +454,7 @@ function buildKindSummary(actions: McpHandoffPayload['actions']): McpHandoffPayl
 
 function buildToolCallDraft(action: ActionItem, note: NoteRecord): McpHandoffPayload['actions'][number]['toolCallDraft'] {
   const ragContext = note.analysisRun?.ragContext ?? []
+  const relatedNotes = handoffRelatedNotes(note)
 
   return {
     status: action.toolHint ? 'ready-for-review' : 'needs-tool-selection',
@@ -457,9 +470,20 @@ function buildToolCallDraft(action: ActionItem, note: NoteRecord): McpHandoffPay
       sourceNoteCategory: note.category,
       sourceNoteTags: note.tags,
       relatedNoteIds: note.related.map((related) => related.noteId),
+      relatedNotes,
       ragContext
     }
   }
+}
+
+function handoffRelatedNotes(note: NoteRecord): HandoffRelatedNote[] {
+  return note.related.map((related) => ({
+    noteId: related.noteId,
+    title: related.title,
+    score: related.score,
+    reason: related.reason,
+    provenance: linkProvenance(related.reason)
+  }))
 }
 
 function isFineTuneCandidate(note: NoteRecord): boolean {

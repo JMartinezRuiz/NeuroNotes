@@ -234,6 +234,19 @@ describe('buildMcpHandoffPayload', () => {
               title: 'Crear tarea',
               sourceNoteId: sourceNote.id,
               relatedNoteIds: ['note-2'],
+              relatedNotes: [
+                {
+                  noteId: 'note-2',
+                  title: 'Interfaz minimalista',
+                  score: 0.82,
+                  reason: 'Comparte contexto de producto.',
+                  provenance: {
+                    label: 'Auto',
+                    tone: 'auto',
+                    title: 'Relacion detectada automaticamente por Neuronotes.'
+                  }
+                }
+              ],
               ragContext: [
                 {
                   noteId: 'note-2',
@@ -253,6 +266,19 @@ describe('buildMcpHandoffPayload', () => {
             category: 'Proyecto',
             tags: ['qwen', 'notas'],
             relatedNoteIds: ['note-2'],
+            relatedNotes: [
+              {
+                noteId: 'note-2',
+                title: 'Interfaz minimalista',
+                score: 0.82,
+                reason: 'Comparte contexto de producto.',
+                provenance: {
+                  label: 'Auto',
+                  tone: 'auto',
+                  title: 'Relacion detectada automaticamente por Neuronotes.'
+                }
+              }
+            ],
             analysis: expect.objectContaining({
               provider: 'qwen',
               model: 'qwen3.5:0.8b',

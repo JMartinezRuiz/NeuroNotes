@@ -1685,6 +1685,8 @@ function formatMcpCreatedAction(action, note) {
       summary: note.summary,
       category: note.category,
       tags: note.tags,
+      relatedNoteIds: note.related.map((related) => related.noteId),
+      relatedNotes: handoffRelatedNotes(note),
       analysisStatus: note.analysisStatus
     }
   }
@@ -1734,7 +1736,8 @@ function noteGraph(database, args = {}) {
         sourceId: source.id,
         targetId: target.id,
         score: related.score,
-        reason: related.reason
+        reason: related.reason,
+        provenance: linkProvenance(related.reason)
       })
       edgesById.set(id, edge)
     }
@@ -1908,6 +1911,8 @@ function listOpenActions(database, args) {
               summary: note.summary,
               category: note.category,
               tags: note.tags,
+              relatedNoteIds: note.related.map((related) => related.noteId),
+              relatedNotes: handoffRelatedNotes(note),
               analysisStatus: note.analysisStatus
             }
           : null
@@ -1950,6 +1955,7 @@ function mcpHandoff(database) {
         tags: note.tags,
         contentExcerpt: excerpt(note.content, 1200),
         relatedNoteIds: note.related.map((related) => related.noteId),
+        relatedNotes: handoffRelatedNotes(note),
         analysis: note.analysisRun
           ? {
               provider: note.analysisRun.provider,
@@ -2051,9 +2057,94 @@ function buildToolCallDraft(action, note) {
       sourceNoteCategory: note.category,
       sourceNoteTags: note.tags,
       relatedNoteIds: note.related.map((related) => related.noteId),
+      relatedNotes: handoffRelatedNotes(note),
       ragContext: note.analysisRun?.ragContext ?? []
     }
   }
+}
+
+function handoffRelatedNotes(note) {
+  return note.related.map((related) => ({
+    noteId: related.noteId,
+    title: related.title,
+    score: related.score,
+    reason: related.reason,
+    provenance: linkProvenance(related.reason)
+  }))
+}
+
+function linkProvenance(reason, direction) {
+  if (direction === 'both') {
+    return {
+      label: 'Mutua',
+      title: 'Ambas notas se enlazan entre si.',
+      tone: 'both'
+    }
+  }
+
+  if (direction === 'backlink') {
+    return {
+      label: 'Entrada',
+      title: 'Otra nota apunta a esta nota.',
+      tone: 'incoming'
+    }
+  }
+
+  const normalized = normalizeProvenanceReason(reason)
+
+  if (normalized.startsWith('enlace reciproco')) {
+    return {
+      label: 'Backlink',
+      title: 'Enlace reciproco creado desde otra relacion.',
+      tone: 'incoming'
+    }
+  }
+
+  if (normalized.includes('enlace manual')) {
+    return {
+      label: 'Manual',
+      title: 'Enlace creado o corregido por el usuario.',
+      tone: 'manual'
+    }
+  }
+
+  if (normalized.includes('referencia explicita')) {
+    return {
+      label: 'Referencia',
+      title: 'La nota menciona explicitamente este destino.',
+      tone: 'explicit'
+    }
+  }
+
+  if (normalized.includes('rag') || normalized.includes('qwen') || normalized.includes('contexto recuperado')) {
+    return {
+      label: 'RAG',
+      title: 'Relacion usada o recuperada como contexto RAG local.',
+      tone: 'rag'
+    }
+  }
+
+  if (normalized.includes('relacion local inicial')) {
+    return {
+      label: 'Local',
+      title: 'Relacion local sembrada antes del analisis Qwen.',
+      tone: 'local'
+    }
+  }
+
+  return {
+    label: 'Auto',
+    title: 'Relacion detectada automaticamente por Neuronotes.',
+    tone: 'auto'
+  }
+}
+
+function normalizeProvenanceReason(value) {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
 }
 
 function librarySummary(database, dbPath, context = {}) {

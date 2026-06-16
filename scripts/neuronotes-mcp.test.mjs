@@ -519,7 +519,18 @@ describe('neuronotes MCP server', () => {
           targetId: 'note-project',
           bidirectional: false,
           relationCount: 1,
-          reasons: ['Ambas notas mencionan Qwen local.']
+          reasons: ['Ambas notas mencionan Qwen local.'],
+          directedLinks: [
+            expect.objectContaining({
+              sourceId: 'note-health',
+              targetId: 'note-project',
+              provenance: {
+                label: 'RAG',
+                title: 'Relacion usada o recuperada como contexto RAG local.',
+                tone: 'rag'
+              }
+            })
+          ]
         })
       ],
       orphanNotes: [
@@ -823,12 +834,39 @@ describe('neuronotes MCP server', () => {
               kind: 'reminder',
               title: 'Crear recordatorio',
               sourceNoteId: 'note-health',
-              relatedNoteIds: ['note-project']
+              relatedNoteIds: ['note-project'],
+              relatedNotes: [
+                {
+                  noteId: 'note-project',
+                  title: 'Roadmap Neuronotes',
+                  score: 0.7,
+                  reason: 'Ambas notas mencionan Qwen local.',
+                  provenance: {
+                    label: 'RAG',
+                    title: 'Relacion usada o recuperada como contexto RAG local.',
+                    tone: 'rag'
+                  }
+                }
+              ]
             })
           },
           sourceNote: {
             id: 'note-health',
-            category: 'Salud'
+            category: 'Salud',
+            relatedNoteIds: ['note-project'],
+            relatedNotes: [
+              {
+                noteId: 'note-project',
+                title: 'Roadmap Neuronotes',
+                score: 0.7,
+                reason: 'Ambas notas mencionan Qwen local.',
+                provenance: {
+                  label: 'RAG',
+                  title: 'Relacion usada o recuperada como contexto RAG local.',
+                  tone: 'rag'
+                }
+              }
+            ]
           }
         }
       ]
@@ -874,6 +912,19 @@ describe('neuronotes MCP server', () => {
             arguments: expect.objectContaining({
               sourceNoteId: 'note-health',
               relatedNoteIds: ['note-project'],
+              relatedNotes: [
+                {
+                  noteId: 'note-project',
+                  title: 'Roadmap Neuronotes',
+                  score: 0.7,
+                  reason: 'Ambas notas mencionan Qwen local.',
+                  provenance: {
+                    label: 'RAG',
+                    title: 'Relacion usada o recuperada como contexto RAG local.',
+                    tone: 'rag'
+                  }
+                }
+              ],
               ragContext: [
                 expect.objectContaining({
                   noteId: 'note-project'
@@ -884,6 +935,19 @@ describe('neuronotes MCP server', () => {
           sourceNote: expect.objectContaining({
             id: 'note-health',
             contentExcerpt: 'Recordar cita con el medico manana y revisar Qwen local.',
+            relatedNotes: [
+              {
+                noteId: 'note-project',
+                title: 'Roadmap Neuronotes',
+                score: 0.7,
+                reason: 'Ambas notas mencionan Qwen local.',
+                provenance: {
+                  label: 'RAG',
+                  title: 'Relacion usada o recuperada como contexto RAG local.',
+                  tone: 'rag'
+                }
+              }
+            ],
             analysis: expect.objectContaining({
               provider: 'qwen',
               ragNoteIds: ['note-project']
@@ -1281,6 +1345,19 @@ describe('neuronotes MCP server', () => {
           arguments: expect.objectContaining({
             sourceNoteId: 'note-health',
             relatedNoteIds: ['note-project'],
+            relatedNotes: [
+              {
+                noteId: 'note-project',
+                title: 'Roadmap Neuronotes',
+                score: 0.7,
+                reason: 'Ambas notas mencionan Qwen local.',
+                provenance: {
+                  label: 'RAG',
+                  title: 'Relacion usada o recuperada como contexto RAG local.',
+                  tone: 'rag'
+                }
+              }
+            ],
             ragContext: [
               expect.objectContaining({
                 noteId: 'note-project'
@@ -1291,6 +1368,20 @@ describe('neuronotes MCP server', () => {
         sourceNote: {
           id: 'note-health',
           title: 'Cita medico',
+          relatedNoteIds: ['note-project'],
+          relatedNotes: [
+            {
+              noteId: 'note-project',
+              title: 'Roadmap Neuronotes',
+              score: 0.7,
+              reason: 'Ambas notas mencionan Qwen local.',
+              provenance: {
+                label: 'RAG',
+                title: 'Relacion usada o recuperada como contexto RAG local.',
+                tone: 'rag'
+              }
+            }
+          ],
           analysisStatus: 'qwen'
         }
       },
