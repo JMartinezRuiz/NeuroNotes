@@ -271,7 +271,7 @@ describe('createPreviewApi', () => {
       content: 'Contenido corregido que debe esperar un nuevo analisis local.'
     })
 
-    expect(updated.summary).toBe('')
+    expect(updated.summary).toBe('Contenido corregido que debe esperar un nuevo analisis local.')
     expect(updated.suggestedActions).toEqual([])
     expect(updated.analysisStatus).toBe('idle')
     expect(updated.analysisError).toBeUndefined()
@@ -282,6 +282,31 @@ describe('createPreviewApi', () => {
       noteId: target.id,
       title: target.title,
       reason: 'Enlace manual.'
+    })
+  })
+
+  it('seeds preview draft metadata after content edits while preserving curated category', async () => {
+    const api = createPreviewApi()
+    const created = await api.createNote('Idea visual inicial')
+    await api.updateNote(created.id, {
+      category: 'Ideas',
+      tags: ['manual']
+    })
+
+    const updated = await api.updateNote(created.id, {
+      content: 'Preparar reminder MCP para #Cliente y #RAG local'
+    })
+
+    expect(updated).toMatchObject({
+      summary: 'Preparar reminder MCP para local',
+      category: 'Ideas',
+      tags: ['manual', 'cliente', 'rag'],
+      suggestedActions: [
+        expect.objectContaining({ kind: 'task', toolHint: 'task.create' }),
+        expect.objectContaining({ kind: 'reminder', toolHint: 'reminder.create' }),
+        expect.objectContaining({ kind: 'mcp', toolHint: 'mcp.workflow.prepare' })
+      ],
+      analysisStatus: 'idle'
     })
   })
 

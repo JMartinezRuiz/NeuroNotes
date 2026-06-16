@@ -292,6 +292,17 @@ export function createNoteDraft(content: string): NoteRecord {
   }
 }
 
+export function seedDraftMetadataAfterContentEdit(note: NoteRecord): void {
+  const tags = normalizeNoteTags([...note.tags, ...inferDraftTags(note.content)])
+
+  note.summary = summarizeDraftContent(note.content)
+  note.tags = tags
+  if (!note.category || note.category === 'Inbox') {
+    note.category = inferDraftCategory(note.content, tags)
+  }
+  note.suggestedActions = inferSuggestedActions(note.content)
+}
+
 function serializeDatabase(database: DatabaseFile): string {
   return `${JSON.stringify(database, null, 2)}\n`
 }

@@ -283,6 +283,16 @@ const previewDraftTitle = (content: string, summary: string): string => {
 
   return title || summary.slice(0, 80) || 'Nota sin titulo'
 }
+const seedPreviewDraftMetadataAfterContentEdit = (note: NoteRecord): void => {
+  const inlineTags = previewInlineTags(note.content)
+
+  note.summary = previewDraftSummary(note.content)
+  note.tags = Array.from(new Set([...note.tags, ...inlineTags].map(normalizePreviewText).filter(Boolean)))
+  if (!note.category || note.category === 'Inbox') {
+    note.category = previewDraftCategory(note.content, note.tags)
+  }
+  note.suggestedActions = previewSuggestedActions(note.content)
+}
 const previewSuggestedActions = (content: string): NoteRecord['suggestedActions'] => {
   const text = normalizePreviewText(content)
   const actions: NoteRecord['suggestedActions'] = []
@@ -660,6 +670,7 @@ export function createPreviewApi(): Api {
         note.content = updates.content
         if (contentChanged) {
           resetPreviewAnalysisAfterContentEdit(note)
+          seedPreviewDraftMetadataAfterContentEdit(note)
           needsGraphSync = true
         }
       }

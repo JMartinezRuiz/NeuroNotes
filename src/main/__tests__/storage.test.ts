@@ -14,7 +14,15 @@ vi.mock('electron', () => ({
   }
 }))
 
-import { createNoteDraft, databasePaths, mutateDatabase, normalizeDatabase, readDatabase, writeDatabase } from '../storage'
+import {
+  createNoteDraft,
+  databasePaths,
+  mutateDatabase,
+  normalizeDatabase,
+  readDatabase,
+  seedDraftMetadataAfterContentEdit,
+  writeDatabase
+} from '../storage'
 
 function note(id: string): NoteRecord {
   const now = '2026-06-15T00:00:00.000Z'
@@ -133,6 +141,45 @@ describe('createNoteDraft', () => {
     expect(draft.title).toBe('Roadmap producto notas automaticas con resumen local')
     expect(draft.summary).toBe('Roadmap producto notas automaticas con resumen local')
     expect(draft.tags).toEqual(['roadmap'])
+  })
+})
+
+describe('seedDraftMetadataAfterContentEdit', () => {
+  it('seeds summary, inline tags, category, and actions after content edits', () => {
+    const draft = createNoteDraft('Nota inicial sin metadata fuerte')
+    draft.summary = ''
+    draft.category = 'Inbox'
+    draft.tags = ['manual']
+    draft.suggestedActions = []
+    draft.content = 'Preparar reminder MCP para #Cliente y #RAG local'
+
+    seedDraftMetadataAfterContentEdit(draft)
+
+    expect(draft).toMatchObject({
+      summary: 'Preparar reminder MCP para local',
+      category: 'Trabajo',
+      tags: ['manual', 'cliente', 'rag'],
+      suggestedActions: [
+        expect.objectContaining({ kind: 'task', toolHint: 'task.create' }),
+        expect.objectContaining({ kind: 'reminder', toolHint: 'reminder.create' }),
+        expect.objectContaining({ kind: 'mcp', toolHint: 'mcp.workflow.prepare' })
+      ]
+    })
+  })
+
+  it('keeps an existing curated category while adding edited content metadata', () => {
+    const draft = createNoteDraft('Idea original #roadmap')
+    draft.category = 'Ideas'
+    draft.summary = ''
+    draft.tags = ['roadmap']
+    draft.suggestedActions = []
+    draft.content = 'Pagar factura mensual y revisar presupuesto #Finanzas'
+
+    seedDraftMetadataAfterContentEdit(draft)
+
+    expect(draft.category).toBe('Ideas')
+    expect(draft.summary).toBe('Pagar factura mensual y revisar presupuesto')
+    expect(draft.tags).toEqual(['roadmap', 'finanzas'])
   })
 })
 

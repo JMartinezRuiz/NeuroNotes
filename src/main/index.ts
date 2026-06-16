@@ -31,7 +31,15 @@ import {
   resetAnalysisAfterContentEdit
 } from './noteLifecycle'
 import { buildQwenWindowsSetupCommand } from './qwenSetup'
-import { createNoteDraft, databasePaths, listNotes, mutateDatabase, normalizeDatabase, readDatabase } from './storage'
+import {
+  createNoteDraft,
+  databasePaths,
+  listNotes,
+  mutateDatabase,
+  normalizeDatabase,
+  readDatabase,
+  seedDraftMetadataAfterContentEdit
+} from './storage'
 import { captureWindowState, readWindowState, writeWindowState } from './windowState'
 import {
   AnalyzePendingResult,
@@ -309,6 +317,7 @@ function registerIpcHandlers(): void {
         note.content = updates.content.trim()
         if (contentChanged) {
           resetAnalysisAfterContentEdit(note)
+          seedDraftMetadataAfterContentEdit(note)
         }
       }
 

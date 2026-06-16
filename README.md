@@ -64,7 +64,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Explicit note references such as `[[Roadmap Neuronotes]]` or `@roadmap-neuronotes` are treated as strong local link signals on new or edited notes and can seed backlinks before Qwen runs.
 - Initial local links are preserved through analysis until Qwen/local analysis confirms the same relationship or replaces the reason with stronger evidence.
 - Automatic summaries, categories, tags, and related-note suggestions.
-- Editing note content clears stale AI summaries, suggested actions, and automatic links while preserving manual links.
+- Editing note content clears stale AI analysis, preserves manual links, and reseeds a local draft summary, inline tags, explicit links, and suggested action intents while waiting for Qwen or fallback analysis.
 - Late AI results are ignored if the note changed while analysis was running, preventing stale Qwen/local output from overwriting user edits.
 - Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
 - Local action plan: users can save suggested actions, review them in a global Plan view, mark them done, delete them, and carry them through library/Markdown export.
