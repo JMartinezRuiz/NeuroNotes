@@ -27,10 +27,16 @@ describe('quick capture messages', () => {
     expect(quickCaptureProgressMessage(false, 'qwen')).toBe('Nota creada.')
     expect(quickCaptureProgressMessage(true, 'qwen')).toBe('Nota creada. Analizando con Qwen...')
     expect(quickCaptureProgressMessage(true, 'local')).toBe('Nota creada. Analizando localmente...')
+    expect(quickCaptureProgressMessage(true, 'local', 'Nota creada desde portapapeles.')).toBe(
+      'Nota creada desde portapapeles. Analizando localmente...'
+    )
   })
 
   it('combines creation and analysis result messages', () => {
     expect(quickCaptureResultMessage({ analysisStatus: 'qwen' }, 'qwen')).toBe('Nota creada. Analisis Qwen listo.')
+    expect(quickCaptureResultMessage({ analysisStatus: 'qwen' }, 'qwen', 'Nota creada desde portapapeles.')).toBe(
+      'Nota creada desde portapapeles. Analisis Qwen listo.'
+    )
   })
 })
 

@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createPreviewApi } from '../previewApi'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('createPreviewApi', () => {
   it('starts each preview instance from a clean seeded state', async () => {
@@ -152,6 +156,42 @@ describe('createPreviewApi', () => {
       ],
       analysisStatus: 'idle'
     })
+  })
+
+  it('creates preview notes from clipboard text', async () => {
+    vi.stubGlobal('navigator', {
+      clipboard: {
+        readText: vi.fn().mockResolvedValue('Preparar RAG desde portapapeles #MCP')
+      }
+    })
+    const api = createPreviewApi()
+
+    const created = await api.createNoteFromClipboard()
+
+    expect(created).toMatchObject({
+      title: 'Preparar RAG desde portapapeles',
+      tags: ['mcp'],
+      analysisStatus: 'idle'
+    })
+    await expect(api.listNotes()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: created.id,
+          content: 'Preparar RAG desde portapapeles #MCP'
+        })
+      ])
+    )
+  })
+
+  it('rejects empty preview clipboard capture', async () => {
+    vi.stubGlobal('navigator', {
+      clipboard: {
+        readText: vi.fn().mockResolvedValue('   ')
+      }
+    })
+    const api = createPreviewApi()
+
+    await expect(api.createNoteFromClipboard()).rejects.toThrow('El portapapeles no contiene texto')
   })
 
   it('seeds preview related links from local note context before analysis', async () => {

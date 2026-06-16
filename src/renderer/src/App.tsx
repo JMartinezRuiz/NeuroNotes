@@ -3,6 +3,7 @@ import {
   Circle,
   CheckCircle2,
   CircleAlert,
+  ClipboardPaste,
   Copy,
   Download,
   FileDown,
@@ -742,6 +743,11 @@ export default function App(): JSX.Element {
       return
     }
 
+    if (command === 'capture-clipboard') {
+      await createNoteFromClipboard()
+      return
+    }
+
     if (command === 'focus-search') {
       window.requestAnimationFrame(() => {
         searchInputRef.current?.focus()
@@ -886,25 +892,45 @@ export default function App(): JSX.Element {
 
     setBusy('create')
     try {
-      const engine = pendingAnalysisEngine(health.ok)
       const created = await api.createNote(content)
       setQuickNote('')
-      setSelectedId(created.id)
-      await refreshNotes(created.id)
-      setCaptureMessage(quickCaptureProgressMessage(settings.autoAnalyze, engine))
-
-      if (settings.autoAnalyze) {
-        setBusy('analyzeQuick')
-        const analyzed = await api.analyzeNote(created.id, engine)
-        await refreshNotes(analyzed.id)
-        const message = quickCaptureResultMessage(analyzed, engine)
-        setCaptureMessage(message)
-        setEditorMessage(analysisResultMessage(analyzed, engine))
-      } else {
-        setEditorMessage('Nota creada.')
-      }
+      await finishCapturedNote(created)
+    } catch (error) {
+      setCaptureMessage(error instanceof Error ? error.message : 'No se pudo crear la nota')
     } finally {
       setBusy(null)
+    }
+  }
+
+  async function createNoteFromClipboard(): Promise<void> {
+    setBusy('clipboard')
+    try {
+      const created = await api.createNoteFromClipboard()
+      setQuickNote('')
+      await finishCapturedNote(created, 'Nota creada desde portapapeles.')
+    } catch (error) {
+      setCaptureMessage(error instanceof Error ? error.message : 'No se pudo leer el portapapeles')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function finishCapturedNote(created: NoteRecord, createdMessage = 'Nota creada.'): Promise<void> {
+    const engine = pendingAnalysisEngine(health.ok)
+
+    setSelectedId(created.id)
+    await refreshNotes(created.id)
+    setCaptureMessage(settings.autoAnalyze ? quickCaptureProgressMessage(true, engine, createdMessage) : createdMessage)
+
+    if (settings.autoAnalyze) {
+      setBusy('analyzeQuick')
+      const analyzed = await api.analyzeNote(created.id, engine)
+      await refreshNotes(analyzed.id)
+      const message = quickCaptureResultMessage(analyzed, engine, createdMessage)
+      setCaptureMessage(message)
+      setEditorMessage(analysisResultMessage(analyzed, engine))
+    } else {
+      setEditorMessage(createdMessage)
     }
   }
 
@@ -1488,10 +1514,26 @@ export default function App(): JSX.Element {
             placeholder="Nota rapida"
             rows={4}
           />
-          <button type="submit" disabled={busy === 'create' || busy === 'analyzeQuick'} title="Crear nota">
-            {busy === 'create' || busy === 'analyzeQuick' ? <Loader2 className="spin" size={17} /> : <Plus size={17} />}
-            {busy === 'analyzeQuick' ? 'Analizando' : 'Crear'}
-          </button>
+          <div className="quick-capture-actions">
+            <button
+              type="submit"
+              disabled={busy === 'create' || busy === 'clipboard' || busy === 'analyzeQuick'}
+              title="Crear nota"
+            >
+              {busy === 'create' || busy === 'analyzeQuick' ? <Loader2 className="spin" size={17} /> : <Plus size={17} />}
+              {busy === 'analyzeQuick' ? 'Analizando' : 'Crear'}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={createNoteFromClipboard}
+              disabled={busy === 'create' || busy === 'clipboard' || busy === 'analyzeQuick'}
+              title="Crear nota desde portapapeles"
+            >
+              {busy === 'clipboard' ? <Loader2 className="spin" size={17} /> : <ClipboardPaste size={17} />}
+              Portapapeles
+            </button>
+          </div>
           {captureMessage && <small className="capture-message">{captureMessage}</small>}
         </form>
 

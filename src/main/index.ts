@@ -143,6 +143,11 @@ function createAppMenu(): void {
           click: () => sendCommand('focus-capture')
         },
         {
+          label: 'Nueva nota desde portapapeles',
+          accelerator: 'CommandOrControl+Alt+V',
+          click: () => sendCommand('capture-clipboard')
+        },
+        {
           label: 'Guardar nota',
           accelerator: 'CommandOrControl+S',
           click: () => sendCommand('save-note')
@@ -296,6 +301,21 @@ function registerIpcHandlers(): void {
   ipcMain.handle('notes:list', async () => listNotes())
 
   ipcMain.handle('notes:create', async (_, content: string) => {
+    const note = createNoteDraft(content)
+    await mutateDatabase((database) => {
+      database.notes.unshift(note)
+      seedInitialRelatedLinks(note, database.notes)
+    })
+    return note
+  })
+
+  ipcMain.handle('notes:createFromClipboard', async () => {
+    const content = clipboard.readText().trim()
+
+    if (!content) {
+      throw new Error('El portapapeles no contiene texto')
+    }
+
     const note = createNoteDraft(content)
     await mutateDatabase((database) => {
       database.notes.unshift(note)

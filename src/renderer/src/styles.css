@@ -129,6 +129,12 @@ button:disabled {
   line-height: 1.45;
 }
 
+.quick-capture-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
 .quick-capture button,
 .editor-actions button {
   display: inline-flex;
@@ -141,18 +147,30 @@ button:disabled {
   background: var(--accent);
 }
 
+.quick-capture button.secondary {
+  color: var(--accent-strong);
+  border: 1px solid rgba(31, 122, 100, 0.18);
+  background: #e5f4ec;
+}
+
 .quick-capture button:hover,
 .editor-actions button:hover {
   background: var(--accent-strong);
 }
 
+.quick-capture button.secondary:hover {
+  color: #fff;
+  background: var(--accent-strong);
+}
+
 .capture-message {
-  overflow: hidden;
+  overflow: visible;
   color: var(--muted);
   font-size: 12px;
   font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .search-box {

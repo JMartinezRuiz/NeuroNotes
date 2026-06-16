@@ -61,19 +61,26 @@ export function analysisActionTitle(note: Pick<NoteRecord, 'analysisStatus'>, qw
   return 'Analizar esta nota con fallback local'
 }
 
-export function quickCaptureProgressMessage(autoAnalyze: boolean, engine: AnalysisMessageEngine): string {
+export function quickCaptureProgressMessage(
+  autoAnalyze: boolean,
+  engine: AnalysisMessageEngine,
+  createdMessage = 'Nota creada.'
+): string {
   if (!autoAnalyze) {
-    return 'Nota creada.'
+    return createdMessage
   }
 
-  return engine === 'qwen' ? 'Nota creada. Analizando con Qwen...' : 'Nota creada. Analizando localmente...'
+  return engine === 'qwen'
+    ? `${createdMessage} Analizando con Qwen...`
+    : `${createdMessage} Analizando localmente...`
 }
 
 export function quickCaptureResultMessage(
   note: Pick<NoteRecord, 'analysisStatus'>,
-  requestedEngine: AnalysisMessageEngine
+  requestedEngine: AnalysisMessageEngine,
+  createdMessage = 'Nota creada.'
 ): string {
-  return `Nota creada. ${analysisResultMessage(note, requestedEngine)}`
+  return `${createdMessage} ${analysisResultMessage(note, requestedEngine)}`
 }
 
 export function isolatedAnalysisProgressMessage(engine: AnalysisMessageEngine, count: number): string {

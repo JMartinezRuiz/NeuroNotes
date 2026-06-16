@@ -2,6 +2,7 @@ export type AnalysisStatus = 'idle' | 'qwen' | 'fallback' | 'error'
 
 export type AppCommand =
   | 'focus-capture'
+  | 'capture-clipboard'
   | 'focus-search'
   | 'save-note'
   | 'analyze-note'

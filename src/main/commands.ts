@@ -1,5 +1,6 @@
 export type AppCommand =
   | 'focus-capture'
+  | 'capture-clipboard'
   | 'focus-search'
   | 'save-note'
   | 'analyze-note'

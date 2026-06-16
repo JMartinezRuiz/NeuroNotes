@@ -742,6 +742,35 @@ export function createPreviewApi(): Api {
       notes = [note, ...notes]
       return note
     },
+    createNoteFromClipboard: async () => {
+      const content = (await navigator.clipboard?.readText())?.trim() ?? ''
+
+      if (!content) {
+        throw new Error('El portapapeles no contiene texto')
+      }
+
+      const now = new Date().toISOString()
+      const tags = previewInlineTags(content)
+      const summary = previewDraftSummary(content)
+      const note: NoteRecord = {
+        id: makeId(),
+        title: previewDraftTitle(content, summary),
+        content,
+        summary,
+        category: previewDraftCategory(content, tags),
+        tags,
+        related: [],
+        suggestedActions: previewSuggestedActions(content),
+        analysisStatus: 'idle',
+        createdAt: now,
+        updatedAt: now
+      }
+      seedPreviewInitialRelatedLinks(note)
+      syncPreviewInitialBacklinks(note)
+
+      notes = [note, ...notes]
+      return note
+    },
     updateNote: async (id, updates) => {
       const note = notes.find((item) => item.id === id)
       const now = new Date().toISOString()
