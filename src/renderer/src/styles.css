@@ -174,6 +174,7 @@ button:disabled {
 }
 
 .category-filter,
+.tag-filter,
 .analysis-filter,
 .review-filter {
   display: flex;
@@ -186,6 +187,10 @@ button:disabled {
   padding: 0 16px 10px;
 }
 
+.tag-filter {
+  padding: 0 16px 8px;
+}
+
 .analysis-filter {
   padding: 0 16px 8px;
 }
@@ -195,6 +200,7 @@ button:disabled {
 }
 
 .category-filter button,
+.tag-filter button,
 .analysis-filter button,
 .review-filter button {
   display: inline-flex;
@@ -215,6 +221,8 @@ button:disabled {
 
 .category-filter button:hover,
 .category-filter button.active,
+.tag-filter button:hover,
+.tag-filter button.active,
 .analysis-filter button:hover,
 .analysis-filter button.active,
 .review-filter button:hover,
@@ -225,6 +233,7 @@ button:disabled {
 }
 
 .category-filter strong,
+.tag-filter strong,
 .analysis-filter strong,
 .review-filter strong {
   display: grid;
@@ -237,6 +246,7 @@ button:disabled {
   font-size: 11px;
 }
 
+.tag-filter button,
 .analysis-filter button,
 .review-filter button {
   min-width: 56px;

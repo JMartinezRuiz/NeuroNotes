@@ -70,6 +70,7 @@ import {
 import { normalizeSearchText, noteMatchesSearch } from './search'
 import { commandFromKeyboardShortcut, shouldSubmitQuickCapture } from './shortcuts'
 import { summarizeRagBudget } from './ragBudget'
+import { ALL_TAG_FILTER, TagFilter, noteMatchesTagFilter, summarizeTagFilters } from './tagFilters'
 import {
   ActionItem,
   AppCommand,
@@ -253,6 +254,7 @@ export default function App(): JSX.Element {
   const [manualLinkTargetId, setManualLinkTargetId] = useState('')
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<string>('Todas')
+  const [activeTagFilter, setActiveTagFilter] = useState<TagFilter>(ALL_TAG_FILTER)
   const [activeAnalysisFilter, setActiveAnalysisFilter] = useState<AnalysisStatusFilter>('all')
   const [activeFineTuneFilter, setActiveFineTuneFilter] = useState<FineTuneReviewFilter>('all')
   const [activeMcpReadinessFilter, setActiveMcpReadinessFilter] = useState<McpActionReadinessFilter>('all')
@@ -424,6 +426,7 @@ export default function App(): JSX.Element {
     [categoryCounts]
   )
   const analysisStatusFilterOptions = useMemo(() => summarizeAnalysisStatusFilters(notes), [notes])
+  const tagFilterOptions = useMemo(() => summarizeTagFilters(notes), [notes])
   const fineTuneReviewFilterOptions = useMemo(() => summarizeFineTuneReviewFilters(notes), [notes])
   const savedActionsByNoteId = useMemo(() => {
     const grouped = new Map<string, ActionItem[]>()
@@ -456,14 +459,15 @@ export default function App(): JSX.Element {
     const analysisFilteredNotes = categoryFilteredNotes.filter((note) =>
       noteMatchesAnalysisStatusFilter(note, activeAnalysisFilter)
     )
-    const fineTuneFilteredNotes = analysisFilteredNotes.filter((note) =>
+    const tagFilteredNotes = analysisFilteredNotes.filter((note) => noteMatchesTagFilter(note, activeTagFilter))
+    const fineTuneFilteredNotes = tagFilteredNotes.filter((note) =>
       noteMatchesFineTuneReviewFilter(note, activeFineTuneFilter)
     )
 
     return fineTuneFilteredNotes.filter((note) =>
       noteMatchesSearch(note, search, savedActionsByNoteId.get(note.id) ?? [])
     )
-  }, [activeAnalysisFilter, activeCategory, activeFineTuneFilter, notes, savedActionsByNoteId, search])
+  }, [activeAnalysisFilter, activeCategory, activeFineTuneFilter, activeTagFilter, notes, savedActionsByNoteId, search])
 
   useEffect(() => {
     return api.onCommand((command) => {
@@ -542,6 +546,15 @@ export default function App(): JSX.Element {
 
     void loadMcpConfig()
   }, [settingsOpen, mcpConfig])
+
+  useEffect(() => {
+    if (
+      activeTagFilter !== ALL_TAG_FILTER &&
+      !tagFilterOptions.some((option) => option.filter === activeTagFilter)
+    ) {
+      setActiveTagFilter(ALL_TAG_FILTER)
+    }
+  }, [activeTagFilter, tagFilterOptions])
 
   useEffect(() => {
     if (selectedNote) {
@@ -1453,6 +1466,22 @@ export default function App(): JSX.Element {
             >
               <span>{category.name}</span>
               <strong>{category.count}</strong>
+            </button>
+          ))}
+        </div>
+
+        <div className="tag-filter" aria-label="Etiquetas">
+          {tagFilterOptions.map((option) => (
+            <button
+              key={option.filter}
+              type="button"
+              className={option.filter === activeTagFilter ? 'active' : ''}
+              aria-pressed={option.filter === activeTagFilter}
+              onClick={() => setActiveTagFilter(option.filter)}
+              title={`Filtrar etiqueta: ${option.label}`}
+            >
+              <span>{option.filter === ALL_TAG_FILTER ? option.label : `#${option.label}`}</span>
+              <strong>{option.count}</strong>
             </button>
           ))}
         </div>
