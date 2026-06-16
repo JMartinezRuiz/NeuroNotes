@@ -11,7 +11,7 @@ export interface AiSetupStep {
 }
 
 export function aiSetupSteps(
-  health: Pick<AiHealth, 'ok' | 'ollamaAvailable' | 'modelInstalled' | 'model' | 'status'>,
+  health: Pick<AiHealth, 'ok' | 'ollamaAvailable' | 'modelInstalled' | 'model' | 'status' | 'installedQwenModels'>,
   diagnostics?: Pick<AiDiagnosticsResult, 'ok' | 'status' | 'model' | 'summary' | 'related' | 'error'> | null
 ): AiSetupStep[] {
   const canRunDiagnostics = health.ok && health.modelInstalled && health.ollamaAvailable
@@ -35,7 +35,11 @@ export function aiSetupSteps(
       id: 'model',
       label: 'Modelo',
       state: health.modelInstalled ? 'ready' : 'action',
-      detail: health.modelInstalled ? `${health.model} instalado.` : `Descarga ${health.model}.`
+      detail: health.modelInstalled
+        ? `${health.model} instalado.`
+        : health.installedQwenModels.length > 0
+          ? `Descarga ${health.model} o cambia a ${health.installedQwenModels[0]}.`
+          : `Descarga ${health.model}.`
     },
     {
       id: 'contract',

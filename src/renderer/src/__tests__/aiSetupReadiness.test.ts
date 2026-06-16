@@ -12,6 +12,7 @@ function health(overrides: Partial<AiHealth> = {}): AiHealth {
     ollamaAvailable: false,
     modelInstalled: false,
     installedModels: [],
+    installedQwenModels: [],
     ...overrides
   }
 }
@@ -108,6 +109,22 @@ describe('aiSetupSteps', () => {
       ['contract', 'fallback'],
       ['analysis', 'fallback']
     ])
+  })
+
+  it('mentions an installed Qwen-family model when the exact configured tag is missing', () => {
+    const steps = aiSetupSteps(
+      health({
+        status: 'model-missing',
+        message: 'Falta qwen3.5:0.8b',
+        ollamaAvailable: true,
+        installedQwenModels: ['qwen3.5:1.7b']
+      })
+    )
+
+    expect(steps.find((step) => step.id === 'model')).toMatchObject({
+      state: 'action',
+      detail: 'Descarga qwen3.5:0.8b o cambia a qwen3.5:1.7b.'
+    })
   })
 
   it('asks for a JSON probe when Qwen is installed but the contract is untested', () => {

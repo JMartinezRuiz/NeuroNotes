@@ -477,16 +477,20 @@ async function verifyQwen(options) {
   }
 
   const modelInstalled = installedModels.some((model) => model.toLowerCase() === options.model.toLowerCase())
+  const installedQwenModels = filterInstalledQwenModels(installedModels)
 
   if (!modelInstalled) {
     if (!options.pull) {
       return withRecoveryHints({
         ok: false,
         stage: 'model-missing',
-        message: `Model ${options.model} is not installed. Run: ollama pull ${options.model}`,
+        message:
+          `Model ${options.model} is not installed. Run: ollama pull ${options.model}` +
+          (installedQwenModels.length > 0 ? `. Qwen-family models already installed: ${installedQwenModels.join(', ')}` : ''),
         endpoint: options.endpoint,
         model: options.model,
-        installedModels
+        installedModels,
+        installedQwenModels
       })
     }
 
@@ -494,6 +498,7 @@ async function verifyQwen(options) {
   }
 
   const probe = await generateProbe(options.endpoint, options.model, options.timeoutMs)
+  const finalInstalledModels = modelInstalled ? installedModels : await getInstalledModels(options.endpoint, options.timeoutMs)
 
   return {
     ok: true,
@@ -501,7 +506,8 @@ async function verifyQwen(options) {
     message: `${options.model} generated a valid Neuronotes analysis`,
     endpoint: options.endpoint,
     model: options.model,
-    installedModels: modelInstalled ? installedModels : await getInstalledModels(options.endpoint, options.timeoutMs),
+    installedModels: finalInstalledModels,
+    installedQwenModels: filterInstalledQwenModels(finalInstalledModels),
     runtimeStarted: runtime?.started ?? false,
     runtimeExecutablePath: runtime?.executablePath,
     durationMs: probe.durationMs,
@@ -516,12 +522,12 @@ function withRecoveryHints(result) {
 
   return {
     ...result,
-    nextSteps: recoveryNextSteps(result.stage, result.model),
+    nextSteps: recoveryNextSteps(result.stage, result.model, result.installedQwenModels ?? []),
     setupCommands: recoverySetupCommands(result.stage, result.model)
   }
 }
 
-function recoveryNextSteps(stage, model = DEFAULT_MODEL) {
+function recoveryNextSteps(stage, model = DEFAULT_MODEL, installedQwenModels = []) {
   if (stage === 'ollama-not-installed') {
     return [
       'Install Ollama locally.',
@@ -531,10 +537,20 @@ function recoveryNextSteps(stage, model = DEFAULT_MODEL) {
   }
 
   if (stage === 'model-missing') {
-    return [
+    const steps = [
       `Pull the configured Qwen model: ${model}.`,
       'Run npm run verify:qwen:start:json to confirm Neuronotes can generate valid JSON.'
     ]
+
+    if (installedQwenModels.length > 0) {
+      steps.splice(
+        1,
+        0,
+        `Qwen-family model already installed: ${installedQwenModels.join(', ')}. Keep ${model} for the 0.8B target, or set Neuronotes to one installed model before verifying.`
+      )
+    }
+
+    return steps
   }
 
   if (stage === 'ollama-unavailable' || stage === 'ollama-start-failed') {
@@ -567,6 +583,10 @@ function recoverySetupCommands(stage, model = DEFAULT_MODEL) {
   }
 
   return ['npm run verify:qwen:start:json']
+}
+
+function filterInstalledQwenModels(installedModels) {
+  return installedModels.filter((model) => /\bqwen/i.test(model)).sort((a, b) => a.localeCompare(b))
 }
 
 async function buildOllamaConnectionFailureResult(options, error) {
@@ -760,6 +780,9 @@ function printHuman(result) {
     console.log(result.message)
     if (result.installedModels?.length) {
       console.log(`Installed models: ${result.installedModels.join(', ')}`)
+    }
+    if (result.installedQwenModels?.length) {
+      console.log(`Installed Qwen-family models: ${result.installedQwenModels.join(', ')}`)
     }
     if (result.nextSteps?.length) {
       console.log('Next steps:')

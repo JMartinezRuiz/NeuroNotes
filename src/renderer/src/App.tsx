@@ -112,7 +112,8 @@ const emptyHealth: AiHealth = {
   ollamaUrl: emptySettings.ollamaUrl,
   ollamaAvailable: false,
   modelInstalled: false,
-  installedModels: []
+  installedModels: [],
+  installedQwenModels: []
 }
 
 function formatDate(value: string): string {
@@ -272,6 +273,24 @@ function aiActionLabel(health: AiHealth): string {
     return 'Activar Ollama'
   }
   return 'Descargar Qwen'
+}
+
+function aiSetupMessage(health: AiHealth): string {
+  if (health.ok) {
+    return 'Listo para resumir, categorizar y enlazar notas.'
+  }
+
+  if (health.ollamaAvailable) {
+    return health.installedQwenModels.length > 0
+      ? `Falta ${health.model}. Qwen instalado: ${health.installedQwenModels.join(', ')}.`
+      : 'Ollama responde, pero falta el modelo configurado.'
+  }
+
+  if (health.status === 'ollama-not-installed') {
+    return 'Ollama no esta instalado. Copia el setup o abre la descarga.'
+  }
+
+  return 'Inicia Ollama para activar Qwen local.'
 }
 
 function saveStateLabel(saveState: SaveState): string {
@@ -1950,15 +1969,7 @@ export default function App(): JSX.Element {
                   <code>~{ragBudget.estimatedTokens} tokens</code>
                 </div>
                 <small>
-                  {setupCommandMessage ||
-                  diagnosticsMessage ||
-                  (health.ok
-                    ? 'Listo para resumir, categorizar y enlazar notas.'
-                    : health.ollamaAvailable
-                      ? 'Ollama responde, pero falta el modelo configurado.'
-                      : health.status === 'ollama-not-installed'
-                        ? 'Ollama no esta instalado. Copia el setup o abre la descarga.'
-                        : 'Inicia Ollama para activar Qwen local.')}
+                  {setupCommandMessage || diagnosticsMessage || aiSetupMessage(health)}
                 </small>
                 <div className="ai-setup-steps">
                   {aiSetupStatus.map((step) => (

@@ -139,6 +139,14 @@ describe('verify-qwen script options', () => {
     ])
   })
 
+  it('mentions installed Qwen-family models when the exact verifier model is missing', () => {
+    expect(recoveryNextSteps('model-missing', 'qwen3.5:0.8b', ['qwen3.5:1.7b'])).toEqual([
+      'Pull the configured Qwen model: qwen3.5:0.8b.',
+      'Qwen-family model already installed: qwen3.5:1.7b. Keep qwen3.5:0.8b for the 0.8B target, or set Neuronotes to one installed model before verifying.',
+      'Run npm run verify:qwen:start:json to confirm Neuronotes can generate valid JSON.'
+    ])
+  })
+
   it('parses fenced Qwen JSON with thinking output and trailing commas', () => {
     expect(
       parseJson(`<think>razonamiento interno</think>

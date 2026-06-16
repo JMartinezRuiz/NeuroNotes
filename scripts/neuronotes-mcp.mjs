@@ -2487,6 +2487,12 @@ function qwenSetup(database, options = {}) {
       maxNotes: settings.ragMaxNotes,
       excerptLength: settings.ragExcerptLength
     },
+    modelPolicy: {
+      targetFamily: 'qwen',
+      targetSize: '0.8B',
+      exactModelRequired: settings.model,
+      installedModelDiscovery: 'Use the desktop app health check or npm run verify:qwen:start:json; this MCP server does not query Ollama.'
+    },
     diagnosticStatus,
     aiDiagnostics: database.aiDiagnostics ?? null,
     mcpPosture: {

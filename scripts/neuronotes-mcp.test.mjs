@@ -827,6 +827,11 @@ describe('neuronotes MCP server', () => {
         maxNotes: 5,
         excerptLength: 550
       },
+      modelPolicy: {
+        targetFamily: 'qwen',
+        targetSize: '0.8B',
+        exactModelRequired: 'qwen3.5:0.8b'
+      },
       diagnosticStatus: 'verified',
       mcpPosture: {
         readOnly: true,

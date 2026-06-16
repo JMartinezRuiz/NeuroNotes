@@ -108,6 +108,7 @@ export interface AiHealth {
   ollamaAvailable: boolean
   modelInstalled: boolean
   installedModels: string[]
+  installedQwenModels: string[]
 }
 
 export interface PullModelResult {

@@ -45,6 +45,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Health checks, Ollama start attempt, model pull action, and persisted Qwen diagnostics.
 - One-step Qwen preparation from settings can start Ollama when it is installed and pull the configured Qwen model when it is missing.
 - The app separates a missing Ollama installation from a stopped Ollama runtime, so Windows setup guidance can point to install, start, or model pull steps accurately.
+- When Ollama is running but the exact configured 0.8B tag is missing, Qwen setup surfaces any other installed Qwen-family models as a diagnostic hint while still keeping the configured target explicit.
 - Qwen verifier output includes actionable next steps and setup commands when Ollama or the model is missing.
 - Local AI setup checklist in settings for Ollama, model availability, persisted JSON/RAG diagnostic contract, and fallback/Qwen analysis mode.
 - Settings can copy PowerShell setup commands for installing Ollama, starting the local runtime, pulling the configured Qwen model, and running a JSON probe on Windows.

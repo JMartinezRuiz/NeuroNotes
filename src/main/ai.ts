@@ -89,7 +89,8 @@ export async function checkOllama(settings: AppSettings, options: CheckOllamaOpt
         ollamaUrl: settings.ollamaUrl,
         ollamaAvailable: true,
         modelInstalled: false,
-        installedModels: []
+        installedModels: [],
+        installedQwenModels: []
       }
     }
 
@@ -98,18 +99,23 @@ export async function checkOllama(settings: AppSettings, options: CheckOllamaOpt
       .map((model) => model.name ?? model.model ?? '')
       .filter(Boolean)
       .sort((a, b) => a.localeCompare(b))
+    const installedQwenModels = filterInstalledQwenModels(installedModels)
     const modelInstalled = installedModels.some((model) => model.toLowerCase() === settings.model.toLowerCase())
 
     if (!modelInstalled) {
+      const qwenHint =
+        installedQwenModels.length > 0 ? ` Qwen instalado: ${installedQwenModels.join(', ')}.` : ''
+
       return {
         ok: false,
         status: 'model-missing',
-        message: `Falta ${settings.model}`,
+        message: `Falta ${settings.model}.${qwenHint}`,
         model: settings.model,
         ollamaUrl: settings.ollamaUrl,
         ollamaAvailable: true,
         modelInstalled: false,
-        installedModels
+        installedModels,
+        installedQwenModels
       }
     }
 
@@ -121,7 +127,8 @@ export async function checkOllama(settings: AppSettings, options: CheckOllamaOpt
       ollamaUrl: settings.ollamaUrl,
       ollamaAvailable: true,
       modelInstalled: true,
-      installedModels
+      installedModels,
+      installedQwenModels
     }
   } catch (error) {
     const executablePath = await (options.findExecutable ?? findOllamaExecutable)()
@@ -138,7 +145,8 @@ export async function checkOllama(settings: AppSettings, options: CheckOllamaOpt
       ollamaUrl: settings.ollamaUrl,
       ollamaAvailable: false,
       modelInstalled: false,
-      installedModels: []
+      installedModels: [],
+      installedQwenModels: []
     }
   }
 }
@@ -890,6 +898,10 @@ async function fetchWithTimeout(
 function formatSeconds(milliseconds: number): string {
   const seconds = milliseconds / 1000
   return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)} s`
+}
+
+function filterInstalledQwenModels(installedModels: string[]): string[] {
+  return installedModels.filter((model) => /\bqwen/i.test(model)).sort((a, b) => a.localeCompare(b))
 }
 
 function formatOllamaConnectionError(error: unknown, ollamaUrl: string): string {

@@ -971,7 +971,8 @@ const previewHealth = (): AiHealth => ({
   ollamaUrl: settings.ollamaUrl,
   ollamaAvailable: false,
   modelInstalled: false,
-  installedModels: []
+  installedModels: [],
+  installedQwenModels: []
 })
 
 const previewPrepareRuntime = (): AiRuntimePrepareResult => ({

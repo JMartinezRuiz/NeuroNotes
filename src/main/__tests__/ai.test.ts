@@ -57,7 +57,8 @@ describe('checkOllama', () => {
       ok: true,
       status: 'ready',
       modelInstalled: true,
-      installedModels: ['qwen3.5:0.8b']
+      installedModels: ['qwen3.5:0.8b'],
+      installedQwenModels: ['qwen3.5:0.8b']
     })
   })
 
@@ -79,6 +80,28 @@ describe('checkOllama', () => {
       status: 'model-missing',
       ollamaAvailable: true,
       modelInstalled: false
+    })
+  })
+
+  it('reports installed Qwen-family models when the configured Qwen tag is missing', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            models: [{ name: 'llama3.2:latest' }, { name: 'qwen3.5:1.7b' }, { name: 'Qwen2.5:0.5b' }]
+          }),
+          { status: 200 }
+        )
+      )
+    )
+
+    await expect(checkOllama(settings)).resolves.toMatchObject({
+      ok: false,
+      status: 'model-missing',
+      message: expect.stringContaining('Qwen instalado:'),
+      installedModels: expect.arrayContaining(['llama3.2:latest', 'qwen3.5:1.7b', 'Qwen2.5:0.5b']),
+      installedQwenModels: expect.arrayContaining(['qwen3.5:1.7b', 'Qwen2.5:0.5b'])
     })
   })
 
@@ -166,6 +189,7 @@ describe('prepareQwenRuntime', () => {
     ollamaAvailable: false,
     modelInstalled: false,
     installedModels: [],
+    installedQwenModels: [],
     ...overrides
   })
 
