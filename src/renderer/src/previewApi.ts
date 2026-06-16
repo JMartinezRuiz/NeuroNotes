@@ -233,6 +233,35 @@ const previewDraftCategory = (content: string, tags: string[]): string => {
 
   return signal?.category ?? 'Inbox'
 }
+const cleanPreviewDraftText = (value: string): string =>
+  value
+    .trim()
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/^[-*+]\s+(?:\[[ xX]\]\s+)?/, '')
+    .replace(/^\d+[.)]\s+/, '')
+    .replace(/(^|\s)(?:y|and|o|or)\s+#[\p{L}\p{N}][\p{L}\p{N}_-]{1,39}/gu, '$1')
+    .replace(/(^|\s)#[\p{L}\p{N}][\p{L}\p{N}_-]{1,39}/gu, '$1')
+    .replace(/\s+/g, ' ')
+    .replace(/^[,;:|/\\-]+|[,;:|/\\-]+$/g, '')
+    .trim()
+const previewDraftSummary = (content: string): string => {
+  const text = content
+    .split(/\r?\n/)
+    .map(cleanPreviewDraftText)
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const words = text.split(/\s+/).filter(Boolean)
+
+  return words.slice(0, 34).join(' ').slice(0, 220)
+}
+const previewDraftTitle = (content: string, summary: string): string => {
+  const firstLine = content.split(/\r?\n/).find((line) => line.trim())
+  const title = firstLine ? cleanPreviewDraftText(firstLine).slice(0, 80) : ''
+
+  return title || summary.slice(0, 80) || 'Nota sin titulo'
+}
 const previewAnalysisTags = (note: NoteRecord): string[] => {
   const inlineTags = previewInlineTags(note.content)
   const contentTags = note.content.toLowerCase().match(/\b[a-z]{4,}\b/g) ?? []
@@ -322,11 +351,12 @@ export function createPreviewApi(): Api {
       const now = new Date().toISOString()
       const trimmedContent = content.trim()
       const tags = previewInlineTags(trimmedContent)
+      const summary = previewDraftSummary(trimmedContent)
       const note: NoteRecord = {
         id: makeId(),
-        title: trimmedContent.split(/\r?\n/)[0]?.slice(0, 80) || 'Nota sin titulo',
+        title: previewDraftTitle(trimmedContent, summary),
         content: trimmedContent,
-        summary: '',
+        summary,
         category: previewDraftCategory(trimmedContent, tags),
         tags,
         related: [],
@@ -470,7 +500,7 @@ export function createPreviewApi(): Api {
         throw new Error('Nota no encontrada')
       }
 
-      note.summary = note.content.replace(/\s+/g, ' ').slice(0, 140)
+      note.summary = previewDraftSummary(note.content).slice(0, 140)
       note.tags = previewAnalysisTags(note)
       note.category = previewDraftCategory(note.content, note.tags)
       const analysisLinks = notes
@@ -525,7 +555,7 @@ export function createPreviewApi(): Api {
       let local = 0
 
       for (const note of pending) {
-        note.summary = note.content.replace(/\s+/g, ' ').slice(0, 140)
+        note.summary = previewDraftSummary(note.content).slice(0, 140)
         note.tags = previewAnalysisTags(note)
         note.category = previewDraftCategory(note.content, note.tags)
         note.suggestedActions = [

@@ -570,9 +570,10 @@ function sanitizeAiPayload(
   const suggestedActions = normalizeSuggestedActions(
     firstArray(payload.suggestedActions, payload.actions, payload.actionSuggestions)
   )
+  const title = typeof payload.title === 'string' ? cleanAnalysisTitle(payload.title) : ''
 
   return {
-    title: typeof payload.title === 'string' && payload.title.trim() ? payload.title.trim().slice(0, 90) : 'Nota sin titulo',
+    title: title || cleanAnalysisTitle(note.title) || inferAnalysisTitle(note.content),
     summary: typeof payload.summary === 'string' ? payload.summary.trim().slice(0, 320) : '',
     category,
     tags,
@@ -589,13 +590,8 @@ function normalizeAnalyzerText(value: string): string {
 }
 
 function fallbackAnalysis(note: NoteRecord, related: RelatedNote[]): Omit<AnalysisResult, 'status' | 'error' | 'analysisRun'> {
-  const words = note.content
-    .replace(/\s+/g, ' ')
-    .trim()
-    .split(' ')
-    .filter(Boolean)
-  const title = note.content.split(/\r?\n/).find((line) => line.trim())?.trim().slice(0, 80) || 'Nota sin titulo'
-  const summary = words.slice(0, 34).join(' ') + (words.length > 34 ? '...' : '')
+  const title = inferAnalysisTitle(note.content)
+  const summary = summarizeAnalysisContent(note.content)
   const text = normalizeAnalyzerText(note.content)
   const category = guessCategory(text)
   const tags = inferFallbackTags(note, text)
@@ -608,6 +604,40 @@ function fallbackAnalysis(note: NoteRecord, related: RelatedNote[]): Omit<Analys
     related,
     suggestedActions: inferSuggestedActions(note.content)
   }
+}
+
+function inferAnalysisTitle(content: string): string {
+  const firstLine = content.split(/\r?\n/).find((line) => line.trim())
+  const title = firstLine ? cleanAnalysisTitle(firstLine) : ''
+
+  return title || summarizeAnalysisContent(content).slice(0, 80) || 'Nota sin titulo'
+}
+
+function summarizeAnalysisContent(content: string): string {
+  const text = content
+    .split(/\r?\n/)
+    .map(cleanAnalysisTitle)
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const words = text.split(/\s+/).filter(Boolean)
+
+  return words.slice(0, 34).join(' ') + (words.length > 34 ? '...' : '')
+}
+
+function cleanAnalysisTitle(value: string): string {
+  return value
+    .trim()
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/^[-*+]\s+(?:\[[ xX]\]\s+)?/, '')
+    .replace(/^\d+[.)]\s+/, '')
+    .replace(/(^|\s)(?:y|and|o|or)\s+#[\p{L}\p{N}][\p{L}\p{N}_-]{1,39}/gu, '$1')
+    .replace(/(^|\s)#[\p{L}\p{N}][\p{L}\p{N}_-]{1,39}/gu, '$1')
+    .replace(/\s+/g, ' ')
+    .replace(/^[,;:|/\\-]+|[,;:|/\\-]+$/g, '')
+    .slice(0, 90)
+    .trim()
 }
 
 const LOCAL_TAG_PATTERNS: Array<{ tag: string; pattern: RegExp }> = [

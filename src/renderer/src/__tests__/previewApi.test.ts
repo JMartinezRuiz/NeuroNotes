@@ -107,6 +107,8 @@ describe('createPreviewApi', () => {
     const created = await api.createNote('Preparar reminder MCP para #Cliente y #RAG local')
 
     expect(created).toMatchObject({
+      title: 'Preparar reminder MCP para local',
+      summary: 'Preparar reminder MCP para local',
       category: 'Trabajo',
       tags: ['cliente', 'rag'],
       analysisStatus: 'idle'

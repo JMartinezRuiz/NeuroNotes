@@ -158,7 +158,7 @@ describe('analyzeNote', () => {
             role: 'assistant',
             content: `<think>razonamiento interno</think>
 {
-  "title": "Mapa de notas",
+  "title": "Mapa de notas #Cliente",
   "summary": "Convierte notas rapidas en una base enlazada.",
   "category": "project roadmap",
   "tags": ["#Qwen", "RAG", "Notas", "M\u00e9dico"],
@@ -550,6 +550,8 @@ Texto posterior {no-json}`
 
     expect(analysis).toMatchObject({
       status: 'fallback',
+      title: 'Cliente pide revisar MCP y RAG para Qwen, preparar automatizacion y enlaces de notas.',
+      summary: 'Cliente pide revisar MCP y RAG para Qwen, preparar automatizacion y enlaces de notas.',
       tags: expect.arrayContaining(['cliente', 'prioridad', 'qwen', 'rag', 'mcp', 'tarea'])
     })
     expect(fetchMock).not.toHaveBeenCalled()

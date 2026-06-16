@@ -101,8 +101,9 @@ describe('createNoteDraft', () => {
     const draft = createNoteDraft('  Preparar reminder MCP para #Cliente y #RAG local  ')
 
     expect(draft).toMatchObject({
-      title: 'Preparar reminder MCP para #Cliente y #RAG local',
+      title: 'Preparar reminder MCP para local',
       content: 'Preparar reminder MCP para #Cliente y #RAG local',
+      summary: 'Preparar reminder MCP para local',
       category: 'Trabajo',
       tags: ['cliente', 'rag'],
       analysisStatus: 'idle'
@@ -110,8 +111,10 @@ describe('createNoteDraft', () => {
   })
 
   it('uses category hashtags as initial metadata when they are explicit', () => {
-    const draft = createNoteDraft('Leer paper sobre memoria local #Aprendizaje')
+    const draft = createNoteDraft('- [ ] Leer paper sobre memoria local #Aprendizaje')
 
+    expect(draft.title).toBe('Leer paper sobre memoria local')
+    expect(draft.summary).toBe('Leer paper sobre memoria local')
     expect(draft.category).toBe('Aprendizaje')
     expect(draft.tags).toEqual(['aprendizaje'])
   })

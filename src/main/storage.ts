@@ -272,14 +272,15 @@ export async function listNotes(): Promise<NoteRecord[]> {
 export function createNoteDraft(content: string): NoteRecord {
   const now = new Date().toISOString()
   const trimmedContent = content.trim()
-  const firstLine = trimmedContent.split(/\r?\n/).find((line) => line.trim().length > 0)?.trim()
   const tags = inferDraftTags(trimmedContent)
+  const summary = summarizeDraftContent(trimmedContent)
+  const title = inferDraftTitle(trimmedContent, summary)
 
   return {
     id: randomUUID(),
-    title: firstLine?.slice(0, 80) || 'Nota sin titulo',
+    title,
     content: trimmedContent,
-    summary: '',
+    summary,
     category: inferDraftCategory(trimmedContent, tags),
     tags,
     related: [],
@@ -324,6 +325,39 @@ function normalizeSettings(settings: unknown): DatabaseFile['settings'] {
 
 function inferDraftTags(content: string): string[] {
   return normalizeNoteTags([...content.matchAll(/(^|\s)#([\p{L}\p{N}][\p{L}\p{N}_-]{1,39})/gu)].map((match) => match[2]))
+}
+
+function inferDraftTitle(content: string, summary: string): string {
+  const firstLine = content.split(/\r?\n/).find((line) => line.trim().length > 0)
+  const title = firstLine ? cleanDraftText(firstLine).slice(0, 80) : ''
+
+  return title || summary.slice(0, 80) || 'Nota sin titulo'
+}
+
+function summarizeDraftContent(content: string): string {
+  const text = content
+    .split(/\r?\n/)
+    .map(cleanDraftText)
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const words = text.split(/\s+/).filter(Boolean)
+
+  return words.slice(0, 34).join(' ').slice(0, 220)
+}
+
+function cleanDraftText(value: string): string {
+  return value
+    .trim()
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/^[-*+]\s+(?:\[[ xX]\]\s+)?/, '')
+    .replace(/^\d+[.)]\s+/, '')
+    .replace(/(^|\s)(?:y|and|o|or)\s+#[\p{L}\p{N}][\p{L}\p{N}_-]{1,39}/gu, '$1')
+    .replace(/(^|\s)#[\p{L}\p{N}][\p{L}\p{N}_-]{1,39}/gu, '$1')
+    .replace(/\s+/g, ' ')
+    .replace(/^[,;:|/\\-]+|[,;:|/\\-]+$/g, '')
+    .trim()
 }
 
 function inferDraftCategory(content: string, tags: string[]): string {
