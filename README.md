@@ -23,7 +23,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Single-instance desktop guard: launching Neuronotes again focuses the existing window instead of opening a second writer.
 - Main window size, position, and maximized state are restored between launches.
 - Quick note capture, auto-save editor, search, category filters, and metadata editing.
-- Quick-captured notes seed a clean title, draft summary, tags, category, and local action intents from inline hashtags and local signals before AI analysis finishes.
+- Quick-captured notes seed a clean title, draft summary, tags, category, local action intents, and initial related-note links from inline hashtags and local signals before AI analysis finishes.
 - Quick capture reports creation and automatic analysis status, including local fallback when Qwen is not ready.
 - Note list rows show compact AI status badges for Qwen, local fallback, pending, and error states.
 - Sidebar filters can narrow notes by AI status to find Qwen-ready notes, local fallback notes, pending notes, and errors.

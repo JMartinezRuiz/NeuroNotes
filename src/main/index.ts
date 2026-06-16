@@ -17,7 +17,7 @@ import {
 import { AppCommand } from './commands'
 import { createDatabaseChangeWatcher, DatabaseChangeWatcher } from './databaseWatcher'
 import { buildFineTuneExamples, buildMcpHandoffPayload, fineTuneDatasetToJsonl, noteToMarkdown, safeMarkdownFileName } from './export'
-import { synchronizeRelatedGraph } from './linking'
+import { seedInitialRelatedLinks, synchronizeRelatedGraph } from './linking'
 import { addManualLink, removeManualLink } from './manualLinks'
 import { buildMcpConnectionConfig, resolveMcpServerPath } from './mcpConfig'
 import { normalizeNoteCategory, normalizeNoteTags } from './metadata'
@@ -290,6 +290,7 @@ function registerIpcHandlers(): void {
     const note = createNoteDraft(content)
     await mutateDatabase((database) => {
       database.notes.unshift(note)
+      seedInitialRelatedLinks(note, database.notes)
     })
     return note
   })

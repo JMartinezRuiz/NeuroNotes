@@ -41,6 +41,7 @@ const STOPWORDS = new Set([
 ])
 
 const MAX_RELATED_NOTES = 6
+const MAX_INITIAL_RELATED_NOTES = 3
 const MIN_RELATED_SCORE = 0.08
 const DEFAULT_RAG_MAX_NOTES = 5
 const DEFAULT_RAG_EXCERPT_LENGTH = 550
@@ -299,6 +300,24 @@ export function buildRagContextBundle(
     noteIds: items.map((item) => item.noteId),
     items
   }
+}
+
+export function seedInitialRelatedLinks(
+  note: NoteRecord,
+  notes: NoteRecord[],
+  now = new Date().toISOString()
+): string[] {
+  const ranked = rankRelatedNotes(note, notes).slice(0, MAX_INITIAL_RELATED_NOTES)
+
+  if (ranked.length === 0) {
+    return []
+  }
+
+  note.related = mergeManualAndRankedRelated(note, notes, ranked).slice(0, MAX_INITIAL_RELATED_NOTES)
+  note.updatedAt = now
+  note.trainingReviewedAt = undefined
+
+  return [note.id, ...synchronizeRelatedGraph(notes, note.id, now).filter((id) => id !== note.id)]
 }
 
 function normalizeRagContextOptions(options: RagContextOptions): Required<RagContextOptions> {

@@ -126,6 +126,14 @@ describe('createNoteDraft', () => {
       expect.objectContaining({ kind: 'research', toolHint: 'documents.search' })
     ])
   })
+
+  it('cleans connector fragments left by middle hashtags', () => {
+    const draft = createNoteDraft('Roadmap producto notas automaticas con #roadmap y resumen local')
+
+    expect(draft.title).toBe('Roadmap producto notas automaticas con resumen local')
+    expect(draft.summary).toBe('Roadmap producto notas automaticas con resumen local')
+    expect(draft.tags).toEqual(['roadmap'])
+  })
 })
 
 describe('normalizeDatabase', () => {

@@ -120,6 +120,19 @@ describe('createPreviewApi', () => {
     })
   })
 
+  it('seeds preview related links from local note context before analysis', async () => {
+    const api = createPreviewApi()
+    const created = await api.createNote('Roadmap producto notas automaticas con #roadmap y resumen local')
+
+    expect(created.title).toBe('Roadmap producto notas automaticas con resumen local')
+    expect(created.related).toEqual([
+      expect.objectContaining({
+        noteId: 'preview-roadmap',
+        title: 'Roadmap Neuronotes'
+      })
+    ])
+  })
+
   it('marks reviewed notes for fine-tuning export', async () => {
     const api = createPreviewApi()
     const analyzed = await api.analyzeNote('preview-roadmap', 'qwen')

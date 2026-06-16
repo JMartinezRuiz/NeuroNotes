@@ -636,6 +636,8 @@ function cleanAnalysisTitle(value: string): string {
     .replace(/(^|\s)(?:y|and|o|or)\s+#[\p{L}\p{N}][\p{L}\p{N}_-]{1,39}/gu, '$1')
     .replace(/(^|\s)#[\p{L}\p{N}][\p{L}\p{N}_-]{1,39}/gu, '$1')
     .replace(/\s+/g, ' ')
+    .replace(/\b(con|para|sobre|de|del|en)\s+(?:y|and|o|or)\s+/g, '$1 ')
+    .replace(/\s+(?:y|and|o|or)\s*$/g, '')
     .replace(/^[,;:|/\\-]+|[,;:|/\\-]+$/g, '')
     .slice(0, 90)
     .trim()

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { buildRagContext, buildRagContextBundle, rankRelatedNotes, synchronizeRelatedGraph } from '../linking'
+import {
+  buildRagContext,
+  buildRagContextBundle,
+  rankRelatedNotes,
+  seedInitialRelatedLinks,
+  synchronizeRelatedGraph
+} from '../linking'
 import { NoteRecord } from '../types'
 
 function note(overrides: Partial<NoteRecord> & Pick<NoteRecord, 'id' | 'content'>): NoteRecord {
@@ -255,6 +261,49 @@ describe('buildRagContext', () => {
     expect(bundle.items).toEqual([])
     expect(bundle.noteIds).toEqual([])
     expect(bundle.text).toBe('No hay notas relacionadas todavia.')
+  })
+})
+
+describe('seedInitialRelatedLinks', () => {
+  it('links a new draft to local matches and creates reciprocal backlinks', () => {
+    const source = note({
+      id: 'source',
+      category: 'Proyecto',
+      tags: ['cliente', 'mcp'],
+      content: 'Preparar workflow MCP para cliente con RAG local.'
+    })
+    const target = note({
+      id: 'target',
+      title: 'Workflow customer MCP',
+      category: 'Proyecto',
+      tags: ['mcp'],
+      content: 'Customer workflow con herramientas MCP y contexto RAG.'
+    })
+    const unrelated = note({
+      id: 'unrelated',
+      title: 'Factura personal',
+      category: 'Finanzas',
+      content: 'Pagar factura mensual y revisar presupuesto.'
+    })
+    const now = '2026-06-15T00:08:00.000Z'
+
+    const changedIds = seedInitialRelatedLinks(source, [source, target, unrelated], now)
+
+    expect(changedIds).toEqual(['source', 'target'])
+    expect(source.related).toEqual([
+      expect.objectContaining({
+        noteId: 'target',
+        title: 'Workflow customer MCP'
+      })
+    ])
+    expect(target.related).toEqual([
+      expect.objectContaining({
+        noteId: 'source',
+        title: 'source',
+        reason: expect.stringContaining('Enlace reciproco:')
+      })
+    ])
+    expect(unrelated.related).toEqual([])
   })
 })
 

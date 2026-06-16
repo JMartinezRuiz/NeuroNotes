@@ -242,6 +242,8 @@ const cleanPreviewDraftText = (value: string): string =>
     .replace(/(^|\s)(?:y|and|o|or)\s+#[\p{L}\p{N}][\p{L}\p{N}_-]{1,39}/gu, '$1')
     .replace(/(^|\s)#[\p{L}\p{N}][\p{L}\p{N}_-]{1,39}/gu, '$1')
     .replace(/\s+/g, ' ')
+    .replace(/\b(con|para|sobre|de|del|en)\s+(?:y|and|o|or)\s+/g, '$1 ')
+    .replace(/\s+(?:y|and|o|or)\s*$/g, '')
     .replace(/^[,;:|/\\-]+|[,;:|/\\-]+$/g, '')
     .trim()
 const previewDraftSummary = (content: string): string => {
@@ -307,6 +309,63 @@ const previewSuggestedActions = (content: string): NoteRecord['suggestedActions'
   }
 
   return actions.slice(0, 4)
+}
+const PREVIEW_LINK_STOPWORDS = new Set(['para', 'sobre', 'notas', 'nota', 'local', 'desde', 'entre', 'con'])
+const previewLinkTokens = (value: string): Set<string> =>
+  new Set(
+    normalizePreviewText(value)
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .filter((token) => token.length > 3 && !PREVIEW_LINK_STOPWORDS.has(token))
+  )
+const previewInitialRelatedLinks = (note: NoteRecord): NoteRecord['related'] => {
+  const sourceTokens = previewLinkTokens(`${note.title} ${note.summary} ${note.content} ${note.tags.join(' ')}`)
+  const sourceTags = new Set(note.tags)
+
+  return notes
+    .map((candidate) => {
+      const candidateTokens = previewLinkTokens(
+        `${candidate.title} ${candidate.summary} ${candidate.content} ${candidate.tags.join(' ')}`
+      )
+      const tokenOverlap = [...sourceTokens].filter((token) => candidateTokens.has(token)).length
+      const tagOverlap = candidate.tags.filter((tag) => sourceTags.has(normalizePreviewText(tag))).length
+      const categoryBoost = note.category !== 'Inbox' && note.category === candidate.category ? 0.08 : 0
+      const score = Math.min(1, tokenOverlap * 0.06 + tagOverlap * 0.22 + categoryBoost)
+
+      return {
+        noteId: candidate.id,
+        title: candidate.title,
+        score,
+        reason:
+          tagOverlap > 0
+            ? 'Relacion local inicial por etiquetas y contenido.'
+            : 'Relacion local inicial por contenido cercano.'
+      }
+    })
+    .filter((related) => related.score >= 0.12)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 3)
+}
+const syncPreviewInitialBacklinks = (source: NoteRecord): void => {
+  for (const related of source.related) {
+    const target = notes.find((note) => note.id === related.noteId)
+
+    if (!target) {
+      continue
+    }
+
+    target.related = [
+      ...target.related.filter((link) => link.noteId !== source.id),
+      {
+        noteId: source.id,
+        title: source.title,
+        score: Math.max(0.08, Math.min(1, related.score * 0.9)),
+        reason: `Enlace reciproco: ${related.reason}`
+      }
+    ].slice(0, 10)
+    target.updatedAt = source.updatedAt
+    target.trainingReviewedAt = undefined
+  }
 }
 const previewAnalysisTags = (note: NoteRecord): string[] => {
   const inlineTags = previewInlineTags(note.content)
@@ -411,6 +470,8 @@ export function createPreviewApi(): Api {
         createdAt: now,
         updatedAt: now
       }
+      note.related = previewInitialRelatedLinks(note)
+      syncPreviewInitialBacklinks(note)
 
       notes = [note, ...notes]
       return note
