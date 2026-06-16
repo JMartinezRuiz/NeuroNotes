@@ -157,6 +157,7 @@ It also exposes MCP resources:
 And user-controlled prompt templates:
 
 - `neuronotes_review_rag_analysis`
+- `neuronotes_prepare_note_append`
 - `neuronotes_prepare_action_plan`
 - `neuronotes_review_mcp_handoff`
 - `neuronotes_library_brief`

@@ -309,6 +309,7 @@ describe('neuronotes MCP server', () => {
 
     expect(listResponse.result.prompts.map((prompt) => prompt.name)).toEqual([
       'neuronotes_review_rag_analysis',
+      'neuronotes_prepare_note_append',
       'neuronotes_prepare_action_plan',
       'neuronotes_review_mcp_handoff',
       'neuronotes_library_brief'
@@ -331,6 +332,26 @@ describe('neuronotes MCP server', () => {
 
     expect(reviewResponse.result.messages[0].content.text).toContain('Roadmap Neuronotes')
     expect(reviewResponse.result.messages[0].content.text).toContain('No ejecutes herramientas externas')
+
+    const appendPromptResponse = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 'prompts-append',
+        method: 'prompts/get',
+        params: {
+          name: 'neuronotes_prepare_note_append',
+          arguments: {
+            noteId: 'note-health'
+          }
+        }
+      },
+      { dbPath }
+    )
+
+    expect(appendPromptResponse.result.messages[0].content.text).toContain('Roadmap Neuronotes')
+    expect(appendPromptResponse.result.messages[0].content.text).toContain('No ejecutes herramientas')
+    expect(appendPromptResponse.result.messages[0].content.text).toContain('neuronotes_append_note')
+    expect(appendPromptResponse.result.messages[0].content.text).toContain('privacyRisks')
 
     const actionPlanResponse = await handleMcpMessage(
       {

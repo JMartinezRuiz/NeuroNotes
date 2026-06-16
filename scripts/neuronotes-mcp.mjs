@@ -401,6 +401,18 @@ const PROMPTS = [
     ]
   },
   {
+    name: 'neuronotes_prepare_note_append',
+    title: 'Prepare Note Append',
+    description: 'Prepare safe local context that could be appended to an existing Neuronotes note without executing tools.',
+    arguments: [
+      {
+        name: 'noteId',
+        description: 'Neuronotes note id that could receive the append.',
+        required: true
+      }
+    ]
+  },
+  {
     name: 'neuronotes_prepare_action_plan',
     title: 'Prepare Local Action Plan',
     description: 'Turn open Neuronotes action intents into a user-approved follow-up plan without executing tools.',
@@ -845,6 +857,38 @@ function getPrompt(name, args, database, context = {}) {
             '- La categoria y etiquetas deben ser especificas.',
             '- Los enlaces RAG deben estar justificados por el contenido.',
             '- Las acciones sugeridas deben ser concretas y no inventar permisos.',
+            '',
+            JSON.stringify(notePayload, null, 2)
+          ].join('\n')
+        )
+      ]
+    }
+  }
+
+  if (name === 'neuronotes_prepare_note_append') {
+    const noteId = stringArg(args.noteId)
+
+    if (!noteId) {
+      throw rpcError(-32602, 'noteId is required')
+    }
+
+    const notePayload = getNote(database, { noteId })
+
+    return {
+      description: 'Prepare append-ready context for an existing Neuronotes note without writing to the local database.',
+      messages: [
+        textPromptMessage(
+          [
+            'Prepara un bloque de contexto que podria anexarse a esta nota de Neuronotes.',
+            'No ejecutes herramientas. No llames a neuronotes_append_note ni a ningun write tool.',
+            'Trata el resultado como una propuesta: cualquier escritura requiere un host confiable en write mode y decision explicita del usuario.',
+            '',
+            'Devuelve:',
+            '- appendCandidate: texto breve y util para anexar, sin superar 8000 caracteres.',
+            '- sourceSummary: de donde salio la informacion y por que pertenece a esta nota.',
+            '- privacyRisks: datos sensibles o contexto que no deberia salir de la maquina.',
+            '- missingEvidence: huecos que impiden anexar con confianza.',
+            '- recommendedNextStep: revisar, pedir mas contexto o usar neuronotes_append_note con aprobacion.',
             '',
             JSON.stringify(notePayload, null, 2)
           ].join('\n')
