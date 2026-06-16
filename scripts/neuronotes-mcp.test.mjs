@@ -62,6 +62,7 @@ describe('neuronotes MCP server', () => {
       'neuronotes_get_note',
       'neuronotes_note_graph',
       'neuronotes_analysis_queue',
+      'neuronotes_preview_rag',
       'neuronotes_list_open_actions',
       'neuronotes_mcp_handoff',
       'neuronotes_library_summary',
@@ -84,6 +85,7 @@ describe('neuronotes MCP server', () => {
       'neuronotes_get_note',
       'neuronotes_note_graph',
       'neuronotes_analysis_queue',
+      'neuronotes_preview_rag',
       'neuronotes_list_open_actions',
       'neuronotes_mcp_handoff',
       'neuronotes_library_summary',
@@ -617,6 +619,62 @@ describe('neuronotes MCP server', () => {
           reason: 'New or edited note waiting for local fallback analysis.'
         })
       ]
+    })
+  })
+
+  it('previews proposed RAG context for MCP hosts without writing the database', async () => {
+    const before = await readFile(dbPath, 'utf8')
+    const result = await callTool('neuronotes_preview_rag', { noteId: 'note-health' }, { dbPath })
+    const after = await readFile(dbPath, 'utf8')
+
+    expect(result).toMatchObject({
+      schema: 'neuronotes.mcp.rag-preview.v1',
+      noteId: 'note-health',
+      targetModel: 'qwen3.5:0.8b',
+      ragSettings: {
+        maxNotes: 5,
+        excerptLength: 550
+      },
+      sideEffects: 'none-read-only',
+      sourceNote: {
+        id: 'note-health',
+        title: 'Cita medico',
+        analysisStatus: 'qwen'
+      },
+      noteIds: ['note-project'],
+      related: [
+        expect.objectContaining({
+          noteId: 'note-project',
+          title: 'Roadmap Neuronotes',
+          score: 0.7,
+          reason: 'Ambas notas mencionan Qwen local.'
+        })
+      ],
+      items: [
+        expect.objectContaining({
+          noteId: 'note-project',
+          title: 'Roadmap Neuronotes',
+          category: 'Proyecto',
+          tags: ['mcp', 'qwen'],
+          provenance: expect.objectContaining({
+            label: 'RAG'
+          }),
+          excerpt: 'MCP local de solo lectura para exponer acciones y notas.'
+        })
+      ],
+      text: expect.stringContaining('ID: note-project')
+    })
+    expect(after).toBe(before)
+  })
+
+  it('requires a valid note id for MCP RAG preview', async () => {
+    await expect(callTool('neuronotes_preview_rag', {}, { dbPath })).rejects.toMatchObject({
+      code: -32602,
+      message: 'noteId is required'
+    })
+    await expect(callTool('neuronotes_preview_rag', { noteId: 'missing' }, { dbPath })).rejects.toMatchObject({
+      code: -32602,
+      message: 'Note not found: missing'
     })
   })
 

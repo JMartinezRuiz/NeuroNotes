@@ -134,6 +134,7 @@ Neuronotes includes a read-only MCP stdio server for local hosts. It exposes not
 - `neuronotes_get_note`
 - `neuronotes_note_graph`
 - `neuronotes_analysis_queue`
+- `neuronotes_preview_rag`
 - `neuronotes_list_open_actions`
 - `neuronotes_mcp_handoff`
 - `neuronotes_library_summary`

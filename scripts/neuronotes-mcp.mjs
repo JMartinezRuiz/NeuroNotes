@@ -188,6 +188,24 @@ const READ_ONLY_TOOLS = [
     }
   },
   {
+    name: 'neuronotes_preview_rag',
+    description: 'Preview the local RAG context Neuronotes would send to Qwen/local analysis for one note, without modifying the library.',
+    annotations: {
+      readOnlyHint: true
+    },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['noteId'],
+      properties: {
+        noteId: {
+          type: 'string',
+          description: 'Neuronotes note id to preview RAG context for.'
+        }
+      }
+    }
+  },
+  {
     name: 'neuronotes_list_open_actions',
     description: 'List open local action intents saved from Neuronotes notes for user-approved MCP follow-up.',
     annotations: {
@@ -539,6 +557,10 @@ export async function callTool(name, args = {}, context = {}) {
 
   if (name === 'neuronotes_analysis_queue') {
     return analysisQueue(database, args)
+  }
+
+  if (name === 'neuronotes_preview_rag') {
+    return previewRagContext(database, args)
   }
 
   if (name === 'neuronotes_list_open_actions') {
@@ -1079,6 +1101,141 @@ function getNote(database, args) {
   }
 }
 
+function previewRagContext(database, args) {
+  const noteId = stringArg(args.noteId)
+
+  if (!noteId) {
+    throw rpcError(-32602, 'noteId is required')
+  }
+
+  const note = database.notes.find((item) => item.id === noteId)
+
+  if (!note) {
+    throw rpcError(-32602, `Note not found: ${noteId}`)
+  }
+
+  const bundle = buildMcpRagContextBundle(note, database.notes, database.settings)
+
+  return {
+    schema: 'neuronotes.mcp.rag-preview.v1',
+    noteId: note.id,
+    targetModel: database.settings.model,
+    ragSettings: {
+      maxNotes: database.settings.ragMaxNotes,
+      excerptLength: database.settings.ragExcerptLength
+    },
+    sideEffects: 'none-read-only',
+    sourceNote: {
+      id: note.id,
+      title: note.title,
+      summary: note.summary,
+      category: note.category,
+      tags: note.tags,
+      analysisStatus: note.analysisStatus,
+      updatedAt: note.updatedAt
+    },
+    noteIds: bundle.noteIds,
+    related: bundle.related,
+    items: bundle.items,
+    text: bundle.text
+  }
+}
+
+function buildMcpRagContextBundle(note, notes, settings) {
+  const maxNotes = clampInteger(settings.ragMaxNotes, 0, 6, 5)
+  const excerptLength = clampInteger(settings.ragExcerptLength, 160, 1200, 550)
+  const related = mergeMcpRelatedForRag(note, notes, maxNotes)
+
+  if (related.length === 0) {
+    return {
+      text: 'No hay notas relacionadas todavia.',
+      related,
+      noteIds: [],
+      items: []
+    }
+  }
+
+  const items = related
+    .map((item) => {
+      const candidate = notes.find((noteItem) => noteItem.id === item.noteId)
+
+      if (!candidate) {
+        return undefined
+      }
+
+      return {
+        noteId: item.noteId,
+        title: candidate.title,
+        category: candidate.category,
+        tags: candidate.tags,
+        score: item.score,
+        reason: item.reason,
+        provenance: linkProvenance(item.reason),
+        excerpt: excerpt(candidate.content, excerptLength)
+      }
+    })
+    .filter(Boolean)
+
+  return {
+    text: formatMcpRagContextText(items),
+    related,
+    noteIds: items.map((item) => item.noteId),
+    items
+  }
+}
+
+function mergeMcpRelatedForRag(note, notes, maxNotes) {
+  if (maxNotes <= 0) {
+    return []
+  }
+
+  const byId = new Map()
+
+  for (const related of note.related) {
+    const target = notes.find((candidate) => candidate.id === related.noteId && candidate.id !== note.id)
+
+    if (!target || isReciprocalMcpLink(related)) {
+      continue
+    }
+
+    byId.set(target.id, {
+      noteId: target.id,
+      title: target.title,
+      score: Math.max(0, Math.min(1, Number.isFinite(related.score) ? related.score : 0.5)),
+      reason: related.reason || 'Relacion guardada por Neuronotes.'
+    })
+  }
+
+  for (const related of initialMcpRelatedLinks(note, notes, { maxNotes })) {
+    const existing = byId.get(related.noteId)
+
+    if (existing) {
+      byId.set(related.noteId, {
+        ...existing,
+        title: related.title || existing.title,
+        score: Math.max(existing.score, related.score)
+      })
+      continue
+    }
+
+    byId.set(related.noteId, related)
+  }
+
+  return [...byId.values()].slice(0, maxNotes)
+}
+
+function formatMcpRagContextText(items) {
+  if (items.length === 0) {
+    return 'No hay notas relacionadas todavia.'
+  }
+
+  return items
+    .map((item) => {
+      return `ID: ${item.noteId}\nTitulo: ${item.title}\nCategoria: ${item.category}\nEtiquetas: ${item.tags.join(', ')}\nPuntuacion: ${Math.round(item.score * 100)}%\nMotivo: ${item.reason}\nExtracto: ${item.excerpt}`
+    })
+    .join('\n\n')
+}
+
 async function createNoteFromMcp(database, args, context) {
   if (!isWriteEnabled(context)) {
     throw rpcError(
@@ -1375,6 +1532,7 @@ function inferMcpSuggestedActions(content) {
 }
 
 function initialMcpRelatedLinks(note, notes, options = {}) {
+  const maxNotes = clampInteger(options.maxNotes, 0, MAX_LIMIT, MAX_INITIAL_RELATED_NOTES)
   const sourceTokens = draftLinkTokens(`${note.title} ${note.summary} ${note.content} ${note.tags.join(' ')} ${note.category}`)
   const sourceTags = new Set(note.tags.map(normalizeTag))
   const explicitTargets = explicitLinkTargets(note.content)
@@ -1410,7 +1568,7 @@ function initialMcpRelatedLinks(note, notes, options = {}) {
     })
     .filter((related) => related.score >= 0.12 && (!options.explicitOnly || related.reason === 'Referencia explicita en la nota.'))
     .sort((left, right) => right.score - left.score)
-    .slice(0, MAX_INITIAL_RELATED_NOTES)
+    .slice(0, maxNotes)
 }
 
 function syncMcpInitialBacklinks(source, notes, now) {
