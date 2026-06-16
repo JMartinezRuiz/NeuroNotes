@@ -19,6 +19,7 @@ let aiDiagnostics: AiDiagnosticsResult | null = null
 
 const MANUAL_LINK_REASON = 'Enlace manual.'
 const MANUAL_RECIPROCAL_REASON = 'Enlace reciproco: Enlace manual.'
+const RECIPROCAL_REASON_PREFIX = 'Enlace reciproco:'
 const PREVIEW_DRAFT_CATEGORY_SIGNALS: Array<{ category: string; pattern: RegExp }> = [
   { category: 'Finanzas', pattern: /\b(finanzas?|finance|facturas?|pagos?|presupuesto|gastos?|dinero)\b/ },
   { category: 'Salud', pattern: /\b(salud|health|medic[ao]|doctor|consulta|cita|ejercicio|bienestar|wellness)\b/ },
@@ -225,6 +226,8 @@ const clampNumber = (value: unknown, min: number, max: number): number =>
   Number.isFinite(value) ? Math.max(min, Math.min(max, Math.round(Number(value)))) : min
 const isManualRelatedLink = (related: NoteRecord['related'][number]): boolean =>
   related.reason === MANUAL_LINK_REASON || related.reason === MANUAL_RECIPROCAL_REASON
+const isReciprocalPreviewLink = (related: NoteRecord['related'][number]): boolean =>
+  related.reason.startsWith(RECIPROCAL_REASON_PREFIX)
 const isInitialPreviewLink = (related: NoteRecord['related'][number]): boolean =>
   related.reason.startsWith('Relacion local inicial') || related.reason.startsWith('Enlace reciproco: Relacion local inicial')
 const isPreservedPreviewLink = (related: NoteRecord['related'][number]): boolean =>
@@ -430,6 +433,89 @@ const resetPreviewAnalysisAfterContentEdit = (note: NoteRecord): void => {
   note.analysisRun = undefined
   note.trainingReviewedAt = undefined
 }
+const syncPreviewRelatedGraph = (source: NoteRecord, now = new Date().toISOString()): void => {
+  const sourceBefore = previewRelatedSignature(source.related)
+  source.related = normalizePreviewRelatedLinks(source)
+  if (sourceBefore !== previewRelatedSignature(source.related)) {
+    source.updatedAt = now
+    source.trainingReviewedAt = undefined
+  }
+  const sourceDirectLinks = source.related.filter((related) => !isReciprocalPreviewLink(related))
+  const sourceTargets = new Set(sourceDirectLinks.map((related) => related.noteId))
+
+  for (const note of notes) {
+    if (note.id === source.id) {
+      continue
+    }
+
+    const before = previewRelatedSignature(note.related)
+    const sourceLink = sourceDirectLinks.find((related) => related.noteId === note.id)
+    const existingIndex = note.related.findIndex((related) => related.noteId === source.id)
+
+    if (sourceLink) {
+      const reciprocal = {
+        noteId: source.id,
+        title: source.title,
+        score: Math.max(0.08, Math.min(1, sourceLink.score * 0.9)),
+        reason: `${RECIPROCAL_REASON_PREFIX} ${sourceLink.reason}`
+      }
+
+      if (existingIndex === -1) {
+        note.related = [...note.related, reciprocal]
+      } else if (isReciprocalPreviewLink(note.related[existingIndex])) {
+        note.related[existingIndex] = reciprocal
+      } else {
+        note.related[existingIndex] = {
+          ...note.related[existingIndex],
+          title: source.title,
+          score: Math.max(note.related[existingIndex].score, reciprocal.score)
+        }
+      }
+    } else if (existingIndex !== -1 && isReciprocalPreviewLink(note.related[existingIndex]) && !sourceTargets.has(note.id)) {
+      note.related = note.related.filter((related) => related.noteId !== source.id)
+    }
+
+    note.related = normalizePreviewRelatedLinks(note)
+    if (before !== previewRelatedSignature(note.related)) {
+      note.updatedAt = now
+      note.trainingReviewedAt = undefined
+    }
+  }
+}
+const normalizePreviewRelatedLinks = (note: NoteRecord): NoteRecord['related'] => {
+  const byId = new Map<string, NoteRecord['related'][number]>()
+
+  for (const related of note.related) {
+    const target = notes.find((candidate) => candidate.id === related.noteId)
+
+    if (!target || target.id === note.id) {
+      continue
+    }
+
+    const normalized = {
+      noteId: target.id,
+      title: target.title,
+      score: Math.max(0, Math.min(1, Number.isFinite(related.score) ? related.score : 0)),
+      reason: related.reason.trim() || 'Relacion detectada por Neuronotes.'
+    }
+    const existing = byId.get(target.id)
+
+    if (!existing || normalized.score > existing.score) {
+      byId.set(target.id, normalized)
+    }
+  }
+
+  return [...byId.values()].sort((left, right) => right.score - left.score).slice(0, 10)
+}
+const previewRelatedSignature = (related: NoteRecord['related']): string =>
+  JSON.stringify(
+    related.map((link) => ({
+      noteId: link.noteId,
+      title: link.title,
+      score: link.score,
+      reason: link.reason
+    }))
+  )
 const removePreviewDeletedNoteReferences = (deletedNoteId: string): void => {
   const now = new Date().toISOString()
 
@@ -496,6 +582,8 @@ export function createPreviewApi(): Api {
     },
     updateNote: async (id, updates) => {
       const note = notes.find((item) => item.id === id)
+      const now = new Date().toISOString()
+      let needsGraphSync = false
 
       if (!note) {
         throw new Error('Nota no encontrada')
@@ -506,16 +594,19 @@ export function createPreviewApi(): Api {
         note.content = updates.content
         if (contentChanged) {
           resetPreviewAnalysisAfterContentEdit(note)
+          needsGraphSync = true
         }
       }
 
-      if (updates.title) {
-        note.title = updates.title
+      if (typeof updates.title === 'string' && updates.title.trim()) {
+        const nextTitle = updates.title.trim()
+        needsGraphSync = needsGraphSync || nextTitle !== note.title
+        note.title = nextTitle
         note.trainingReviewedAt = undefined
         for (const action of actions) {
           if (action.noteId === note.id) {
             action.noteTitle = note.title
-            action.updatedAt = new Date().toISOString()
+            action.updatedAt = now
           }
         }
       }
@@ -536,7 +627,10 @@ export function createPreviewApi(): Api {
         note.trainingReviewedAt = undefined
       }
 
-      note.updatedAt = new Date().toISOString()
+      note.updatedAt = now
+      if (needsGraphSync) {
+        syncPreviewRelatedGraph(note, now)
+      }
       return note
     },
     setTrainingReview: async (id, reviewed) => {
@@ -620,6 +714,7 @@ export function createPreviewApi(): Api {
     },
     analyzeNote: async (id, mode = 'qwen') => {
       const note = notes.find((item) => item.id === id)
+      const now = new Date().toISOString()
 
       if (!note) {
         throw new Error('Nota no encontrada')
@@ -652,7 +747,7 @@ export function createPreviewApi(): Api {
       note.analysisRun = {
         provider: mode === 'qwen' ? 'qwen' : 'local',
         model: settings.model,
-        analyzedAt: new Date().toISOString(),
+        analyzedAt: now,
         durationMs: mode === 'qwen' ? 860 : 12,
         ragNoteIds: note.related.slice(0, settings.ragMaxNotes).map((related) => related.noteId),
         ragContext: note.related.slice(0, settings.ragMaxNotes).map((related) => {
@@ -670,7 +765,8 @@ export function createPreviewApi(): Api {
         })
       }
       note.trainingReviewedAt = undefined
-      note.updatedAt = new Date().toISOString()
+      note.updatedAt = now
+      syncPreviewRelatedGraph(note, now)
       return note
     },
     analyzePending: async (mode) => {

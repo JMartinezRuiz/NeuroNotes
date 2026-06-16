@@ -259,6 +259,61 @@ describe('createPreviewApi', () => {
     )
   })
 
+  it('syncs preview related titles when a linked note is renamed', async () => {
+    const api = createPreviewApi()
+    const source = await api.createNote('Nota fuente sobre MCP')
+    const target = await api.createNote('Referencia cliente estable')
+
+    await api.addManualLink(source.id, target.id)
+    await api.updateNote(target.id, {
+      title: 'Referencia cliente actualizada'
+    })
+
+    const notes = await api.listNotes()
+    const updatedSource = notes.find((note) => note.id === source.id)
+
+    expect(updatedSource?.related).toContainEqual(
+      expect.objectContaining({
+        noteId: target.id,
+        title: 'Referencia cliente actualizada',
+        reason: 'Enlace manual.'
+      })
+    )
+  })
+
+  it('removes stale preview reciprocal links after content edits clear automatic links', async () => {
+    const api = createPreviewApi()
+    const source = await api.createNote('Roadmap producto notas automaticas con #roadmap y resumen local')
+    const analyzed = await api.analyzeNote(source.id, 'qwen')
+    const automaticTargetId = analyzed.related.find((related) =>
+      related.reason.includes('Relacion simulada para vista previa')
+    )?.noteId
+
+    expect(automaticTargetId).toBeTruthy()
+
+    const withBacklink = await api.listNotes()
+    expect(withBacklink.find((note) => note.id === automaticTargetId)?.related).toContainEqual(
+      expect.objectContaining({
+        noteId: source.id,
+        reason: expect.stringContaining('Enlace reciproco:')
+      })
+    )
+
+    await api.updateNote(source.id, {
+      content: 'Contenido corregido que debe esperar un nuevo analisis local.'
+    })
+
+    const afterEdit = await api.listNotes()
+
+    expect(afterEdit.find((note) => note.id === source.id)?.related).toEqual([])
+    expect(afterEdit.find((note) => note.id === automaticTargetId)?.related).not.toContainEqual(
+      expect.objectContaining({
+        noteId: source.id,
+        reason: expect.stringContaining('Enlace reciproco:')
+      })
+    )
+  })
+
   it('removes deleted note references and clears reviewed preview examples', async () => {
     const api = createPreviewApi()
     const source = await api.createNote('Nota revisada con enlace manual')

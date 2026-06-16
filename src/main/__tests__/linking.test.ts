@@ -415,6 +415,44 @@ describe('synchronizeRelatedGraph', () => {
     expect(target.trainingReviewedAt).toBeUndefined()
   })
 
+  it('refreshes incoming direct link titles when the source note is renamed', () => {
+    const source = note({
+      id: 'source',
+      title: 'Titulo nuevo',
+      content: 'Nota renombrada'
+    })
+    const target = note({
+      id: 'target',
+      title: 'Nota destino',
+      content: 'Mantiene un enlace directo al source',
+      related: [
+        {
+          noteId: 'source',
+          title: 'Titulo anterior',
+          score: 0.72,
+          reason: 'Enlace manual.'
+        }
+      ],
+      trainingReviewedAt: '2026-06-15T00:02:00.000Z'
+    })
+    const notes = [source, target]
+    const graphUpdatedAt = '2026-06-15T00:08:00.000Z'
+
+    const affectedIds = synchronizeRelatedGraph(notes, source.id, graphUpdatedAt)
+
+    expect(affectedIds).toEqual(['target'])
+    expect(target.related).toEqual([
+      {
+        noteId: 'source',
+        title: 'Titulo nuevo',
+        score: 0.72,
+        reason: 'Enlace manual.'
+      }
+    ])
+    expect(target.updatedAt).toBe(graphUpdatedAt)
+    expect(target.trainingReviewedAt).toBeUndefined()
+  })
+
   it('leaves reviewed notes untouched when reciprocal links are already synchronized', () => {
     const source = note({
       id: 'source',
