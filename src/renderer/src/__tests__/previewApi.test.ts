@@ -98,7 +98,19 @@ describe('createPreviewApi', () => {
 
     const analyzed = await api.analyzeNote(created.id, 'local')
 
+    expect(analyzed.category).toBe('Trabajo')
     expect(analyzed.tags).toEqual(expect.arrayContaining(['manual', 'cliente', 'rag']))
+  })
+
+  it('seeds preview draft metadata from quick-capture hashtags', async () => {
+    const api = createPreviewApi()
+    const created = await api.createNote('Preparar reminder MCP para #Cliente y #RAG local')
+
+    expect(created).toMatchObject({
+      category: 'Trabajo',
+      tags: ['cliente', 'rag'],
+      analysisStatus: 'idle'
+    })
   })
 
   it('marks reviewed notes for fine-tuning export', async () => {

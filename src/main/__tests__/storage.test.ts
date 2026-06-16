@@ -14,7 +14,7 @@ vi.mock('electron', () => ({
   }
 }))
 
-import { databasePaths, mutateDatabase, normalizeDatabase, readDatabase, writeDatabase } from '../storage'
+import { createNoteDraft, databasePaths, mutateDatabase, normalizeDatabase, readDatabase, writeDatabase } from '../storage'
 
 function note(id: string): NoteRecord {
   const now = '2026-06-15T00:00:00.000Z'
@@ -93,6 +93,27 @@ describe('readDatabase', () => {
     expect(second).toMatchObject({ version: 1, notes: [], actions: [] })
     expect(third).toMatchObject({ version: 1, notes: [], actions: [] })
     expect(created).toMatchObject({ version: 1, notes: [], actions: [] })
+  })
+})
+
+describe('createNoteDraft', () => {
+  it('seeds draft tags and category from quick-capture content', () => {
+    const draft = createNoteDraft('  Preparar reminder MCP para #Cliente y #RAG local  ')
+
+    expect(draft).toMatchObject({
+      title: 'Preparar reminder MCP para #Cliente y #RAG local',
+      content: 'Preparar reminder MCP para #Cliente y #RAG local',
+      category: 'Trabajo',
+      tags: ['cliente', 'rag'],
+      analysisStatus: 'idle'
+    })
+  })
+
+  it('uses category hashtags as initial metadata when they are explicit', () => {
+    const draft = createNoteDraft('Leer paper sobre memoria local #Aprendizaje')
+
+    expect(draft.category).toBe('Aprendizaje')
+    expect(draft.tags).toEqual(['aprendizaje'])
   })
 })
 

@@ -12,6 +12,7 @@ import {
   DatabaseFile,
   DEFAULT_SETTINGS,
   NoteRecord,
+  NOTE_CATEGORIES,
   RagContextItem,
   RelatedNote,
   SuggestedAction,
@@ -24,6 +25,15 @@ const DB_TEMP_FILE = `${DB_FILE}.tmp`
 
 const ANALYSIS_STATUSES = new Set<AnalysisStatus>(['idle', 'qwen', 'fallback', 'error'])
 const ACTION_STATUSES = new Set<ActionItemStatus>(['open', 'done'])
+const DRAFT_CATEGORY_SIGNALS: Array<{ category: string; pattern: RegExp }> = [
+  { category: 'Finanzas', pattern: /\b(finanzas?|finance|facturas?|pagos?|presupuesto|gastos?|dinero)\b/ },
+  { category: 'Salud', pattern: /\b(salud|health|medic[ao]|doctor|consulta|cita|ejercicio|bienestar|wellness)\b/ },
+  { category: 'Trabajo', pattern: /\b(trabajo|work|job|laboral|oficina|cliente|customer|equipo|reunion|deadline)\b/ },
+  { category: 'Proyecto', pattern: /\b(proyecto|project|producto|product|roadmap|feature|qwen|rag|mcp|ollama|lanzamiento)\b/ },
+  { category: 'Ideas', pattern: /\b(idea|ideas|brainstorming|propuesta|concepto|explorar|interfaz|minimalismo|ui)\b/ },
+  { category: 'Aprendizaje', pattern: /\b(aprendizaje|learning|study|estudio|curso|libro|aprender|investigar|paper|fuente)\b/ },
+  { category: 'Personal', pattern: /\b(personal|vida|hogar|home|familia)\b/ }
+]
 
 let mutationQueue: Promise<void> = Promise.resolve()
 let ensureDatabaseQueue: Promise<void> | undefined
@@ -261,15 +271,17 @@ export async function listNotes(): Promise<NoteRecord[]> {
 
 export function createNoteDraft(content: string): NoteRecord {
   const now = new Date().toISOString()
-  const firstLine = content.split(/\r?\n/).find((line) => line.trim().length > 0)?.trim()
+  const trimmedContent = content.trim()
+  const firstLine = trimmedContent.split(/\r?\n/).find((line) => line.trim().length > 0)?.trim()
+  const tags = inferDraftTags(trimmedContent)
 
   return {
     id: randomUUID(),
     title: firstLine?.slice(0, 80) || 'Nota sin titulo',
-    content: content.trim(),
+    content: trimmedContent,
     summary: '',
-    category: 'Inbox',
-    tags: [],
+    category: inferDraftCategory(trimmedContent, tags),
+    tags,
     related: [],
     suggestedActions: [],
     analysisStatus: 'idle',
@@ -308,6 +320,32 @@ function normalizeSettings(settings: unknown): DatabaseFile['settings'] {
     ragMaxNotes: clampInteger(source.ragMaxNotes, 0, 6, DEFAULT_SETTINGS.ragMaxNotes),
     ragExcerptLength: clampInteger(source.ragExcerptLength, 160, 1200, DEFAULT_SETTINGS.ragExcerptLength)
   }
+}
+
+function inferDraftTags(content: string): string[] {
+  return normalizeNoteTags([...content.matchAll(/(^|\s)#([\p{L}\p{N}][\p{L}\p{N}_-]{1,39})/gu)].map((match) => match[2]))
+}
+
+function inferDraftCategory(content: string, tags: string[]): string {
+  const taggedCategory = tags
+    .map((tag) => normalizeNoteCategory(tag))
+    .find((category) => category !== 'Inbox' && NOTE_CATEGORIES.includes(category as (typeof NOTE_CATEGORIES)[number]))
+
+  if (taggedCategory) {
+    return taggedCategory
+  }
+
+  const normalizedText = normalizeDraftText(`${content} ${tags.join(' ')}`)
+  const signal = DRAFT_CATEGORY_SIGNALS.find((item) => item.pattern.test(normalizedText))
+
+  return signal?.category ?? 'Inbox'
+}
+
+function normalizeDraftText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
 }
 
 function normalizeAiDiagnostics(value: unknown, settings: DatabaseFile['settings']): AiDiagnosticsResult | undefined {

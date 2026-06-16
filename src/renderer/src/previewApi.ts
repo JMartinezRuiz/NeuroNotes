@@ -17,6 +17,15 @@ let aiDiagnostics: AiDiagnosticsResult | null = null
 
 const MANUAL_LINK_REASON = 'Enlace manual.'
 const MANUAL_RECIPROCAL_REASON = 'Enlace reciproco: Enlace manual.'
+const PREVIEW_DRAFT_CATEGORY_SIGNALS: Array<{ category: string; pattern: RegExp }> = [
+  { category: 'Finanzas', pattern: /\b(finanzas?|finance|facturas?|pagos?|presupuesto|gastos?|dinero)\b/ },
+  { category: 'Salud', pattern: /\b(salud|health|medic[ao]|doctor|consulta|cita|ejercicio|bienestar|wellness)\b/ },
+  { category: 'Trabajo', pattern: /\b(trabajo|work|job|laboral|oficina|cliente|customer|equipo|reunion|deadline)\b/ },
+  { category: 'Proyecto', pattern: /\b(proyecto|project|producto|product|roadmap|feature|qwen|rag|mcp|ollama|lanzamiento)\b/ },
+  { category: 'Ideas', pattern: /\b(idea|ideas|brainstorming|propuesta|concepto|explorar|interfaz|minimalismo|ui)\b/ },
+  { category: 'Aprendizaje', pattern: /\b(aprendizaje|learning|study|estudio|curso|libro|aprender|investigar|paper|fuente)\b/ },
+  { category: 'Personal', pattern: /\b(personal|vida|hogar|home|familia)\b/ }
+]
 
 let notes: NoteRecord[] = [
   {
@@ -204,20 +213,34 @@ const clampNumber = (value: unknown, min: number, max: number): number =>
   Number.isFinite(value) ? Math.max(min, Math.min(max, Math.round(Number(value)))) : min
 const isManualRelatedLink = (related: NoteRecord['related'][number]): boolean =>
   related.reason === MANUAL_LINK_REASON || related.reason === MANUAL_RECIPROCAL_REASON
+const normalizePreviewText = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+const previewInlineTags = (content: string): string[] =>
+  Array.from(
+    new Set(
+      [...content.matchAll(/(^|\s)#([\p{L}\p{N}][\p{L}\p{N}_-]{1,39})/gu)]
+        .map((match) => normalizePreviewText(match[2]))
+        .filter(Boolean)
+    )
+  ).slice(0, 10)
+const previewDraftCategory = (content: string, tags: string[]): string => {
+  const normalizedText = normalizePreviewText(`${content} ${tags.join(' ')}`)
+  const signal = PREVIEW_DRAFT_CATEGORY_SIGNALS.find((item) => item.pattern.test(normalizedText))
+
+  return signal?.category ?? 'Inbox'
+}
 const previewAnalysisTags = (note: NoteRecord): string[] => {
-  const inlineTags = [...note.content.matchAll(/(^|\s)#([\p{L}\p{N}][\p{L}\p{N}_-]{1,39})/gu)].map((match) => match[2])
+  const inlineTags = previewInlineTags(note.content)
   const contentTags = note.content.toLowerCase().match(/\b[a-z]{4,}\b/g) ?? []
 
   return Array.from(
     new Set(
       [...note.tags, ...inlineTags, ...contentTags]
-        .map((tag) =>
-          tag
-            .trim()
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-        )
+        .map(normalizePreviewText)
         .filter(Boolean)
     )
   ).slice(0, 6)
@@ -297,13 +320,15 @@ export function createPreviewApi(): Api {
     listNotes: async () => sortNotes(),
     createNote: async (content: string) => {
       const now = new Date().toISOString()
+      const trimmedContent = content.trim()
+      const tags = previewInlineTags(trimmedContent)
       const note: NoteRecord = {
         id: makeId(),
-        title: content.split(/\r?\n/)[0]?.slice(0, 80) || 'Nota sin titulo',
-        content,
+        title: trimmedContent.split(/\r?\n/)[0]?.slice(0, 80) || 'Nota sin titulo',
+        content: trimmedContent,
         summary: '',
-        category: 'Inbox',
-        tags: [],
+        category: previewDraftCategory(trimmedContent, tags),
+        tags,
         related: [],
         suggestedActions: [],
         analysisStatus: 'idle',
@@ -446,8 +471,8 @@ export function createPreviewApi(): Api {
       }
 
       note.summary = note.content.replace(/\s+/g, ' ').slice(0, 140)
-      note.category = note.content.toLowerCase().includes('ui') ? 'Ideas' : 'Proyecto'
       note.tags = previewAnalysisTags(note)
+      note.category = previewDraftCategory(note.content, note.tags)
       const analysisLinks = notes
         .filter((candidate) => candidate.id !== note.id)
         .slice(0, 3)
@@ -501,8 +526,8 @@ export function createPreviewApi(): Api {
 
       for (const note of pending) {
         note.summary = note.content.replace(/\s+/g, ' ').slice(0, 140)
-        note.category = note.content.toLowerCase().includes('ui') ? 'Ideas' : 'Proyecto'
         note.tags = previewAnalysisTags(note)
+        note.category = previewDraftCategory(note.content, note.tags)
         note.suggestedActions = [
           {
             kind: 'mcp',
