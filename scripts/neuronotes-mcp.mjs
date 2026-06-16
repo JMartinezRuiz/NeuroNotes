@@ -19,6 +19,7 @@ const MAX_MCP_NOTE_CONTENT_LENGTH = 20000
 const MAX_MCP_ACTION_TITLE_LENGTH = 160
 const MAX_MCP_ACTION_DETAIL_LENGTH = 1200
 const MAX_MCP_TOOL_HINT_LENGTH = 80
+const MAX_INITIAL_RELATED_NOTES = 3
 const NOTE_CATEGORIES = ['Inbox', 'Trabajo', 'Proyecto', 'Ideas', 'Aprendizaje', 'Personal', 'Salud', 'Finanzas']
 const CATEGORY_ALIASES = new Map([
   ['entrada', 'Inbox'],
@@ -60,12 +61,13 @@ const CATEGORY_ALIASES = new Map([
 const CATEGORY_KEYWORDS = [
   { category: 'Finanzas', pattern: /\b(finanzas?|finance|finances|money|dinero|presupuesto|gastos?|pagos?)\b/ },
   { category: 'Salud', pattern: /\b(salud|health|medic[ao]|wellness|bienestar)\b/ },
-  { category: 'Trabajo', pattern: /\b(work|job|laboral|oficina|cliente|equipo|reunion)\b/ },
-  { category: 'Proyecto', pattern: /\b(project|producto|product|roadmap|lanzamiento)\b/ },
-  { category: 'Ideas', pattern: /\b(idea|ideas|brainstorming|propuesta)\b/ },
-  { category: 'Aprendizaje', pattern: /\b(learning|study|estudio|curso|libro|aprender)\b/ },
+  { category: 'Trabajo', pattern: /\b(trabajo|work|job|laboral|oficina|cliente|customer|equipo|reunion|deadline)\b/ },
+  { category: 'Proyecto', pattern: /\b(proyecto|project|producto|product|roadmap|feature|qwen|rag|mcp|ollama|lanzamiento)\b/ },
+  { category: 'Ideas', pattern: /\b(idea|ideas|brainstorming|propuesta|concepto|explorar|interfaz|minimalismo|ui)\b/ },
+  { category: 'Aprendizaje', pattern: /\b(aprendizaje|learning|study|estudio|curso|libro|aprender|investigar|paper|fuente)\b/ },
   { category: 'Personal', pattern: /\b(personal|vida|hogar|home|familia)\b/ }
 ]
+const DRAFT_LINK_STOPWORDS = new Set(['para', 'sobre', 'notas', 'nota', 'local', 'desde', 'entre', 'con', 'una'])
 const RESOURCE_URIS = {
   summary: 'neuronotes://library/summary',
   noteGraph: 'neuronotes://graph/links',
@@ -280,7 +282,8 @@ const WRITE_TOOLS = [
         content: {
           type: 'string',
           maxLength: MAX_MCP_NOTE_CONTENT_LENGTH,
-          description: 'Note body to save locally. The note is stored as pending analysis for Neuronotes/Qwen.'
+          description:
+            'Note body to save locally. Neuronotes seeds local title, summary, tags, category, action intents, and initial links, then leaves it pending Qwen analysis.'
         },
         title: {
           type: 'string',
@@ -1021,21 +1024,11 @@ async function createNoteFromMcp(database, args, context) {
   }
 
   const now = new Date().toISOString()
-  const note = {
-    id: randomUUID(),
-    title: mcpNoteTitle(args.title, content),
-    content,
-    summary: '',
-    category: normalizeNoteCategory(args.category),
-    tags: uniqueNormalizedTags(args.tags).slice(0, 10),
-    related: [],
-    suggestedActions: [],
-    analysisStatus: 'idle',
-    createdAt: now,
-    updatedAt: now
-  }
+  const note = createMcpNoteDraft(args, content, now)
+  note.related = initialMcpRelatedLinks(note, database.notes)
 
   database.notes.unshift(note)
+  syncMcpInitialBacklinks(note, database.notes, now)
 
   const stored = await writeNeuronotesDatabase(context.dbPath, database)
   const created = stored.notes.find((item) => item.id === note.id) ?? note
@@ -1047,7 +1040,9 @@ async function createNoteFromMcp(database, args, context) {
     databasePath: context.dbPath,
     note: {
       ...noteSummary(created, 1),
-      content: created.content
+      content: created.content,
+      related: created.related,
+      suggestedActions: created.suggestedActions
     },
     next: {
       analysisStatus: created.analysisStatus,
@@ -1055,6 +1050,193 @@ async function createNoteFromMcp(database, args, context) {
       reason: 'La app puede analizar esta nota despues con Qwen/RAG o fallback local.'
     }
   }
+}
+
+function createMcpNoteDraft(args, content, now) {
+  const explicitTags = uniqueNormalizedTags(args.tags)
+  const inlineTags = inlineTagsFromContent(content)
+  const tags = uniqueNormalizedTags([...explicitTags, ...inlineTags]).slice(0, 10)
+  const summary = draftSummary(content)
+
+  return {
+    id: randomUUID(),
+    title: mcpNoteTitle(args.title, content, summary),
+    content,
+    summary,
+    category: stringArg(args.category) ? normalizeNoteCategory(args.category) : draftCategory(content, tags),
+    tags,
+    related: [],
+    suggestedActions: inferMcpSuggestedActions(content),
+    analysisStatus: 'idle',
+    createdAt: now,
+    updatedAt: now
+  }
+}
+
+function draftSummary(content) {
+  const text = content
+    .split(/\r?\n/)
+    .map(cleanDraftText)
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const words = text.split(/\s+/).filter(Boolean)
+
+  return words.slice(0, 34).join(' ').slice(0, 220)
+}
+
+function mcpNoteTitle(title, content, summary = '') {
+  const explicitTitle = stringArg(title)
+
+  if (explicitTitle) {
+    return excerpt(cleanDraftText(explicitTitle), 160) || 'Nota sin titulo'
+  }
+
+  const firstLine = content.split(/\r?\n/).find((line) => line.trim())
+  const inferredTitle = firstLine ? cleanDraftText(firstLine).slice(0, 80) : ''
+
+  return inferredTitle || summary.slice(0, 80) || 'Nota sin titulo'
+}
+
+function cleanDraftText(value) {
+  return String(value)
+    .trim()
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/^[-*+]\s+(?:\[[ xX]\]\s+)?/, '')
+    .replace(/^\d+[.)]\s+/, '')
+    .replace(/(^|\s)(?:y|and|o|or)\s+#[\p{L}\p{N}][\p{L}\p{N}_-]{1,39}/gu, '$1')
+    .replace(/(^|\s)#[\p{L}\p{N}][\p{L}\p{N}_-]{1,39}/gu, '$1')
+    .replace(/\s+/g, ' ')
+    .replace(/\b(con|para|sobre|de|del|en)\s+(?:y|and|o|or)\s+/g, '$1 ')
+    .replace(/\s+(?:y|and|o|or)\s*$/g, '')
+    .replace(/^[,;:|/\\-]+|[,;:|/\\-]+$/g, '')
+    .trim()
+}
+
+function inlineTagsFromContent(content) {
+  return [...content.matchAll(/(^|\s)#([\p{L}\p{N}][\p{L}\p{N}_-]{1,39})/gu)]
+    .map((match) => normalizeTag(match[2]))
+    .filter(Boolean)
+}
+
+function draftCategory(content, tags) {
+  const normalizedText = normalizeText(`${content} ${tags.join(' ')}`)
+  const signal = CATEGORY_KEYWORDS.find((item) => item.pattern.test(normalizedText))
+
+  return signal?.category ?? 'Inbox'
+}
+
+function inferMcpSuggestedActions(content) {
+  const text = normalizeText(content)
+  const actions = []
+
+  if (/(pendiente|tarea|task|todo|hacer|preparar|crear|revisar|enviar|llamar|follow up)/.test(text)) {
+    actions.push({
+      kind: 'task',
+      title: 'Crear tarea desde la nota',
+      detail: 'La nota contiene lenguaje accionable que puede convertirse en una tarea local o MCP.',
+      toolHint: 'task.create',
+      confidence: 0.7
+    })
+  }
+
+  if (/(recordar|recordatorio|reminder|alerta|manana|cita|reunion|meeting|fecha|deadline|vencimiento)/.test(text)) {
+    actions.push({
+      kind: 'reminder',
+      title: 'Preparar recordatorio',
+      detail: 'La nota menciona tiempo, reunion o vencimiento; puede mapearse a una herramienta de recordatorios.',
+      toolHint: 'reminder.create',
+      confidence: 0.66
+    })
+  }
+
+  if (/(investigar|buscar|leer|comparar|referencia|documento|paper|fuente|research|source)/.test(text)) {
+    actions.push({
+      kind: 'research',
+      title: 'Buscar contexto adicional',
+      detail: 'La nota parece necesitar investigacion o documentos relacionados.',
+      toolHint: 'documents.search',
+      confidence: 0.64
+    })
+  }
+
+  if (/\b(mcp|workflow|automatizacion|automatizar|handoff|herramientas?|tools?)\b/.test(text)) {
+    actions.push({
+      kind: 'mcp',
+      title: 'Preparar handoff MCP',
+      detail: 'La nota menciona automatizacion o herramientas; puede revisarse para un handoff MCP aprobado por el usuario.',
+      toolHint: 'mcp.workflow.prepare',
+      confidence: 0.62
+    })
+  }
+
+  return actions.slice(0, 4)
+}
+
+function initialMcpRelatedLinks(note, notes) {
+  const sourceTokens = draftLinkTokens(`${note.title} ${note.summary} ${note.content} ${note.tags.join(' ')} ${note.category}`)
+  const sourceTags = new Set(note.tags.map(normalizeTag))
+
+  return notes
+    .filter((candidate) => candidate.id !== note.id)
+    .map((candidate) => {
+      const candidateTokens = draftLinkTokens(
+        `${candidate.title} ${candidate.summary} ${candidate.content} ${candidate.tags.join(' ')} ${candidate.category}`
+      )
+      const tokenOverlap = [...sourceTokens].filter((token) => candidateTokens.has(token)).length
+      const keywordOverlap = ['mcp', 'rag', 'qwen', 'ollama'].filter(
+        (token) => sourceTokens.has(token) && candidateTokens.has(token)
+      ).length
+      const tagOverlap = candidate.tags.filter((tag) => sourceTags.has(normalizeTag(tag))).length
+      const categoryBoost = note.category !== 'Inbox' && note.category === candidate.category ? 0.08 : 0
+      const keywordBoost = Math.min(0.2, keywordOverlap * 0.08)
+      const score = Math.min(1, tokenOverlap * 0.06 + keywordBoost + tagOverlap * 0.22 + categoryBoost)
+
+      return {
+        noteId: candidate.id,
+        title: candidate.title,
+        score,
+        reason:
+          tagOverlap > 0
+            ? 'Relacion local inicial por etiquetas y contenido.'
+            : 'Relacion local inicial por contenido cercano.'
+      }
+    })
+    .filter((related) => related.score >= 0.12)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, MAX_INITIAL_RELATED_NOTES)
+}
+
+function syncMcpInitialBacklinks(source, notes, now) {
+  for (const related of source.related) {
+    const target = notes.find((note) => note.id === related.noteId)
+
+    if (!target) {
+      continue
+    }
+
+    target.related = [
+      ...target.related.filter((link) => link.noteId !== source.id),
+      {
+        noteId: source.id,
+        title: source.title,
+        score: Math.max(0.08, Math.min(1, related.score * 0.9)),
+        reason: `Enlace reciproco: ${related.reason}`
+      }
+    ].slice(0, 10)
+    target.updatedAt = now
+    target.trainingReviewedAt = undefined
+  }
+}
+
+function draftLinkTokens(value) {
+  return new Set(
+    normalizeText(value)
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .filter((token) => token.length > 2 && !DRAFT_LINK_STOPWORDS.has(token))
+  )
 }
 
 async function createActionFromMcp(database, args, context) {
@@ -1167,21 +1349,6 @@ async function createActionFromMcp(database, args, context) {
       reason: 'Neuronotes no ejecuta herramientas externas; el usuario debe aprobar el handoff MCP primero.'
     }
   }
-}
-
-function mcpNoteTitle(value, content) {
-  const explicit = stringArg(value)
-
-  if (explicit) {
-    return excerpt(explicit, 120)
-  }
-
-  const firstLine = content
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find(Boolean)
-
-  return excerpt(firstLine || 'Nota MCP', 120)
 }
 
 function uniqueNormalizedTags(values) {

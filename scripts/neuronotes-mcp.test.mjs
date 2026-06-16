@@ -978,10 +978,28 @@ describe('neuronotes MCP server', () => {
       writeMode: 'enabled',
       note: {
         title: 'Captura desde MCP',
+        summary: 'Nueva idea capturada desde un host MCP autorizado.',
         category: 'Proyecto',
         tags: ['mcp', 'qwen'],
         analysisStatus: 'idle',
-        content: 'Nueva idea capturada desde un host MCP autorizado.'
+        content: 'Nueva idea capturada desde un host MCP autorizado.',
+        related: [
+          expect.objectContaining({
+            noteId: 'note-project',
+            title: 'Roadmap Neuronotes'
+          }),
+          expect.objectContaining({
+            noteId: 'note-health',
+            title: 'Cita medico'
+          })
+        ],
+        suggestedActionCount: 1,
+        suggestedActions: [
+          expect.objectContaining({
+            kind: 'mcp',
+            toolHint: 'mcp.workflow.prepare'
+          })
+        ]
       },
       next: {
         analysisStatus: 'idle',
@@ -994,9 +1012,32 @@ describe('neuronotes MCP server', () => {
       id: created.note.id,
       title: 'Captura desde MCP',
       analysisStatus: 'idle',
-      related: [],
-      suggestedActions: []
+      summary: 'Nueva idea capturada desde un host MCP autorizado.',
+      related: [
+        expect.objectContaining({
+          noteId: 'note-project',
+          title: 'Roadmap Neuronotes',
+          reason: 'Relacion local inicial por etiquetas y contenido.'
+        }),
+        expect.objectContaining({
+          noteId: 'note-health',
+          title: 'Cita medico'
+        })
+      ],
+      suggestedActions: [
+        expect.objectContaining({
+          kind: 'mcp',
+          toolHint: 'mcp.workflow.prepare'
+        })
+      ]
     })
+    expect(database.notes.find((note) => note.id === 'note-project')?.related).toContainEqual(
+      expect.objectContaining({
+        noteId: created.note.id,
+        title: 'Captura desde MCP',
+        reason: expect.stringContaining('Enlace reciproco: Relacion local inicial')
+      })
+    )
 
     const projectSearch = await callTool('neuronotes_search_notes', { category: 'project' }, { dbPath })
     expect(projectSearch).toMatchObject({
@@ -1020,6 +1061,59 @@ describe('neuronotes MCP server', () => {
         canCreateActions: true,
         canExecuteExternalTools: false
       }
+    })
+  })
+
+  it('seeds MCP-captured quick notes with local metadata, actions, and initial links', async () => {
+    const created = await callTool(
+      'neuronotes_create_note',
+      {
+        content: 'Preparar workflow MCP para #Cliente y #RAG local'
+      },
+      { dbPath, writeEnabled: true }
+    )
+
+    expect(created).toMatchObject({
+      schema: 'neuronotes.mcp.write-note.v1',
+      note: {
+        title: 'Preparar workflow MCP para local',
+        summary: 'Preparar workflow MCP para local',
+        category: 'Trabajo',
+        tags: ['cliente', 'rag'],
+        analysisStatus: 'idle',
+        related: [
+          expect.objectContaining({
+            noteId: 'note-project',
+            title: 'Roadmap Neuronotes'
+          })
+        ],
+        suggestedActions: [
+          expect.objectContaining({ kind: 'task', toolHint: 'task.create' }),
+          expect.objectContaining({ kind: 'mcp', toolHint: 'mcp.workflow.prepare' })
+        ]
+      },
+      next: {
+        qwenQueue: 'pending'
+      }
+    })
+
+    const database = await readNeuronotesDatabase(dbPath)
+    expect(database.notes[0]).toMatchObject({
+      id: created.note.id,
+      title: 'Preparar workflow MCP para local',
+      summary: 'Preparar workflow MCP para local',
+      category: 'Trabajo',
+      tags: ['cliente', 'rag'],
+      suggestedActions: [
+        expect.objectContaining({ kind: 'task' }),
+        expect.objectContaining({ kind: 'mcp' })
+      ],
+      related: [
+        expect.objectContaining({
+          noteId: 'note-project',
+          reason: expect.stringContaining('Relacion local inicial')
+        })
+      ]
     })
   })
 
