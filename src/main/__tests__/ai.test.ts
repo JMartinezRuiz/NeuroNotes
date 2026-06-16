@@ -758,7 +758,7 @@ Texto posterior {no-json}`
         }),
         expect.objectContaining({
           kind: 'reminder',
-          toolHint: 'reminder.create'
+          toolHint: 'calendar.create_event'
         })
       ]
     })

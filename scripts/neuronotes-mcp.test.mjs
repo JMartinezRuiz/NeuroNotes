@@ -1336,7 +1336,7 @@ describe('neuronotes MCP server', () => {
           })
         ],
         suggestedActions: expect.arrayContaining([
-          expect.objectContaining({ kind: 'reminder', toolHint: 'reminder.create' }),
+          expect.objectContaining({ kind: 'reminder', toolHint: 'calendar.create_event' }),
           expect.objectContaining({ kind: 'mcp', toolHint: 'mcp.workflow.prepare' })
         ])
       },
@@ -1363,6 +1363,21 @@ describe('neuronotes MCP server', () => {
 
     const backup = JSON.parse(await readFile(path.join(tempDir, 'neuronotes.json.bak'), 'utf8'))
     expect(backup.notes.find((item) => item.id === 'note-health')?.content).toContain('Nueva evidencia')
+  })
+
+  it('seeds MCP-captured notes with calendar and email tool hints', async () => {
+    const created = await callTool(
+      'neuronotes_create_note',
+      {
+        content: 'Agendar reunion con cliente manana y enviar correo con resumen'
+      },
+      { dbPath, writeEnabled: true }
+    )
+
+    expect(created.note.suggestedActions).toEqual([
+      expect.objectContaining({ kind: 'task', title: 'Preparar correo', toolHint: 'email.compose' }),
+      expect.objectContaining({ kind: 'reminder', title: 'Crear evento de calendario', toolHint: 'calendar.create_event' })
+    ])
   })
 
   it('creates local action intents only when MCP write mode is explicitly enabled', async () => {

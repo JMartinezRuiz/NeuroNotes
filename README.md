@@ -73,6 +73,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Editing note content clears stale AI analysis, preserves manual links, and reseeds a local draft summary, inline tags, explicit links, and suggested action intents while waiting for Qwen or fallback analysis.
 - Late AI results are ignored if the note changed while analysis was running, preventing stale Qwen/local output from overwriting user edits.
 - Suggested action intents that can later map to MCP tools such as tasks, reminders, research, or workflows.
+- Local action intents now seed more specific MCP tool hints for calendar events, email drafts, messages, and calls when quick notes mention meetings or communication.
 - Local action plan: users can save suggested actions, review them in a global Plan view, mark them done, delete them, and carry them through library/Markdown export.
 - Saved actions can be explicitly approved or revoked for MCP handoff review before any future external tool execution exists.
 - Saved actions can have their MCP `toolHint` filled or corrected before approval, and changing it clears stale approval.

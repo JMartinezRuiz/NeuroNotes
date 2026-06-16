@@ -158,6 +158,16 @@ describe('createPreviewApi', () => {
     })
   })
 
+  it('seeds preview action hints for calendar and email handoff', async () => {
+    const api = createPreviewApi()
+    const created = await api.createNote('Agendar reunion con cliente manana y enviar correo con resumen')
+
+    expect(created.suggestedActions).toEqual([
+      expect.objectContaining({ kind: 'task', title: 'Preparar correo', toolHint: 'email.compose' }),
+      expect.objectContaining({ kind: 'reminder', title: 'Crear evento de calendario', toolHint: 'calendar.create_event' })
+    ])
+  })
+
   it('creates preview notes from clipboard text', async () => {
     vi.stubGlobal('navigator', {
       clipboard: {

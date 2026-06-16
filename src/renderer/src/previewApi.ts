@@ -305,8 +305,36 @@ const seedPreviewDraftMetadataAfterContentEdit = (note: NoteRecord): void => {
 const previewSuggestedActions = (content: string): NoteRecord['suggestedActions'] => {
   const text = normalizePreviewText(content)
   const actions: NoteRecord['suggestedActions'] = []
+  const hasEmail = /\b(email|e-mail|correo|mail)\b/.test(text) || /enviar.+\b(correo|mail)\b/.test(text)
+  const hasMessage = /\b(whatsapp|mensaje|slack|teams|telegram|dm)\b/.test(text)
+  const hasCall = /\b(llamar|llamada|call|telefono|phone)\b/.test(text)
+  const hasCalendar = /\b(reunion|meeting|cita|evento|calendario|calendar|agenda|agendar)\b/.test(text)
 
-  if (/(pendiente|tarea|task|todo|hacer|preparar|crear|revisar|enviar|llamar|follow up)/.test(text)) {
+  if (hasEmail) {
+    actions.push({
+      kind: 'task',
+      title: 'Preparar correo',
+      detail: 'La nota pide redactar o enviar un correo; puede revisarse para un handoff MCP de email.',
+      toolHint: 'email.compose',
+      confidence: 0.72
+    })
+  } else if (hasMessage) {
+    actions.push({
+      kind: 'task',
+      title: 'Preparar mensaje',
+      detail: 'La nota pide enviar un mensaje; puede revisarse para una herramienta de mensajeria.',
+      toolHint: 'message.send',
+      confidence: 0.7
+    })
+  } else if (hasCall) {
+    actions.push({
+      kind: 'task',
+      title: 'Preparar llamada',
+      detail: 'La nota pide llamar a alguien; puede revisarse para una accion de llamada o seguimiento.',
+      toolHint: 'phone.call',
+      confidence: 0.68
+    })
+  } else if (/(pendiente|tarea|task|todo|hacer|preparar|crear|revisar|enviar|follow up)/.test(text)) {
     actions.push({
       kind: 'task',
       title: 'Crear tarea desde la nota',
@@ -316,7 +344,15 @@ const previewSuggestedActions = (content: string): NoteRecord['suggestedActions'
     })
   }
 
-  if (/(recordar|recordatorio|reminder|alerta|manana|cita|reunion|meeting|fecha|deadline|vencimiento)/.test(text)) {
+  if (hasCalendar) {
+    actions.push({
+      kind: 'reminder',
+      title: 'Crear evento de calendario',
+      detail: 'La nota menciona reunion, cita o evento; puede revisarse para crear un evento de calendario.',
+      toolHint: 'calendar.create_event',
+      confidence: 0.72
+    })
+  } else if (/(recordar|recordatorio|reminder|alerta|manana|fecha|deadline|vencimiento)/.test(text)) {
     actions.push({
       kind: 'reminder',
       title: 'Preparar recordatorio',
