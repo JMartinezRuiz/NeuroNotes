@@ -58,6 +58,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Manual pending-note analysis can use the local fallback before Qwen is ready without contacting Ollama; when Qwen becomes available, fallback notes can be upgraded through the Qwen pending flow.
 - Pending analysis results report how many notes finished with Qwen, local fallback, failures, or stale skipped updates.
 - RAG context generation from locally related notes before Qwen analysis, prioritizing user-curated manual links before TF-IDF-style lexical matches, with stored excerpts and scores for auditability.
+- RAG ranking expands lightweight Spanish/English concept aliases such as `cliente/customer`, `recordatorio/reminder`, `RAG/retrieval`, and `MCP/workflow` so related notes can connect without exact wording.
 - Automatic summaries, categories, tags, and related-note suggestions.
 - Editing note content clears stale AI summaries, suggested actions, and automatic links while preserving manual links.
 - Late AI results are ignored if the note changed while analysis was running, preventing stale Qwen/local output from overwriting user edits.

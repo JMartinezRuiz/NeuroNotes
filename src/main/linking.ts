@@ -45,6 +45,81 @@ const MIN_RELATED_SCORE = 0.08
 const DEFAULT_RAG_MAX_NOTES = 5
 const DEFAULT_RAG_EXCERPT_LENGTH = 550
 
+const CONCEPT_ALIASES = new Map<string, string>([
+  ['qwen', 'concept:local-ai'],
+  ['ollama', 'concept:local-ai'],
+  ['llm', 'concept:local-ai'],
+  ['ia', 'concept:local-ai'],
+  ['rag', 'concept:rag'],
+  ['retrieval', 'concept:rag'],
+  ['contexto', 'concept:rag'],
+  ['recuperacion', 'concept:rag'],
+  ['recuperado', 'concept:rag'],
+  ['enlace', 'concept:rag'],
+  ['enlaces', 'concept:rag'],
+  ['enlazar', 'concept:rag'],
+  ['conectar', 'concept:rag'],
+  ['conexion', 'concept:rag'],
+  ['conexiones', 'concept:rag'],
+  ['grafo', 'concept:rag'],
+  ['mcp', 'concept:mcp'],
+  ['handoff', 'concept:mcp'],
+  ['herramienta', 'concept:mcp'],
+  ['herramientas', 'concept:mcp'],
+  ['tool', 'concept:mcp'],
+  ['tools', 'concept:mcp'],
+  ['workflow', 'concept:mcp'],
+  ['automatizacion', 'concept:mcp'],
+  ['automatizar', 'concept:mcp'],
+  ['tarea', 'concept:task'],
+  ['tareas', 'concept:task'],
+  ['task', 'concept:task'],
+  ['todo', 'concept:task'],
+  ['pendiente', 'concept:task'],
+  ['pendientes', 'concept:task'],
+  ['recordar', 'concept:reminder'],
+  ['recordatorio', 'concept:reminder'],
+  ['reminder', 'concept:reminder'],
+  ['alerta', 'concept:reminder'],
+  ['reunion', 'concept:meeting'],
+  ['junta', 'concept:meeting'],
+  ['meeting', 'concept:meeting'],
+  ['cliente', 'concept:client'],
+  ['customer', 'concept:client'],
+  ['medico', 'concept:health'],
+  ['medica', 'concept:health'],
+  ['doctor', 'concept:health'],
+  ['consulta', 'concept:health'],
+  ['salud', 'concept:health'],
+  ['wellness', 'concept:health'],
+  ['bienestar', 'concept:health'],
+  ['factura', 'concept:finance'],
+  ['facturas', 'concept:finance'],
+  ['pago', 'concept:finance'],
+  ['pagos', 'concept:finance'],
+  ['presupuesto', 'concept:finance'],
+  ['gasto', 'concept:finance'],
+  ['gastos', 'concept:finance'],
+  ['dinero', 'concept:finance'],
+  ['finanzas', 'concept:finance'],
+  ['finance', 'concept:finance'],
+  ['curso', 'concept:learning'],
+  ['libro', 'concept:learning'],
+  ['aprender', 'concept:learning'],
+  ['estudiar', 'concept:learning'],
+  ['investigar', 'concept:learning'],
+  ['paper', 'concept:learning'],
+  ['fuente', 'concept:learning'],
+  ['study', 'concept:learning'],
+  ['learning', 'concept:learning'],
+  ['app', 'concept:product'],
+  ['aplicacion', 'concept:product'],
+  ['producto', 'concept:product'],
+  ['product', 'concept:product'],
+  ['feature', 'concept:product'],
+  ['roadmap', 'concept:product']
+])
+
 export interface RagContextOptions {
   maxNotes?: number
   excerptLength?: number
@@ -53,7 +128,7 @@ export interface RagContextOptions {
 type RagSourceNote = Pick<NoteRecord, 'id' | 'content' | 'tags' | 'category'> &
   Partial<Pick<NoteRecord, 'title' | 'summary' | 'related'>>
 
-function tokens(text: string): string[] {
+function lexicalTokens(text: string): string[] {
   return text
     .toLowerCase()
     .normalize('NFD')
@@ -61,6 +136,11 @@ function tokens(text: string): string[] {
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .split(/\s+/)
     .filter((token) => token.length > 2 && !STOPWORDS.has(token))
+}
+
+function tokens(text: string): string[] {
+  return lexicalTokens(text)
+    .flatMap(expandConceptTokens)
 }
 
 function vector(parts: Array<{ text: string; weight: number }>): Map<string, number> {
@@ -108,39 +188,45 @@ export function rankRelatedNotes(
 ): RelatedNote[] {
   const candidates = notes.filter((candidate) => candidate.id !== note.id)
   const sourceTokens = tokens(sourceText(note))
-  const sourceTokenSet = new Set(sourceTokens)
-  const sourceBigrams = bigrams(sourceTokens)
+  const sourceLexicalTokens = lexicalTokens(sourceText(note))
+  const sourceTokenSet = new Set(sourceLexicalTokens)
+  const sourceConcepts = conceptSet(sourceTokens)
+  const sourceBigrams = bigrams(sourceLexicalTokens)
   const sourceVector = noteVector(note)
   const candidateVectors = candidates.map((candidate) => ({
     candidate,
     vector: candidateVector(candidate),
-    tokens: tokens(candidateText(candidate))
+    tokens: tokens(candidateText(candidate)),
+    lexicalTokens: lexicalTokens(candidateText(candidate))
   }))
   const allVectors = [sourceVector, ...candidateVectors.map((item) => item.vector)]
   const documentFrequency = buildDocumentFrequency(allVectors)
   const totalDocuments = allVectors.length
 
   return candidateVectors
-    .map(({ candidate, vector: candidateVectorValue, tokens: candidateTokens }) => {
+    .map(({ candidate, vector: candidateVectorValue, tokens: candidateTokens, lexicalTokens: candidateLexicalTokens }) => {
       const semanticScore = cosine(sourceVector, candidateVectorValue, documentFrequency, totalDocuments)
       const tagOverlap = overlappingTags(note.tags, candidate.tags)
       const sameCategory = note.category === candidate.category && note.category !== 'Inbox'
-      const phraseOverlap = intersectionSize(sourceBigrams, bigrams(candidateTokens))
-      const titleOverlap = overlapRatio(sourceTokenSet, new Set(tokens(candidate.title)))
+      const phraseOverlap = intersectionSize(sourceBigrams, bigrams(candidateLexicalTokens))
+      const titleOverlap = overlapRatio(sourceTokenSet, new Set(lexicalTokens(candidate.title)))
+      const conceptOverlap = intersectionSize(sourceConcepts, conceptSet(candidateTokens))
       const tagBoost = Math.min(0.22, tagOverlap * 0.11)
-      const hasTextSignal = semanticScore > 0.02 || tagOverlap > 0 || phraseOverlap > 0 || titleOverlap > 0
+      const conceptBoost = Math.min(0.18, conceptOverlap * 0.06)
+      const hasTextSignal =
+        semanticScore > 0.02 || tagOverlap > 0 || phraseOverlap > 0 || titleOverlap > 0 || conceptOverlap > 0
       const categoryBoost = sameCategory && hasTextSignal ? 0.08 : 0
       const phraseBoost = Math.min(0.16, phraseOverlap * 0.04)
       const titleBoost = Math.min(0.08, titleOverlap * 0.08)
       const score = hasTextSignal
-        ? Math.min(1, semanticScore * 0.74 + tagBoost + categoryBoost + phraseBoost + titleBoost)
+        ? Math.min(1, semanticScore * 0.68 + tagBoost + conceptBoost + categoryBoost + phraseBoost + titleBoost)
         : 0
 
       return {
         noteId: candidate.id,
         title: candidate.title,
         score,
-        reason: relatedReason({ tagOverlap, sameCategory, phraseOverlap, titleOverlap })
+        reason: relatedReason({ tagOverlap, sameCategory, phraseOverlap, titleOverlap, conceptOverlap })
       }
     })
     .filter((candidate) => candidate.score >= MIN_RELATED_SCORE)
@@ -319,6 +405,15 @@ function inverseDocumentFrequency(token: string, documentFrequency: Map<string, 
   return Math.log((totalDocuments + 1) / (appearances + 1)) + 1
 }
 
+function expandConceptTokens(token: string): string[] {
+  const concept = CONCEPT_ALIASES.get(token)
+  return concept ? [token, concept] : [token]
+}
+
+function conceptSet(values: string[]): Set<string> {
+  return new Set(values.filter((token) => token.startsWith('concept:')))
+}
+
 function bigrams(values: string[]): Set<string> {
   const result = new Set<string>()
 
@@ -359,6 +454,7 @@ function relatedReason(signals: {
   sameCategory: boolean
   phraseOverlap: number
   titleOverlap: number
+  conceptOverlap: number
 }): string {
   if (signals.tagOverlap > 0 && signals.phraseOverlap > 0) {
     return 'Comparte etiquetas, frases y vocabulario relevante.'
@@ -370,6 +466,10 @@ function relatedReason(signals: {
 
   if (signals.phraseOverlap > 0 || signals.titleOverlap >= 0.4) {
     return 'Comparte frases y conceptos especificos.'
+  }
+
+  if (signals.conceptOverlap > 0) {
+    return 'Comparte conceptos equivalentes y vocabulario relevante.'
   }
 
   if (signals.sameCategory) {

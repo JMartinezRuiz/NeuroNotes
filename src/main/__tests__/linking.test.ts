@@ -78,6 +78,34 @@ describe('rankRelatedNotes', () => {
     })
   })
 
+  it('connects notes through bilingual concept aliases', () => {
+    const source = note({
+      id: 'source',
+      category: 'Proyecto',
+      content: 'Preparar automatizacion para una alerta del cliente desde Neuronotes.'
+    })
+    const conceptMatch = note({
+      id: 'concept-match',
+      title: 'Workflow customer reminder',
+      category: 'Proyecto',
+      content: 'MCP workflow para crear reminder del customer y dejarlo como accion aprobable.'
+    })
+    const unrelated = note({
+      id: 'unrelated',
+      title: 'Ajustes visuales',
+      category: 'Proyecto',
+      content: 'Revisar iconos, espacios y contraste de la interfaz minimalista.'
+    })
+
+    const ranked = rankRelatedNotes(source, [source, unrelated, conceptMatch])
+
+    expect(ranked[0]).toMatchObject({
+      noteId: 'concept-match',
+      reason: 'Comparte conceptos equivalentes y vocabulario relevante.'
+    })
+    expect(ranked.some((item) => item.noteId === 'unrelated')).toBe(false)
+  })
+
   it('does not link notes that only share a category', () => {
     const source = note({
       id: 'source',
