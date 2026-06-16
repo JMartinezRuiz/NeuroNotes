@@ -1,9 +1,25 @@
-import { ActionItem, DatabaseFile, NoteRecord, RagContextItem, SuggestedAction } from './types'
+import { ActionItem, DatabaseFile, NOTE_CATEGORIES, NoteRecord, RagContextItem, SuggestedAction } from './types'
 
 const MCP_HANDOFF_SCHEMA = 'neuronotes.mcp-handoff.v1'
 const FINE_TUNE_EXAMPLE_SCHEMA = 'neuronotes.finetune-example.v1'
-const FINE_TUNE_SYSTEM_PROMPT =
-  'Eres el motor local de Neuronotes. Devuelve exclusivamente JSON valido con title, summary, category, tags, related y suggestedActions para una nota nueva.'
+const FINE_TUNE_SYSTEM_PROMPT = [
+  'Eres el motor local de Neuronotes para Qwen 0.8B. Analiza una nota nueva y usa el contexto recuperado solo si ayuda.',
+  '',
+  'Devuelve exclusivamente JSON valido con esta forma:',
+  '{',
+  '  "title": "maximo 8 palabras",',
+  '  "summary": "resumen en una frase",',
+  '  "category": "una categoria",',
+  '  "tags": ["2 a 6 etiquetas cortas"],',
+  '  "related": [{ "noteId": "id de nota existente", "reason": "motivo breve" }],',
+  '  "suggestedActions": [{ "kind": "task | reminder | research | mcp", "title": "accion breve", "detail": "detalle breve", "toolHint": "herramienta MCP opcional", "confidence": 0.0 }]',
+  '}',
+  '',
+  `Categorias permitidas: ${NOTE_CATEGORIES.join(', ')}.`,
+  'No inventes IDs. Si no hay relacion clara, usa related: [].',
+  'No ejecutes herramientas ni asumas permisos. Las suggestedActions son solo intenciones locales para una futura capa MCP.',
+  'No incluyas razonamiento, texto fuera del JSON ni bloques <think>.'
+].join('\n')
 
 export interface FineTuneExample {
   schema: string
@@ -477,6 +493,14 @@ function buildFineTuneAssistantPayload(
 
 function buildFineTuneUserPrompt(note: NoteRecord, notesById: Map<string, NoteRecord>): string {
   return [
+    'Fecha de referencia:',
+    note.createdAt.slice(0, 10),
+    '',
+    'Metadatos actuales:',
+    `Titulo: ${note.title || 'Sin titulo'}`,
+    `Categoria actual: ${note.category || 'Inbox'}`,
+    `Etiquetas actuales: ${note.tags.join(', ') || 'sin etiquetas'}`,
+    '',
     'Nota nueva:',
     note.content.trim(),
     '',
