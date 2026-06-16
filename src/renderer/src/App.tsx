@@ -33,6 +33,7 @@ import {
   isPendingForAnalysis,
   pendingAnalysisButtonTitle,
   pendingAnalysisEngine,
+  pendingAnalysisNoteReason,
   pendingAnalysisProgressMessage,
   pendingAnalysisQueueLabel,
   pendingAnalysisResultMessage,
@@ -117,17 +118,21 @@ function formatDate(value: string): string {
   }).format(new Date(value))
 }
 
-function statusLabel(note: NoteRecord): string {
-  if (note.analysisStatus === 'qwen') {
+function analysisStatusLabel(status: NoteRecord['analysisStatus']): string {
+  if (status === 'qwen') {
     return 'Qwen'
   }
-  if (note.analysisStatus === 'fallback') {
+  if (status === 'fallback') {
     return 'Local'
   }
-  if (note.analysisStatus === 'error') {
+  if (status === 'error') {
     return 'Error'
   }
   return 'Sin analizar'
+}
+
+function statusLabel(note: NoteRecord): string {
+  return analysisStatusLabel(note.analysisStatus)
 }
 
 function analysisProviderLabel(provider: AnalysisProvider): string {
@@ -389,11 +394,14 @@ export default function App(): JSX.Element {
         .map((note) => ({
           id: note.id,
           content: note.content,
+          title: note.title,
+          category: note.category,
           status: note.analysisStatus
         })),
     [notes, pendingEngine]
   )
   const pendingAnalysisCount = pendingAnalysisNotes.length
+  const pendingAnalysisPreviewNotes = useMemo(() => pendingAnalysisNotes.slice(0, 4), [pendingAnalysisNotes])
   const pendingAnalysisLabel = useMemo(
     () => pendingAnalysisQueueLabel(pendingEngine, pendingAnalysisNotes),
     [pendingAnalysisNotes, pendingEngine]
@@ -1619,6 +1627,50 @@ export default function App(): JSX.Element {
             </button>
           </div>
         </header>
+
+        {pendingAnalysisCount > 0 && (
+          <section className="analysis-queue-band" data-engine={pendingEngine}>
+            <div className="analysis-queue-heading">
+              <span>
+                <Sparkles size={16} />
+                <strong>Cola IA</strong>
+                <small>{pendingAnalysisLabel}</small>
+              </span>
+              <button
+                type="button"
+                onClick={() => runPendingAnalysis('manual')}
+                disabled={busy === 'analyzePending'}
+                title={pendingAnalysisButtonTitle(pendingEngine)}
+              >
+                {busy === 'analyzePending' ? <Loader2 className="spin" size={15} /> : <Sparkles size={15} />}
+                Analizar lote
+              </button>
+            </div>
+            <div className="analysis-queue-list">
+              {pendingAnalysisPreviewNotes.map((note) => (
+                <button
+                  type="button"
+                  key={note.id}
+                  className="analysis-queue-item"
+                  data-status={note.status}
+                  onClick={() => setSelectedId(note.id)}
+                  title="Seleccionar nota pendiente"
+                >
+                  <span>
+                    <strong>{note.title || 'Nota sin titulo'}</strong>
+                    <small>
+                      {note.category || 'Inbox'} - {pendingAnalysisNoteReason(pendingEngine, note.status)}
+                    </small>
+                  </span>
+                  <em>{analysisStatusLabel(note.status ?? 'idle')}</em>
+                </button>
+              ))}
+              {pendingAnalysisCount > pendingAnalysisPreviewNotes.length && (
+                <span className="analysis-queue-more">+{pendingAnalysisCount - pendingAnalysisPreviewNotes.length}</span>
+              )}
+            </div>
+          </section>
+        )}
 
         {settingsOpen && (
           <section className="settings-panel">

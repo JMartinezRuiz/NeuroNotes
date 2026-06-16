@@ -37,6 +37,7 @@ The current code uses a lightweight in-app retrieval/ranking layer for RAG conte
 - Native confirmation before deleting notes.
 - Automatic and manual note analysis.
 - Auto-analysis covers new and pending edited notes: it uses local fallback when Qwen is unavailable and can upgrade those notes once Qwen becomes ready.
+- The workspace shows a compact AI queue for pending local/Qwen analysis, including each note, its current status, and why it will be processed before running the batch.
 - Ollama integration with `qwen3.5:0.8b` as the default Qwen 0.8B model.
 - Health checks, Ollama start attempt, model pull action, and persisted Qwen diagnostics.
 - The app separates a missing Ollama installation from a stopped Ollama runtime, so Windows setup guidance can point to install, start, or model pull steps accurately.

@@ -2,6 +2,8 @@ export interface PendingAnalysisNote {
   id: string
   content: string
   status?: PendingAnalysisStatus
+  title?: string
+  category?: string
 }
 
 export interface AutoAnalyzeDecision {
@@ -74,6 +76,29 @@ export function isPendingForAnalysis(status: PendingAnalysisStatus, engine: Pend
   }
 
   return status !== 'qwen'
+}
+
+export function pendingAnalysisNoteReason(
+  engine: PendingAnalysisEngine,
+  status: PendingAnalysisStatus = 'idle'
+): string {
+  if (engine === 'qwen') {
+    if (status === 'fallback') {
+      return 'Mejora Qwen + RAG'
+    }
+
+    if (status === 'error') {
+      return 'Reintento Qwen'
+    }
+
+    return 'Nueva nota'
+  }
+
+  if (status === 'error') {
+    return 'Reintento local'
+  }
+
+  return 'Nueva nota'
 }
 
 export function pendingAnalysisProgressMessage(

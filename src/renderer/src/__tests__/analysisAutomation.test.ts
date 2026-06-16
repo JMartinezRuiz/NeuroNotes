@@ -4,6 +4,7 @@ import {
   isPendingForAnalysis,
   pendingAnalysisButtonTitle,
   pendingAnalysisEngine,
+  pendingAnalysisNoteReason,
   pendingAnalysisProgressMessage,
   pendingAnalysisQueueLabel,
   pendingAnalysisResultMessage,
@@ -193,5 +194,18 @@ describe('isPendingForAnalysis', () => {
     expect(isPendingForAnalysis('error', 'qwen')).toBe(true)
     expect(isPendingForAnalysis('fallback', 'qwen')).toBe(true)
     expect(isPendingForAnalysis('qwen', 'qwen')).toBe(false)
+  })
+})
+
+describe('pendingAnalysisNoteReason', () => {
+  it('labels Qwen pending work by note state', () => {
+    expect(pendingAnalysisNoteReason('qwen', 'idle')).toBe('Nueva nota')
+    expect(pendingAnalysisNoteReason('qwen', 'fallback')).toBe('Mejora Qwen + RAG')
+    expect(pendingAnalysisNoteReason('qwen', 'error')).toBe('Reintento Qwen')
+  })
+
+  it('labels local fallback work without implying Qwen is available', () => {
+    expect(pendingAnalysisNoteReason('local', 'idle')).toBe('Nueva nota')
+    expect(pendingAnalysisNoteReason('local', 'error')).toBe('Reintento local')
   })
 })
