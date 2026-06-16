@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, shell } from 'electron'
 import type { MenuItemConstructorOptions, MessageBoxOptions } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -42,6 +42,7 @@ import {
   seedDraftMetadataAfterContentEdit
 } from './storage'
 import { captureWindowState, readWindowState, writeWindowState } from './windowState'
+import { registerAppGlobalShortcuts } from './globalShortcuts'
 import {
   AnalyzePendingResult,
   AnalyzePendingMode,
@@ -130,6 +131,15 @@ function sendCommand(command: AppCommand): void {
   }
 
   window.webContents.send('app:command', command)
+}
+
+function focusAndSendCommand(command: AppCommand): void {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow()
+  }
+
+  focusMainWindow()
+  sendCommand(command)
 }
 
 function createAppMenu(): void {
@@ -238,6 +248,22 @@ function createAppMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
+function registerGlobalShortcuts(): void {
+  const registrations = registerAppGlobalShortcuts(
+    globalShortcut.register.bind(globalShortcut),
+    focusAndSendCommand
+  )
+  const failed = registrations.filter((registration) => !registration.registered)
+
+  if (failed.length > 0) {
+    console.warn(
+      `Neuronotes global shortcuts unavailable: ${failed
+        .map((registration) => registration.accelerator)
+        .join(', ')}`
+    )
+  }
+}
+
 const singleInstanceLock = app.requestSingleInstanceLock()
 let databaseChangeWatcher: DatabaseChangeWatcher | undefined
 
@@ -266,6 +292,7 @@ if (!singleInstanceLock) {
     }
     createAppMenu()
     createWindow()
+    registerGlobalShortcuts()
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -286,6 +313,10 @@ if (!singleInstanceLock) {
   app.on('before-quit', () => {
     databaseChangeWatcher?.close()
     databaseChangeWatcher = undefined
+  })
+
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll()
   })
 }
 
