@@ -400,6 +400,19 @@ describe('fine-tune dataset export', () => {
           model: 'qwen3.5:0.8b',
           related: 1
         },
+        quality: {
+          level: 'high',
+          score: 1,
+          reasons: expect.arrayContaining([
+            'Analisis generado por Qwen.',
+            'Incluye contexto RAG auditado.',
+            'Incluye resumen revisable.',
+            'Incluye etiquetas.',
+            'Incluye enlaces a notas relacionadas.',
+            'Incluye acciones sugeridas.'
+          ]),
+          warnings: []
+        },
         reviewedForTraining: true,
         reviewedAt: now
       }
@@ -441,6 +454,43 @@ describe('fine-tune dataset export', () => {
           toolHint: 'task.create'
         }
       ]
+    })
+  })
+
+  it('marks local fallback fine-tuning examples with quality warnings', () => {
+    const now = '2026-06-15T00:00:00.000Z'
+    const database: DatabaseFile = {
+      version: 1,
+      notes: [
+        note({
+          analysisStatus: 'fallback',
+          analysisRun: {
+            provider: 'local',
+            model: 'qwen3.5:0.8b',
+            analyzedAt: now,
+            durationMs: 12,
+            ragNoteIds: [],
+            ragContext: []
+          },
+          related: [],
+          suggestedActions: [],
+          trainingReviewedAt: now
+        })
+      ],
+      settings: { ...DEFAULT_SETTINGS },
+      actions: []
+    }
+
+    const [example] = buildFineTuneExamples(database, now)
+
+    expect(example.metadata.quality).toMatchObject({
+      level: 'low',
+      score: 0.25,
+      reasons: expect.arrayContaining(['Incluye resumen revisable.', 'Incluye etiquetas.']),
+      warnings: expect.arrayContaining([
+        'Ejemplo basado en fallback local; revisarlo antes de usarlo para ajustar Qwen.',
+        'No incluye contexto RAG ni enlaces relacionados.'
+      ])
     })
   })
 

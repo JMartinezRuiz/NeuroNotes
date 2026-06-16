@@ -1532,6 +1532,7 @@ function fineTuneReadiness(database, options = {}) {
   const reviewedLocalNotes = reviewedNotes.filter((note) => note.analysisStatus === 'fallback')
   const pendingQwenNotes = pendingReviewNotes.filter((note) => note.analysisStatus === 'qwen')
   const pendingLocalNotes = pendingReviewNotes.filter((note) => note.analysisStatus === 'fallback')
+  const reviewedQualityCounts = qualityCounts(reviewedNotes)
 
   const payload = {
     schema: 'neuronotes.mcp.finetune-readiness.v1',
@@ -1543,6 +1544,7 @@ function fineTuneReadiness(database, options = {}) {
     reviewedLocalCount: reviewedLocalNotes.length,
     pendingQwenCount: pendingQwenNotes.length,
     pendingLocalCount: pendingLocalNotes.length,
+    reviewedQualityCounts,
     status: reviewedNotes.length > 0 ? 'ready' : pendingReviewNotes.length > 0 ? 'needs-review' : 'empty'
   }
 
@@ -1568,7 +1570,74 @@ function fineTuneNoteSummary(note) {
     ragNoteIds: note.analysisRun?.ragNoteIds ?? [],
     relatedCount: note.related.length,
     suggestedActionCount: note.suggestedActions.length,
+    quality: fineTuneExampleQuality(note),
     excerpt: excerpt(note.content, 220)
+  }
+}
+
+function qualityCounts(notes) {
+  return notes.reduce(
+    (counts, note) => {
+      counts[fineTuneExampleQuality(note).level] += 1
+      return counts
+    },
+    { high: 0, medium: 0, low: 0 }
+  )
+}
+
+function fineTuneExampleQuality(note) {
+  const reasons = []
+  const warnings = []
+  let score = 0
+
+  if (note.analysisStatus === 'qwen' && note.analysisRun?.provider === 'qwen') {
+    score += 0.35
+    reasons.push('Analisis generado por Qwen.')
+  } else {
+    warnings.push('Ejemplo basado en fallback local; revisarlo antes de usarlo para ajustar Qwen.')
+  }
+
+  if (note.analysisRun?.ragContext?.length) {
+    score += 0.25
+    reasons.push('Incluye contexto RAG auditado.')
+  } else if (note.related.length > 0) {
+    score += 0.12
+    warnings.push('Usa enlaces relacionados como contexto; no hay RAG auditado guardado.')
+  } else {
+    warnings.push('No incluye contexto RAG ni enlaces relacionados.')
+  }
+
+  if (note.summary.trim()) {
+    score += 0.15
+    reasons.push('Incluye resumen revisable.')
+  } else {
+    warnings.push('No incluye resumen.')
+  }
+
+  if (note.tags.length > 0) {
+    score += 0.1
+    reasons.push('Incluye etiquetas.')
+  } else {
+    warnings.push('No incluye etiquetas.')
+  }
+
+  if (note.related.length > 0) {
+    score += 0.1
+    reasons.push('Incluye enlaces a notas relacionadas.')
+  }
+
+  if (note.suggestedActions.length > 0) {
+    score += 0.05
+    reasons.push('Incluye acciones sugeridas.')
+  }
+
+  const roundedScore = Math.min(1, Number(score.toFixed(2)))
+
+  return {
+    level: roundedScore >= 0.75 ? 'high' : roundedScore >= 0.5 ? 'medium' : 'low',
+    score: roundedScore,
+    reasons,
+    warnings
   }
 }
 

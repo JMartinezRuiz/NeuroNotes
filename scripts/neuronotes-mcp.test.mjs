@@ -677,19 +677,34 @@ describe('neuronotes MCP server', () => {
       reviewedLocalCount: 0,
       pendingQwenCount: 0,
       pendingLocalCount: 1,
+      reviewedQualityCounts: {
+        high: 1,
+        medium: 0,
+        low: 0
+      },
       status: 'ready',
       reviewedExamples: [
         expect.objectContaining({
           id: 'note-health',
           analysisStatus: 'qwen',
           reviewedAt: '2026-06-15T00:03:00.000Z',
-          ragNoteIds: ['note-project']
+          ragNoteIds: ['note-project'],
+          quality: expect.objectContaining({
+            level: 'high',
+            score: 1,
+            warnings: []
+          })
         })
       ],
       pendingReview: [
         expect.objectContaining({
           id: 'note-project',
-          analysisStatus: 'fallback'
+          analysisStatus: 'fallback',
+          quality: expect.objectContaining({
+            warnings: expect.arrayContaining([
+              'Ejemplo basado en fallback local; revisarlo antes de usarlo para ajustar Qwen.'
+            ])
+          })
         })
       ]
     })
@@ -700,6 +715,11 @@ describe('neuronotes MCP server', () => {
       schema: 'neuronotes.mcp.finetune-readiness.v1',
       reviewedExampleCount: 1,
       pendingReviewCount: 1,
+      reviewedQualityCounts: {
+        high: 1,
+        medium: 0,
+        low: 0
+      },
       status: 'ready'
     })
     expect(summary.fineTune.reviewedExamples).toBeUndefined()

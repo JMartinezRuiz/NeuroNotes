@@ -53,9 +53,17 @@ export interface FineTuneExample {
       model: string
       related: number
     } | null
+    quality: FineTuneExampleQuality
     reviewedForTraining: boolean
     reviewedAt: string | null
   }
+}
+
+export interface FineTuneExampleQuality {
+  level: 'high' | 'medium' | 'low'
+  score: number
+  reasons: string[]
+  warnings: string[]
 }
 
 export interface McpHandoffPayload {
@@ -306,6 +314,7 @@ export function buildFineTuneExamples(database: DatabaseFile, exportedAt = new D
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .map((note) => {
       const assistantPayload = buildFineTuneAssistantPayload(note, notesById)
+      const quality = fineTuneExampleQuality(note)
 
       return {
         schema: FINE_TUNE_EXAMPLE_SCHEMA,
@@ -352,6 +361,7 @@ export function buildFineTuneExamples(database: DatabaseFile, exportedAt = new D
                   related: database.aiDiagnostics.related
                 }
               : null,
+          quality,
           reviewedForTraining: true,
           reviewedAt: note.trainingReviewedAt ?? null
         }
@@ -546,4 +556,60 @@ function buildFineTuneContext(note: NoteRecord, notesById: Map<string, NoteRecor
       ].join('\n')
     )
     .join('\n\n')
+}
+
+function fineTuneExampleQuality(note: NoteRecord): FineTuneExampleQuality {
+  const reasons: string[] = []
+  const warnings: string[] = []
+  let score = 0
+
+  if (note.analysisStatus === 'qwen' && note.analysisRun?.provider === 'qwen') {
+    score += 0.35
+    reasons.push('Analisis generado por Qwen.')
+  } else {
+    warnings.push('Ejemplo basado en fallback local; revisarlo antes de usarlo para ajustar Qwen.')
+  }
+
+  if (note.analysisRun?.ragContext?.length) {
+    score += 0.25
+    reasons.push('Incluye contexto RAG auditado.')
+  } else if (note.related.length > 0) {
+    score += 0.12
+    warnings.push('Usa enlaces relacionados como contexto; no hay RAG auditado guardado.')
+  } else {
+    warnings.push('No incluye contexto RAG ni enlaces relacionados.')
+  }
+
+  if (note.summary.trim()) {
+    score += 0.15
+    reasons.push('Incluye resumen revisable.')
+  } else {
+    warnings.push('No incluye resumen.')
+  }
+
+  if (note.tags.length > 0) {
+    score += 0.1
+    reasons.push('Incluye etiquetas.')
+  } else {
+    warnings.push('No incluye etiquetas.')
+  }
+
+  if (note.related.length > 0) {
+    score += 0.1
+    reasons.push('Incluye enlaces a notas relacionadas.')
+  }
+
+  if (note.suggestedActions.length > 0) {
+    score += 0.05
+    reasons.push('Incluye acciones sugeridas.')
+  }
+
+  const roundedScore = Math.min(1, Number(score.toFixed(2)))
+
+  return {
+    level: roundedScore >= 0.75 ? 'high' : roundedScore >= 0.5 ? 'medium' : 'low',
+    score: roundedScore,
+    reasons,
+    warnings
+  }
 }
