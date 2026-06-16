@@ -1117,6 +1117,41 @@ describe('neuronotes MCP server', () => {
     })
   })
 
+  it('seeds MCP-captured notes from explicit wiki and mention links', async () => {
+    const created = await callTool(
+      'neuronotes_create_note',
+      {
+        content: 'Cruzar [[Roadmap Neuronotes]] con @cita-medico para preparar contexto local.'
+      },
+      { dbPath, writeEnabled: true }
+    )
+
+    expect(created.note.related).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          noteId: 'note-project',
+          title: 'Roadmap Neuronotes',
+          score: 0.97,
+          reason: 'Referencia explicita en la nota.'
+        }),
+        expect.objectContaining({
+          noteId: 'note-health',
+          title: 'Cita medico',
+          score: 0.97,
+          reason: 'Referencia explicita en la nota.'
+        })
+      ])
+    )
+
+    const database = await readNeuronotesDatabase(dbPath)
+    expect(database.notes.find((note) => note.id === 'note-project')?.related).toContainEqual(
+      expect.objectContaining({
+        noteId: created.note.id,
+        reason: 'Enlace reciproco: Referencia explicita en la nota.'
+      })
+    )
+  })
+
   it('creates local action intents only when MCP write mode is explicitly enabled', async () => {
     const args = {
       noteId: 'note-health',

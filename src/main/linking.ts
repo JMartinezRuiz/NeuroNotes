@@ -43,6 +43,7 @@ const STOPWORDS = new Set([
 const MAX_RELATED_NOTES = 6
 const MAX_INITIAL_RELATED_NOTES = 3
 const MIN_RELATED_SCORE = 0.08
+const EXPLICIT_LINK_SCORE = 0.97
 const DEFAULT_RAG_MAX_NOTES = 5
 const DEFAULT_RAG_EXCERPT_LENGTH = 550
 
@@ -193,6 +194,7 @@ export function rankRelatedNotes(
   const sourceTokenSet = new Set(sourceLexicalTokens)
   const sourceConcepts = conceptSet(sourceTokens)
   const sourceBigrams = bigrams(sourceLexicalTokens)
+  const explicitTargets = explicitLinkTargets(note.content)
   const sourceVector = noteVector(note)
   const candidateVectors = candidates.map((candidate) => ({
     candidate,
@@ -212,22 +214,24 @@ export function rankRelatedNotes(
       const phraseOverlap = intersectionSize(sourceBigrams, bigrams(candidateLexicalTokens))
       const titleOverlap = overlapRatio(sourceTokenSet, new Set(lexicalTokens(candidate.title)))
       const conceptOverlap = intersectionSize(sourceConcepts, conceptSet(candidateTokens))
+      const explicitReference = matchesExplicitTarget(candidate, explicitTargets)
       const tagBoost = Math.min(0.22, tagOverlap * 0.11)
       const conceptBoost = Math.min(0.18, conceptOverlap * 0.06)
-      const hasTextSignal =
+      const hasRankedSignal =
         semanticScore > 0.02 || tagOverlap > 0 || phraseOverlap > 0 || titleOverlap > 0 || conceptOverlap > 0
-      const categoryBoost = sameCategory && hasTextSignal ? 0.08 : 0
+      const categoryBoost = sameCategory && hasRankedSignal ? 0.08 : 0
       const phraseBoost = Math.min(0.16, phraseOverlap * 0.04)
       const titleBoost = Math.min(0.08, titleOverlap * 0.08)
-      const score = hasTextSignal
+      const rankedScore = hasRankedSignal
         ? Math.min(1, semanticScore * 0.68 + tagBoost + conceptBoost + categoryBoost + phraseBoost + titleBoost)
         : 0
+      const score = explicitReference ? Math.max(EXPLICIT_LINK_SCORE, rankedScore) : rankedScore
 
       return {
         noteId: candidate.id,
         title: candidate.title,
         score,
-        reason: relatedReason({ tagOverlap, sameCategory, phraseOverlap, titleOverlap, conceptOverlap })
+        reason: relatedReason({ explicitReference, tagOverlap, sameCategory, phraseOverlap, titleOverlap, conceptOverlap })
       }
     })
     .filter((candidate) => candidate.score >= MIN_RELATED_SCORE)
@@ -468,13 +472,62 @@ function overlappingTags(sourceTags: string[], candidateTags: string[]): number 
   return sourceTags.filter((tag) => candidateSet.has(tag.toLowerCase())).length
 }
 
+function explicitLinkTargets(content: string): Set<string> {
+  const targets = new Set<string>()
+
+  for (const match of content.matchAll(/\[\[([^\]\r\n]{1,120})\]\]/g)) {
+    const label = normalizeExplicitTarget(match[1].split('|')[0] ?? '')
+
+    if (label) {
+      targets.add(label)
+    }
+  }
+
+  for (const match of content.matchAll(/(?:^|[\s([])@([\p{L}\p{N}][\p{L}\p{N}_-]{1,80})/gu)) {
+    const label = normalizeExplicitTarget(match[1])
+
+    if (label) {
+      targets.add(label)
+    }
+  }
+
+  return targets
+}
+
+function matchesExplicitTarget(candidate: NoteRecord, targets: Set<string>): boolean {
+  if (targets.size === 0) {
+    return false
+  }
+
+  return explicitTargetKeys(candidate).some((key) => targets.has(key))
+}
+
+function explicitTargetKeys(note: NoteRecord): string[] {
+  return [normalizeExplicitTarget(note.title), normalizeExplicitTarget(note.id)].filter(Boolean)
+}
+
+function normalizeExplicitTarget(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
 function relatedReason(signals: {
+  explicitReference: boolean
   tagOverlap: number
   sameCategory: boolean
   phraseOverlap: number
   titleOverlap: number
   conceptOverlap: number
 }): string {
+  if (signals.explicitReference) {
+    return 'Referencia explicita en la nota.'
+  }
+
   if (signals.tagOverlap > 0 && signals.phraseOverlap > 0) {
     return 'Comparte etiquetas, frases y vocabulario relevante.'
   }

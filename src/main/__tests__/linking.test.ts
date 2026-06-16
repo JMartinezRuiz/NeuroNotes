@@ -112,6 +112,48 @@ describe('rankRelatedNotes', () => {
     expect(ranked.some((item) => item.noteId === 'unrelated')).toBe(false)
   })
 
+  it('treats explicit wiki and mention links as strong local relationships', () => {
+    const source = note({
+      id: 'source',
+      category: 'Ideas',
+      content: 'Retomar [[Decision arquitectura]] y coordinar @roadmap-neuronotes.'
+    })
+    const wikiTarget = note({
+      id: 'decision-arquitectura',
+      title: 'Decision arquitectura',
+      category: 'Proyecto',
+      content: 'ADR sobre almacenamiento local y sincronizacion futura.'
+    })
+    const mentionTarget = note({
+      id: 'roadmap-note',
+      title: 'Roadmap Neuronotes',
+      category: 'Proyecto',
+      content: 'Plan de producto para IA local y MCP.'
+    })
+    const noisy = note({
+      id: 'noisy',
+      title: 'Ideas generales',
+      category: 'Ideas',
+      tags: ['ideas'],
+      content: 'Notas generales de investigacion y planificacion.'
+    })
+
+    const ranked = rankRelatedNotes(source, [source, noisy, mentionTarget, wikiTarget])
+
+    expect(ranked.slice(0, 2)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        noteId: 'decision-arquitectura',
+        score: 0.97,
+        reason: 'Referencia explicita en la nota.'
+      }),
+      expect.objectContaining({
+        noteId: 'roadmap-note',
+        score: 0.97,
+        reason: 'Referencia explicita en la nota.'
+      })
+    ]))
+  })
+
   it('does not link notes that only share a category', () => {
     const source = note({
       id: 'source',

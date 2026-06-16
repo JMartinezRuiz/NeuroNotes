@@ -20,6 +20,7 @@ const MAX_MCP_ACTION_TITLE_LENGTH = 160
 const MAX_MCP_ACTION_DETAIL_LENGTH = 1200
 const MAX_MCP_TOOL_HINT_LENGTH = 80
 const MAX_INITIAL_RELATED_NOTES = 3
+const EXPLICIT_LINK_SCORE = 0.97
 const NOTE_CATEGORIES = ['Inbox', 'Trabajo', 'Proyecto', 'Ideas', 'Aprendizaje', 'Personal', 'Salud', 'Finanzas']
 const CATEGORY_ALIASES = new Map([
   ['entrada', 'Inbox'],
@@ -1177,6 +1178,7 @@ function inferMcpSuggestedActions(content) {
 function initialMcpRelatedLinks(note, notes) {
   const sourceTokens = draftLinkTokens(`${note.title} ${note.summary} ${note.content} ${note.tags.join(' ')} ${note.category}`)
   const sourceTags = new Set(note.tags.map(normalizeTag))
+  const explicitTargets = explicitLinkTargets(note.content)
 
   return notes
     .filter((candidate) => candidate.id !== note.id)
@@ -1191,14 +1193,18 @@ function initialMcpRelatedLinks(note, notes) {
       const tagOverlap = candidate.tags.filter((tag) => sourceTags.has(normalizeTag(tag))).length
       const categoryBoost = note.category !== 'Inbox' && note.category === candidate.category ? 0.08 : 0
       const keywordBoost = Math.min(0.2, keywordOverlap * 0.08)
-      const score = Math.min(1, tokenOverlap * 0.06 + keywordBoost + tagOverlap * 0.22 + categoryBoost)
+      const explicitReference = matchesExplicitTarget(candidate, explicitTargets)
+      const rankedScore = Math.min(1, tokenOverlap * 0.06 + keywordBoost + tagOverlap * 0.22 + categoryBoost)
+      const score = explicitReference ? Math.max(EXPLICIT_LINK_SCORE, rankedScore) : rankedScore
 
       return {
         noteId: candidate.id,
         title: candidate.title,
         score,
         reason:
-          tagOverlap > 0
+          explicitReference
+            ? 'Referencia explicita en la nota.'
+            : tagOverlap > 0
             ? 'Relacion local inicial por etiquetas y contenido.'
             : 'Relacion local inicial por contenido cercano.'
       }
@@ -1237,6 +1243,47 @@ function draftLinkTokens(value) {
       .split(/\s+/)
       .filter((token) => token.length > 2 && !DRAFT_LINK_STOPWORDS.has(token))
   )
+}
+
+function explicitLinkTargets(content) {
+  const targets = new Set()
+
+  for (const match of content.matchAll(/\[\[([^\]\r\n]{1,120})\]\]/g)) {
+    const label = normalizeExplicitTarget(String(match[1]).split('|')[0] ?? '')
+
+    if (label) {
+      targets.add(label)
+    }
+  }
+
+  for (const match of content.matchAll(/(?:^|[\s([])@([\p{L}\p{N}][\p{L}\p{N}_-]{1,80})/gu)) {
+    const label = normalizeExplicitTarget(match[1])
+
+    if (label) {
+      targets.add(label)
+    }
+  }
+
+  return targets
+}
+
+function matchesExplicitTarget(candidate, targets) {
+  if (targets.size === 0) {
+    return false
+  }
+
+  return explicitTargetKeys(candidate).some((key) => targets.has(key))
+}
+
+function explicitTargetKeys(note) {
+  return [normalizeExplicitTarget(note.title), normalizeExplicitTarget(note.id)].filter(Boolean)
+}
+
+function normalizeExplicitTarget(value) {
+  return normalizeText(value)
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
 }
 
 async function createActionFromMcp(database, args, context) {
