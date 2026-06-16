@@ -16,6 +16,7 @@ const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 25
 const MAX_GRAPH_NODES = 100
 const MAX_MCP_NOTE_CONTENT_LENGTH = 20000
+const MAX_MCP_APPEND_CONTENT_LENGTH = 8000
 const MAX_MCP_ACTION_TITLE_LENGTH = 160
 const MAX_MCP_ACTION_DETAIL_LENGTH = 1200
 const MAX_MCP_TOOL_HINT_LENGTH = 80
@@ -309,6 +310,34 @@ const WRITE_TOOLS = [
     }
   },
   {
+    name: 'neuronotes_append_note',
+    description:
+      'Append local context to an existing Neuronotes note from an authorized MCP host. Requires NEURONOTES_MCP_WRITE=1 or --write and leaves the note pending Neuronotes/Qwen analysis.',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false
+    },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['noteId', 'content'],
+      properties: {
+        noteId: {
+          type: 'string',
+          description: 'Existing Neuronotes note id to append to.'
+        },
+        content: {
+          type: 'string',
+          maxLength: MAX_MCP_APPEND_CONTENT_LENGTH,
+          description:
+            'Text to append locally. Neuronotes refreshes draft summary, inline tags, explicit links, and suggested action intents, then leaves the note pending analysis.'
+        }
+      }
+    }
+  },
+  {
     name: 'neuronotes_create_action',
     description:
       'Create a local Neuronotes action intent for an existing note from an authorized MCP host. Requires NEURONOTES_MCP_WRITE=1 or --write and never executes external tools.',
@@ -474,6 +503,10 @@ export async function callTool(name, args = {}, context = {}) {
 
   if (name === 'neuronotes_create_note') {
     return createNoteFromMcp(database, args, context)
+  }
+
+  if (name === 'neuronotes_append_note') {
+    return appendNoteFromMcp(database, args, context)
   }
 
   if (name === 'neuronotes_create_action') {
@@ -1053,6 +1086,78 @@ async function createNoteFromMcp(database, args, context) {
   }
 }
 
+async function appendNoteFromMcp(database, args, context) {
+  if (!isWriteEnabled(context)) {
+    throw rpcError(
+      -32003,
+      'MCP write mode is disabled. Start the server with NEURONOTES_MCP_WRITE=1 or --write for trusted hosts.'
+    )
+  }
+
+  if (!context.dbPath) {
+    throw rpcError(-32602, 'Database path is required to append notes')
+  }
+
+  const noteId = stringArg(args.noteId)
+  if (!noteId) {
+    throw rpcError(-32602, 'noteId is required')
+  }
+
+  const note = database.notes.find((item) => item.id === noteId)
+  if (!note) {
+    throw rpcError(-32602, `Note not found: ${noteId}`)
+  }
+
+  const content = typeof args.content === 'string' ? args.content.trim() : ''
+  if (!content) {
+    throw rpcError(-32602, 'content is required')
+  }
+
+  if (content.length > MAX_MCP_APPEND_CONTENT_LENGTH) {
+    throw rpcError(-32602, `content must be ${MAX_MCP_APPEND_CONTENT_LENGTH} characters or fewer`)
+  }
+
+  const nextContent = note.content.trim() ? `${note.content.trimEnd()}\n\n${content}` : content
+  if (nextContent.length > MAX_MCP_NOTE_CONTENT_LENGTH) {
+    throw rpcError(-32602, `resulting note content must be ${MAX_MCP_NOTE_CONTENT_LENGTH} characters or fewer`)
+  }
+
+  const now = new Date().toISOString()
+  note.content = nextContent
+  resetMcpAnalysisAfterContentEdit(note)
+  seedMcpDraftMetadataAfterContentEdit(note)
+  note.related = mergeMcpPreservedAndInitialLinks(
+    note.related,
+    initialMcpRelatedLinks(note, database.notes, { explicitOnly: true })
+  )
+  note.updatedAt = now
+  syncMcpRelatedGraph(note, database.notes, now)
+
+  const stored = await writeNeuronotesDatabase(context.dbPath, database)
+  const updated = stored.notes.find((item) => item.id === note.id) ?? note
+
+  return {
+    schema: 'neuronotes.mcp.append-note.v1',
+    writeMode: 'enabled',
+    message: 'Contexto anexado desde MCP y nota pendiente de analisis en Neuronotes.',
+    databasePath: context.dbPath,
+    note: {
+      ...noteSummary(updated, 1),
+      content: updated.content,
+      related: updated.related,
+      suggestedActions: updated.suggestedActions
+    },
+    appended: {
+      characters: content.length
+    },
+    next: {
+      analysisStatus: updated.analysisStatus,
+      qwenQueue: 'pending',
+      reason: 'La app puede reanalizar esta nota despues con Qwen/RAG o fallback local.'
+    }
+  }
+}
+
 function createMcpNoteDraft(args, content, now) {
   const explicitTags = uniqueNormalizedTags(args.tags)
   const inlineTags = inlineTagsFromContent(content)
@@ -1072,6 +1177,56 @@ function createMcpNoteDraft(args, content, now) {
     createdAt: now,
     updatedAt: now
   }
+}
+
+function resetMcpAnalysisAfterContentEdit(note) {
+  note.summary = ''
+  note.related = note.related.filter(isManualMcpLink)
+  note.suggestedActions = []
+  note.analysisStatus = 'idle'
+  note.analysisError = undefined
+  note.analysisRun = undefined
+  note.trainingReviewedAt = undefined
+}
+
+function seedMcpDraftMetadataAfterContentEdit(note) {
+  const tags = uniqueNormalizedTags([...note.tags, ...inlineTagsFromContent(note.content)]).slice(0, 10)
+
+  note.summary = draftSummary(note.content)
+  note.tags = tags
+  if (!note.category || note.category === 'Inbox') {
+    note.category = draftCategory(note.content, tags)
+  }
+  note.suggestedActions = inferMcpSuggestedActions(note.content)
+}
+
+function mergeMcpPreservedAndInitialLinks(preserved, initialLinks) {
+  const linksById = new Map()
+
+  for (const link of preserved) {
+    linksById.set(link.noteId, link)
+  }
+
+  for (const link of initialLinks) {
+    const existing = linksById.get(link.noteId)
+
+    if (existing) {
+      linksById.set(link.noteId, {
+        ...existing,
+        title: link.title || existing.title,
+        score: Math.max(existing.score, link.score)
+      })
+      continue
+    }
+
+    linksById.set(link.noteId, link)
+  }
+
+  return [...linksById.values()].slice(0, 10)
+}
+
+function isManualMcpLink(link) {
+  return link.reason === 'Enlace manual.' || link.reason === 'Enlace reciproco: Enlace manual.'
 }
 
 function draftSummary(content) {
@@ -1175,7 +1330,7 @@ function inferMcpSuggestedActions(content) {
   return actions.slice(0, 4)
 }
 
-function initialMcpRelatedLinks(note, notes) {
+function initialMcpRelatedLinks(note, notes, options = {}) {
   const sourceTokens = draftLinkTokens(`${note.title} ${note.summary} ${note.content} ${note.tags.join(' ')} ${note.category}`)
   const sourceTags = new Set(note.tags.map(normalizeTag))
   const explicitTargets = explicitLinkTargets(note.content)
@@ -1209,7 +1364,7 @@ function initialMcpRelatedLinks(note, notes) {
             : 'Relacion local inicial por contenido cercano.'
       }
     })
-    .filter((related) => related.score >= 0.12)
+    .filter((related) => related.score >= 0.12 && (!options.explicitOnly || related.reason === 'Referencia explicita en la nota.'))
     .sort((left, right) => right.score - left.score)
     .slice(0, MAX_INITIAL_RELATED_NOTES)
 }
@@ -1234,6 +1389,64 @@ function syncMcpInitialBacklinks(source, notes, now) {
     target.updatedAt = now
     target.trainingReviewedAt = undefined
   }
+}
+
+function syncMcpRelatedGraph(source, notes, now) {
+  const sourceDirectLinks = source.related.filter((related) => !isReciprocalMcpLink(related))
+  const sourceTargets = new Set(sourceDirectLinks.map((related) => related.noteId))
+
+  for (const note of notes) {
+    if (note.id === source.id) {
+      continue
+    }
+
+    const sourceLink = sourceDirectLinks.find((related) => related.noteId === note.id)
+    const existingIndex = note.related.findIndex((related) => related.noteId === source.id)
+    const before = relatedSignature(note.related)
+
+    if (sourceLink) {
+      const reciprocal = {
+        noteId: source.id,
+        title: source.title,
+        score: Math.max(0.08, Math.min(1, sourceLink.score * 0.9)),
+        reason: `Enlace reciproco: ${sourceLink.reason}`
+      }
+
+      if (existingIndex === -1) {
+        note.related = [...note.related, reciprocal]
+      } else if (isReciprocalMcpLink(note.related[existingIndex])) {
+        note.related[existingIndex] = reciprocal
+      } else {
+        note.related[existingIndex] = {
+          ...note.related[existingIndex],
+          title: source.title,
+          score: Math.max(note.related[existingIndex].score, reciprocal.score)
+        }
+      }
+    } else if (existingIndex !== -1 && isReciprocalMcpLink(note.related[existingIndex]) && !sourceTargets.has(note.id)) {
+      note.related = note.related.filter((related) => related.noteId !== source.id)
+    }
+
+    if (before !== relatedSignature(note.related)) {
+      note.updatedAt = now
+      note.trainingReviewedAt = undefined
+    }
+  }
+}
+
+function relatedSignature(links) {
+  return JSON.stringify(
+    links.map((link) => ({
+      noteId: link.noteId,
+      title: link.title,
+      score: link.score,
+      reason: link.reason
+    }))
+  )
+}
+
+function isReciprocalMcpLink(link) {
+  return link.reason.startsWith('Enlace reciproco:')
 }
 
 function draftLinkTokens(value) {
@@ -1827,6 +2040,7 @@ function librarySummary(database, dbPath, context = {}) {
       mode: writeEnabled ? 'write-enabled-local' : 'read-only-context',
       canModifyNotes: writeEnabled,
       canCreateNotes: writeEnabled,
+      canAppendNotes: writeEnabled,
       canCreateActions: writeEnabled,
       canExecuteExternalTools: false,
       requiresUserApprovalForFollowUp: true

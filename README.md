@@ -137,9 +137,10 @@ Neuronotes includes a read-only MCP stdio server for local hosts. It exposes not
 When the server is explicitly started with `NEURONOTES_MCP_WRITE=1` or `--write`, trusted local hosts also get:
 
 - `neuronotes_create_note`
+- `neuronotes_append_note`
 - `neuronotes_create_action`
 
-Those write tools only create local Neuronotes records: pending notes or open action intents attached to existing notes. Note capture can seed local metadata, action intents, and initial related-note/backlink suggestions from existing local context. It does not call Qwen, execute external MCP tools, or approve action handoffs.
+Those write tools only create or update local Neuronotes records: pending notes, appended local note context, or open action intents attached to existing notes. Note capture and append can seed local metadata, action intents, and related-note/backlink suggestions from existing local context. They do not call Qwen, execute external MCP tools, or approve action handoffs.
 When the desktop app is open, it watches the local database and refreshes notes/actions after trusted MCP capture writes.
 
 It also exposes MCP resources:
@@ -238,7 +239,7 @@ MCP tool execution is not wired into the shipped app yet. The intended direction
 
 When MCP tool execution lands, it should be added as a separate integration layer with clear permissions, tests, and UI indicators showing what data is being sent to a tool.
 
-The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. Users can mark saved actions as approved for MCP handoff, and exports include approval state plus tool-call drafts for external review. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, manual-approval flags, stored RAG snippets, tool summaries, and action-kind summaries. The stdio server exposes the same handoff shape through `neuronotes_mcp_handoff` and `neuronotes://actions/handoff`, plus a `neuronotes_review_mcp_handoff` prompt that asks the host to review risks and missing approvals without executing tools. The stdio server can also report Qwen/Ollama setup guidance and the latest stored JSON/RAG diagnostic through `neuronotes_qwen_setup`, but it does not install Ollama, pull models, or run diagnostics. The stdio server is read-only by default; write mode currently only allows trusted hosts to create locally seeded pending notes and unapproved local action intents for later Neuronotes/Qwen processing and user review. It remains the bridge for future MCP execution once permissions and tool routing are implemented.
+The app already stores action intents with an optional `toolHint` field and lets the user save them into a local action plan. Users can mark saved actions as approved for MCP handoff, and exports include approval state plus tool-call drafts for external review. It can export open local actions as `neuronotes.mcp-handoff.v1` JSON with source-note context, model metadata, manual-approval flags, stored RAG snippets, tool summaries, and action-kind summaries. The stdio server exposes the same handoff shape through `neuronotes_mcp_handoff` and `neuronotes://actions/handoff`, plus a `neuronotes_review_mcp_handoff` prompt that asks the host to review risks and missing approvals without executing tools. The stdio server can also report Qwen/Ollama setup guidance and the latest stored JSON/RAG diagnostic through `neuronotes_qwen_setup`, but it does not install Ollama, pull models, or run diagnostics. The stdio server is read-only by default; write mode currently only allows trusted hosts to create locally seeded pending notes, append local context to existing notes, and create unapproved local action intents for later Neuronotes/Qwen processing and user review. It remains the bridge for future MCP execution once permissions and tool routing are implemented.
 
 ## Fine-Tuning Dataset
 

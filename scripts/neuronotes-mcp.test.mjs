@@ -90,6 +90,7 @@ describe('neuronotes MCP server', () => {
       'neuronotes_qwen_setup',
       'neuronotes_finetune_readiness',
       'neuronotes_create_note',
+      'neuronotes_append_note',
       'neuronotes_create_action'
     ])
   })
@@ -1058,6 +1059,7 @@ describe('neuronotes MCP server', () => {
         mode: 'write-enabled-local',
         canModifyNotes: true,
         canCreateNotes: true,
+        canAppendNotes: true,
         canCreateActions: true,
         canExecuteExternalTools: false
       }
@@ -1150,6 +1152,74 @@ describe('neuronotes MCP server', () => {
         reason: 'Enlace reciproco: Referencia explicita en la nota.'
       })
     )
+  })
+
+  it('appends context to existing notes only when MCP write mode is enabled', async () => {
+    await expect(
+      callTool(
+        'neuronotes_append_note',
+        {
+          noteId: 'note-health',
+          content: 'Nueva evidencia: revisar [[Roadmap Neuronotes]] para #RAG y preparar recordatorio MCP.'
+        },
+        { dbPath }
+      )
+    ).rejects.toThrow('MCP write mode is disabled')
+
+    const updated = await callTool(
+      'neuronotes_append_note',
+      {
+        noteId: 'note-health',
+        content: 'Nueva evidencia: revisar [[Roadmap Neuronotes]] para #RAG y preparar recordatorio MCP.'
+      },
+      { dbPath, writeEnabled: true }
+    )
+
+    expect(updated).toMatchObject({
+      schema: 'neuronotes.mcp.append-note.v1',
+      writeMode: 'enabled',
+      note: {
+        id: 'note-health',
+        title: 'Cita medico',
+        category: 'Salud',
+        tags: ['salud', 'qwen', 'rag'],
+        analysisStatus: 'idle',
+        content: expect.stringContaining('Nueva evidencia'),
+        related: [
+          expect.objectContaining({
+            noteId: 'note-project',
+            title: 'Roadmap Neuronotes',
+            reason: 'Referencia explicita en la nota.'
+          })
+        ],
+        suggestedActions: expect.arrayContaining([
+          expect.objectContaining({ kind: 'reminder', toolHint: 'reminder.create' }),
+          expect.objectContaining({ kind: 'mcp', toolHint: 'mcp.workflow.prepare' })
+        ])
+      },
+      next: {
+        analysisStatus: 'idle',
+        qwenQueue: 'pending'
+      }
+    })
+
+    const database = await readNeuronotesDatabase(dbPath)
+    const note = database.notes.find((item) => item.id === 'note-health')
+    expect(note).toMatchObject({
+      analysisStatus: 'idle',
+      analysisError: undefined,
+      analysisRun: undefined,
+      trainingReviewedAt: undefined
+    })
+    expect(database.notes.find((item) => item.id === 'note-project')?.related).toContainEqual(
+      expect.objectContaining({
+        noteId: 'note-health',
+        reason: 'Enlace reciproco: Referencia explicita en la nota.'
+      })
+    )
+
+    const backup = JSON.parse(await readFile(path.join(tempDir, 'neuronotes.json.bak'), 'utf8'))
+    expect(backup.notes.find((item) => item.id === 'note-health')?.content).toContain('Nueva evidencia')
   })
 
   it('creates local action intents only when MCP write mode is explicitly enabled', async () => {
