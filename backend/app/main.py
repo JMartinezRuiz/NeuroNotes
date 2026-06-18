@@ -172,6 +172,7 @@ class SettingsRequest(BaseModel):
   model_provider: str = "ollama"
   model_base_url: str = "http://localhost:11434"
   model_name: str = "qwen3:4b"
+  embedding_model: str = ""
   privacy_mode: str = "local_first"
 
 

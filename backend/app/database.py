@@ -6,10 +6,13 @@ import math
 import os
 import re
 import sqlite3
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+
+import httpx
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DB_PATH = Path(os.getenv("NEURONOTES_DB_PATH", str(ROOT_DIR / "data" / "neuronotes.db")))
@@ -227,6 +230,7 @@ def ensure_default_settings(connection: sqlite3.Connection) -> None:
     "model_provider": os.getenv("MODEL_PROVIDER", "ollama"),
     "model_base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     "model_name": os.getenv("QWEN_MODEL", "qwen3:4b"),
+    "embedding_model": os.getenv("NEURONOTES_EMBED_MODEL", ""),
     "privacy_mode": "local_first",
   }
   now = utc_now()
@@ -666,6 +670,86 @@ def local_embedding(text: str, dimensions: int = VECTOR_DIMENSIONS) -> list[floa
   return [round(value / length, 6) for value in vector]
 
 
+def l2_normalize(vector: list[float]) -> list[float]:
+  length = math.sqrt(sum(value * value for value in vector))
+  if length == 0:
+    return [0.0] * len(vector)
+  return [round(value / length, 6) for value in vector]
+
+
+def _is_loopback(base_url: str) -> bool:
+  lowered = base_url.lower()
+  return any(host in lowered for host in ("127.0.0.1", "localhost", "::1", "0.0.0.0"))
+
+
+def fetch_remote_embedding(
+  text: str, model: str, base_url: str, provider: str, timeout: float = 20.0
+) -> list[float] | None:
+  base = base_url.rstrip("/")
+  try:
+    with httpx.Client(timeout=timeout) as client:
+      if provider == "lmstudio":
+        response = client.post(f"{base}/v1/embeddings", json={"model": model, "input": text})
+        response.raise_for_status()
+        vector = response.json()["data"][0]["embedding"]
+      else:
+        response = client.post(f"{base}/api/embeddings", json={"model": model, "prompt": text})
+        response.raise_for_status()
+        payload = response.json()
+        vector = payload.get("embedding")
+        if not vector and isinstance(payload.get("embeddings"), list):
+          vector = payload["embeddings"][0]
+      if not vector:
+        return None
+      return l2_normalize([float(value) for value in vector])
+  except Exception:
+    return None
+
+
+_EMBEDDER_CACHE: dict[str, Any] = {"at": 0.0, "value": None}
+_EMBEDDER_TTL_SECONDS = 30.0
+
+
+def resolve_embedder(force: bool = False) -> tuple[str, int, Any]:
+  """Return (model_tag, dimensions, embed_fn).
+
+  Tries the configured neural embedding model with a single probe; on any
+  failure (no model set, endpoint down, or a privacy block) it falls back to the
+  deterministic local hash embedding so retrieval never breaks. Cached briefly so
+  per-note writes do not each re-probe the network."""
+  now = time.monotonic()
+  cached = _EMBEDDER_CACHE["value"]
+  if cached is not None and not force and (now - _EMBEDDER_CACHE["at"]) < _EMBEDDER_TTL_SECONDS:
+    return cached
+
+  settings = get_settings()
+  embedding_model = (settings.get("embedding_model") or "").strip()
+  base_url = settings.get("model_base_url", "http://localhost:11434")
+  provider = settings.get("model_provider", "ollama").lower()
+  privacy_mode = settings.get("privacy_mode", "local_first")
+
+  resolved: tuple[str, int, Any] = (VECTOR_MODEL, VECTOR_DIMENSIONS, local_embedding)
+  privacy_block = privacy_mode == "local_first" and not _is_loopback(base_url)
+  if embedding_model and not privacy_block:
+    probe = fetch_remote_embedding("neuronotes embedding probe", embedding_model, base_url, provider, timeout=8.0)
+    if probe:
+      dims = len(probe)
+
+      def embed_fn(
+        text: str, _model=embedding_model, _base=base_url, _provider=provider, _dims=dims
+      ) -> list[float]:
+        vector = fetch_remote_embedding(text, _model, _base, _provider)
+        if vector and len(vector) == _dims:
+          return vector
+        return local_embedding(text, _dims)
+
+      resolved = (embedding_model, dims, embed_fn)
+
+  _EMBEDDER_CACHE["value"] = resolved
+  _EMBEDDER_CACHE["at"] = now
+  return resolved
+
+
 def dot_product(left: list[float], right: list[float]) -> float:
   return sum(a * b for a, b in zip(left, right))
 
@@ -680,17 +764,23 @@ def project_embedding(vector: list[float]) -> tuple[float, float, float]:
   return (round(x / scale, 6), round(y / scale, 6), round(z / scale, 6))
 
 
-def upsert_note_vector(connection: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
+def upsert_note_vector(
+  connection: sqlite3.Connection, row: sqlite3.Row, embedder: tuple[str, int, Any] | None = None
+) -> dict[str, Any]:
+  if embedder is None:
+    embedder = resolve_embedder()
+  model_tag, _dims_hint, embed_fn = embedder
   source = vector_source(row)
   fingerprint = source_hash(source)
   existing = connection.execute(
-    "SELECT * FROM note_vectors WHERE note_id = ? AND source_hash = ? AND dimensions = ? AND model = ?",
-    (row["id"], fingerprint, VECTOR_DIMENSIONS, VECTOR_MODEL),
+    "SELECT * FROM note_vectors WHERE note_id = ? AND source_hash = ? AND model = ?",
+    (row["id"], fingerprint, model_tag),
   ).fetchone()
   if existing is not None:
     return vector_row_payload(row, existing)
 
-  vector = local_embedding(source)
+  vector = embed_fn(source)
+  dimensions = len(vector)
   x, y, z = project_embedding(vector)
   connection.execute(
     """
@@ -709,8 +799,8 @@ def upsert_note_vector(connection: sqlite3.Connection, row: sqlite3.Row) -> dict
     (
       row["id"],
       json.dumps(vector),
-      VECTOR_DIMENSIONS,
-      VECTOR_MODEL,
+      dimensions,
+      model_tag,
       fingerprint,
       x,
       y,
@@ -784,33 +874,42 @@ def note_rows_for_vectors(
 
 def rebuild_note_vectors(project_id: str | None = None) -> dict[str, Any]:
   init_database()
+  embedder = resolve_embedder(force=True)
+  model_tag, dims_hint, _embed_fn = embedder
   with connect() as connection:
     rows = note_rows_for_vectors(connection, project_id=project_id)
-    payloads = [upsert_note_vector(connection, row) for row in rows]
+    payloads = [upsert_note_vector(connection, row, embedder) for row in rows]
     connection.commit()
   return {
     "rebuilt": len(payloads),
-    "dimensions": VECTOR_DIMENSIONS,
-    "model": VECTOR_MODEL,
+    "dimensions": dims_hint,
+    "model": model_tag,
   }
 
 
 def semantic_search_notes(query: str, limit: int = 8, project_id: str | None = None) -> list[dict[str, Any]]:
   init_database()
-  query_vector = local_embedding(query)
+  embedder = resolve_embedder()
+  model_tag, _dims, embed_fn = embedder
+  query_vector = embed_fn(query)
   query_terms = set(vector_tokens(query))
   with connect() as connection:
     rows = note_rows_for_vectors(connection, project_id=project_id)
-    payloads = [(row, upsert_note_vector(connection, row)) for row in rows]
+    payloads = [(row, upsert_note_vector(connection, row, embedder)) for row in rows]
     connection.commit()
+  is_neural = model_tag != VECTOR_MODEL
+  lexical_weight = 0.3 if is_neural else 0.85
+  vector_weight = 0.7 if is_neural else 0.15
   results = []
   for row, payload in payloads:
     doc_terms = set(vector_tokens(vector_source(row)))
     lexical_score = 0.0
     if query_terms and doc_terms:
       lexical_score = len(query_terms & doc_terms) / math.sqrt(len(query_terms) * len(doc_terms))
-    vector_score = dot_product(query_vector, payload["vector"])
-    score = (lexical_score * 0.85) + (vector_score * 0.15)
+    vector_score = (
+      dot_product(query_vector, payload["vector"]) if len(payload["vector"]) == len(query_vector) else 0.0
+    )
+    score = (lexical_score * lexical_weight) + (vector_score * vector_weight)
     item = {key: value for key, value in payload.items() if key != "vector"}
     item["score"] = round(score, 4)
     item["lexical_score"] = round(lexical_score, 4)
@@ -828,9 +927,11 @@ def vector_memory_map(
   category: str | None = None,
 ) -> dict[str, Any]:
   init_database()
+  embedder = resolve_embedder()
+  model_tag, dims_hint, _embed_fn = embedder
   with connect() as connection:
     rows = note_rows_for_vectors(connection, project_id=project_id, folder=folder, category=category)
-    nodes = [upsert_note_vector(connection, row) for row in rows]
+    nodes = [upsert_note_vector(connection, row, embedder) for row in rows]
     connection.commit()
   relation_rows = list_relations(project_id)
 
@@ -851,14 +952,17 @@ def vector_memory_map(
     and relation["to_id"] in note_ids
   ]
 
+  semantic_threshold = 0.55 if model_tag != VECTOR_MODEL else 0.18
   semantic_edges: list[dict[str, Any]] = []
   for left_index, left in enumerate(nodes):
     scores: list[tuple[float, str]] = []
     for right_index, right in enumerate(nodes):
       if left_index == right_index:
         continue
+      if len(left["vector"]) != len(right["vector"]):
+        continue
       score = dot_product(left["vector"], right["vector"])
-      if score >= 0.18:
+      if score >= semantic_threshold:
         scores.append((score, right["id"]))
     scores.sort(reverse=True)
     for score, right_id in scores[:3]:
@@ -881,8 +985,8 @@ def vector_memory_map(
   return {
     "nodes": clean_nodes,
     "edges": relation_edges + semantic_edges[: max(80, len(nodes) * 2)],
-    "dimensions": VECTOR_DIMENSIONS,
-    "model": VECTOR_MODEL,
+    "dimensions": dims_hint,
+    "model": model_tag,
     "sources": {
       "relation_edges": len(relation_edges),
       "semantic_edges": len(semantic_edges),
@@ -1420,13 +1524,14 @@ def get_settings() -> dict[str, str]:
     "model_provider": settings.get("model_provider", "ollama"),
     "model_base_url": settings.get("model_base_url", "http://localhost:11434"),
     "model_name": settings.get("model_name", "qwen3:4b"),
+    "embedding_model": settings.get("embedding_model", os.getenv("NEURONOTES_EMBED_MODEL", "")),
     "privacy_mode": settings.get("privacy_mode", "local_first"),
   }
 
 
 def update_settings(data: dict[str, Any]) -> dict[str, str]:
   init_database()
-  allowed = {"model_provider", "model_base_url", "model_name", "privacy_mode"}
+  allowed = {"model_provider", "model_base_url", "model_name", "embedding_model", "privacy_mode"}
   now = utc_now()
   with connect() as connection:
     for key, value in data.items():
