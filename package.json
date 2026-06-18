@@ -1,82 +1,17 @@
 {
-  "name": "neuronotes",
+  "name": "neuronotes-2",
   "version": "0.1.0",
-  "description": "Windows-first minimal desktop notes app powered by local AI, Qwen 0.8B, RAG context, opt-in MCP note capture/action handoff, and future fine-tuning exports.",
-  "author": "Neuronotes",
   "private": true,
-  "type": "module",
-  "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "icons": "node scripts/generate-icons.mjs",
-    "test": "vitest run",
-    "typecheck": "npm run typecheck:node && npm run typecheck:web",
-    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
-    "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
-    "verify:qwen": "node scripts/verify-qwen.mjs",
-    "verify:qwen:start": "node scripts/verify-qwen.mjs --start",
-    "verify:qwen:pull": "node scripts/verify-qwen.mjs --pull",
-    "verify:qwen:start:pull": "node scripts/verify-qwen.mjs --start --pull",
-    "verify:qwen:json": "node scripts/verify-qwen.mjs --json",
-    "verify:qwen:start:json": "node scripts/verify-qwen.mjs --start --json",
-    "setup:qwen:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-qwen-win.ps1",
-    "setup:qwen:win:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-qwen-win.ps1 -InstallOllama -PullModel",
-    "setup:qwen:win:pull": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-qwen-win.ps1 -PullModel",
-    "verify:win-dist": "node scripts/verify-win-dist.mjs",
-    "mcp:stdio": "node scripts/neuronotes-mcp.mjs",
-    "build": "npm run icons && npm run typecheck && npm test && electron-vite build",
-    "preview": "electron-vite preview",
-    "dist:win": "npm run build && electron-builder --win nsis && npm run verify:win-dist",
-    "dist:mac": "npm run build && electron-builder --mac dmg"
-  },
-  "dependencies": {
-    "@electron-toolkit/preload": "^3.0.1",
-    "@electron-toolkit/utils": "^4.0.0",
-    "lucide-react": "^0.468.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "dev": "concurrently -k -n backend,frontend \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && ..\\.venv\\Scripts\\python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8787",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "desktop": "npm run build && electron electron/main.cjs",
+    "build": "npm --prefix frontend run build",
+    "mcp": "cd backend && ..\\.venv\\Scripts\\python -m app.mcp_server"
   },
   "devDependencies": {
-    "@swc/core": "^1.15.41",
-    "@types/node": "^22.10.2",
-    "@types/react": "^18.3.17",
-    "@types/react-dom": "^18.3.5",
-    "@vitejs/plugin-react": "^5.2.0",
-    "electron": "^42.4.0",
-    "electron-builder": "^26.15.3",
-    "electron-vite": "^5.0.0",
-    "typescript": "^6.0.3",
-    "vite": "^7.3.5",
-    "vitest": "^4.1.8"
-  },
-  "build": {
-    "appId": "com.neuronotes.desktop",
-    "productName": "Neuronotes",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "out/**/*",
-      "build/icon.ico",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "scripts/neuronotes-mcp.mjs",
-        "to": "mcp/neuronotes-mcp.mjs"
-      }
-    ],
-    "win": {
-      "icon": "build/icon.ico",
-      "signExecutable": false,
-      "target": [
-        "nsis"
-      ]
-    },
-    "mac": {
-      "target": [
-        "dmg"
-      ]
-    }
+    "concurrently": "^10.0.3",
+    "electron": "^39.2.7"
   }
 }
