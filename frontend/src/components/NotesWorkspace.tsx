@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   Save,
+  Trash2,
   Wand2,
 } from "lucide-react";
 import { api, agentColor } from "../lib/api";
@@ -199,6 +200,21 @@ export function NotesWorkspace({
     setEditorMode("write");
   }
 
+  async function deleteNote() {
+    if (!draft.id) return;
+    if (!window.confirm(`¿Eliminar la nota "${draft.title || "Untitled"}"? No se puede deshacer.`)) return;
+    try {
+      await api(`/api/notes/${draft.id}`, { method: "DELETE" });
+      loadedNoteIdRef.current = "";
+      setDirty(false);
+      setSaveError("");
+      setSelectedNoteId("");
+      await refresh();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "No se pudo eliminar la nota.");
+    }
+  }
+
   async function insertImage(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -367,7 +383,7 @@ export function NotesWorkspace({
             <button className="icon-button" type="button" title={editorMode === "write" ? "Preview" : "Edit"} onClick={() => setEditorMode(editorMode === "write" ? "preview" : "write")}>
               {editorMode === "write" ? <Eye size={16} /> : <Pencil size={16} />}
             </button>
-            <button className="icon-button" type="button" title="Insert image" onClick={() => imageInputRef.current?.click()}>
+            <button className="icon-button" type="button" title="Insert image" aria-label="Insertar imagen" onClick={() => imageInputRef.current?.click()}>
               <ImageIcon size={16} />
             </button>
             <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={insertImage} />
@@ -440,6 +456,18 @@ export function NotesWorkspace({
             <small style={{ alignSelf: "center", fontSize: 12, color: saveError ? "var(--warning)" : "var(--muted)" }}>
               {saveError ? saveError : saving ? "Guardando…" : dirty ? "Sin guardar" : draft.id ? "Guardado" : ""}
             </small>
+            {draft.id ? (
+              <button
+                className="icon-button"
+                type="button"
+                onClick={deleteNote}
+                title="Eliminar nota"
+                aria-label="Eliminar nota"
+                style={{ marginLeft: "auto" }}
+              >
+                <Trash2 size={16} />
+              </button>
+            ) : null}
           </div>
         </div>
 

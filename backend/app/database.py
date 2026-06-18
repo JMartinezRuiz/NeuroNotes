@@ -1523,6 +1523,54 @@ def insert_inbox_item(
   return item_id
 
 
+def delete_note(note_id: str) -> dict[str, Any]:
+  init_database()
+  with connect() as connection:
+    note = connection.execute("SELECT id, project_id, title FROM notes WHERE id = ?", (note_id,)).fetchone()
+    if note is None:
+      raise ValueError("Note not found")
+    connection.execute("DELETE FROM note_vectors WHERE note_id = ?", (note_id,))
+    connection.execute(
+      "DELETE FROM relations WHERE (from_type = 'note' AND from_id = ?) OR (to_type = 'note' AND to_id = ?)",
+      (note_id, note_id),
+    )
+    connection.execute("UPDATE tasks SET source_note_id = NULL WHERE source_note_id = ?", (note_id,))
+    connection.execute("UPDATE decisions SET source_note_id = NULL WHERE source_note_id = ?", (note_id,))
+    connection.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+    connection.execute(
+      "INSERT INTO activity_events (id, project_id, agent_id, action, created_at) VALUES (?, ?, ?, ?, ?)",
+      (make_id("activity"), note["project_id"], "user", f"elimino la nota {note['title']}.", utc_now()),
+    )
+    connection.commit()
+  return {"deleted": note_id, "type": "note"}
+
+
+def delete_task(task_id: str) -> dict[str, Any]:
+  init_database()
+  with connect() as connection:
+    task = connection.execute("SELECT id FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if task is None:
+      raise ValueError("Task not found")
+    connection.execute(
+      "DELETE FROM relations WHERE (from_type = 'task' AND from_id = ?) OR (to_type = 'task' AND to_id = ?)",
+      (task_id, task_id),
+    )
+    connection.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    connection.commit()
+  return {"deleted": task_id, "type": "task"}
+
+
+def delete_relation(relation_id: str) -> dict[str, Any]:
+  init_database()
+  with connect() as connection:
+    relation = connection.execute("SELECT id FROM relations WHERE id = ?", (relation_id,)).fetchone()
+    if relation is None:
+      raise ValueError("Relation not found")
+    connection.execute("DELETE FROM relations WHERE id = ?", (relation_id,))
+    connection.commit()
+  return {"deleted": relation_id, "type": "relation"}
+
+
 def get_settings() -> dict[str, str]:
   init_database()
   with connect() as connection:

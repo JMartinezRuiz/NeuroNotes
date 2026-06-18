@@ -5,7 +5,7 @@ import secrets
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from starlette.requests import Request
@@ -18,6 +18,9 @@ from .database import (
   create_project,
   create_relation,
   create_task,
+  delete_note,
+  delete_relation,
+  delete_task,
   export_codex_context,
   get_settings,
   get_dashboard,
@@ -234,6 +237,30 @@ def update_note_endpoint(note_id: str, request: NoteRequest) -> dict[str, Any]:
     raise HTTPException(status_code=404, detail=str(error)) from error
 
 
+@app.delete("/api/notes/{note_id}")
+def delete_note_endpoint(note_id: str) -> dict[str, Any]:
+  try:
+    return delete_note(note_id)
+  except ValueError as error:
+    raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.delete("/api/tasks/{task_id}")
+def delete_task_endpoint(task_id: str) -> dict[str, Any]:
+  try:
+    return delete_task(task_id)
+  except ValueError as error:
+    raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.delete("/api/relations/{relation_id}")
+def delete_relation_endpoint(relation_id: str) -> dict[str, Any]:
+  try:
+    return delete_relation(relation_id)
+  except ValueError as error:
+    raise HTTPException(status_code=404, detail=str(error)) from error
+
+
 @app.post("/api/notes/{note_id}/improve")
 async def improve_note_endpoint(note_id: str, request: ImproveNoteRequest) -> dict[str, Any]:
   note = get_note_by_id(note_id)
@@ -370,7 +397,7 @@ def save_settings(request: SettingsRequest) -> dict[str, str]:
 
 
 @app.get("/api/search")
-def search(query: str, limit: int = 8, project_id: str | None = None) -> list[dict[str, Any]]:
+def search(query: str, limit: int = Query(8, ge=1, le=100), project_id: str | None = None) -> list[dict[str, Any]]:
   return search_memory(query, limit, project_id)
 
 
@@ -380,7 +407,7 @@ def rebuild_vectors(project_id: str | None = None) -> dict[str, Any]:
 
 
 @app.get("/api/vectors/search")
-def vector_search(query: str, limit: int = 8, project_id: str | None = None) -> list[dict[str, Any]]:
+def vector_search(query: str, limit: int = Query(8, ge=1, le=100), project_id: str | None = None) -> list[dict[str, Any]]:
   if len(query.strip()) < 2:
     return []
   return semantic_search_notes(query, limit, project_id)
