@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { chooseVisibleEdges, clamp, trimText } from "../lib/helpers";
 import {
   addLineSegments,
   buildThreeNodePositions,
-  chooseVisibleEdges,
-  clamp,
   createGlowTexture,
   makeThreeColor,
-  trimText,
-} from "../lib/helpers";
+} from "../lib/three-helpers";
 import type { GraphNode, VectorEdge } from "../types";
 
 export function ThreeVectorScene({

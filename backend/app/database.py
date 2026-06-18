@@ -18,6 +18,8 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 DB_PATH = Path(os.getenv("NEURONOTES_DB_PATH", str(ROOT_DIR / "data" / "neuronotes.db")))
 VECTOR_DIMENSIONS = 256
 VECTOR_MODEL = "local-hash-v2"
+SCHEMA_VERSION = 1
+_DB_INITIALIZED = False
 DATA_IMAGE_PATTERN = re.compile(r"!\[([^\]]*)\]\(data:image\/[^;]+;base64,[^)]+\)", re.IGNORECASE)
 MARKDOWN_IMAGE_PATTERN = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 
@@ -37,6 +39,9 @@ def connect() -> sqlite3.Connection:
 
 
 def init_database() -> None:
+  global _DB_INITIALIZED
+  if _DB_INITIALIZED:
+    return
   with connect() as connection:
     connection.executescript(
       """
@@ -198,7 +203,9 @@ def init_database() -> None:
     ensure_note_metadata_columns(connection)
     ensure_seed_relations(connection)
     ensure_default_settings(connection)
+    connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     connection.commit()
+  _DB_INITIALIZED = True
 
 
 def ensure_note_metadata_columns(connection: sqlite3.Connection) -> None:
@@ -207,22 +214,23 @@ def ensure_note_metadata_columns(connection: sqlite3.Connection) -> None:
     connection.execute("ALTER TABLE notes ADD COLUMN folder TEXT NOT NULL DEFAULT ''")
   if "category" not in existing:
     connection.execute("ALTER TABLE notes ADD COLUMN category TEXT NOT NULL DEFAULT 'General'")
-  connection.execute(
-    """
-    UPDATE notes
-    SET category = CASE
-      WHEN category IS NULL OR category = '' THEN
-        CASE
-          WHEN type LIKE '%Research%' THEN 'Research'
-          WHEN type LIKE '%Meeting%' THEN 'Meetings'
-          WHEN type LIKE '%Decision%' THEN 'Decisions'
-          WHEN type LIKE '%Agent%' THEN 'AI Notes'
-          ELSE 'General'
-        END
-      ELSE category
-    END
-    """
-  )
+    # Backfill only when the column is first created — not on every startup.
+    connection.execute(
+      """
+      UPDATE notes
+      SET category = CASE
+        WHEN category IS NULL OR category = '' THEN
+          CASE
+            WHEN type LIKE '%Research%' THEN 'Research'
+            WHEN type LIKE '%Meeting%' THEN 'Meetings'
+            WHEN type LIKE '%Decision%' THEN 'Decisions'
+            WHEN type LIKE '%Agent%' THEN 'AI Notes'
+            ELSE 'General'
+          END
+        ELSE category
+      END
+      """
+    )
 
 
 def ensure_default_settings(connection: sqlite3.Connection) -> None:

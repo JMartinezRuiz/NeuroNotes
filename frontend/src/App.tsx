@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { api } from "./lib/api";
@@ -17,8 +17,13 @@ import type {
 import { ProjectSidebar } from "./components/ProjectSidebar";
 import { Topbar } from "./components/Topbar";
 import { NotesWorkspace } from "./components/NotesWorkspace";
-import { MapWorkspace } from "./components/MapWorkspace";
 import { LLMWorkspace } from "./components/LLMWorkspace";
+
+// Three.js is heavy (~600 kB); load the Map view (and three) on demand so it
+// stays out of the initial bundle.
+const MapWorkspace = lazy(() =>
+  import("./components/MapWorkspace").then((module) => ({ default: module.MapWorkspace })),
+);
 
 const FALLBACK_HEALTH: ModelHealth = {
   online: false,
@@ -237,17 +242,19 @@ function App() {
         ) : null}
 
         {mode === "map" ? (
-          <MapWorkspace
-            scope={scope}
-            projects={dashboard.projects}
-            notes={notes}
-            allNotes={allNotes}
-            tasks={tasks}
-            relations={relations}
-            selectedNoteId={selectedNoteId}
-            onSelectNote={setSelectedNoteId}
-            onOpenNote={openNoteInProject}
-          />
+          <Suspense fallback={<div style={{ padding: "24px", color: "var(--muted)" }}>Cargando mapa…</div>}>
+            <MapWorkspace
+              scope={scope}
+              projects={dashboard.projects}
+              notes={notes}
+              allNotes={allNotes}
+              tasks={tasks}
+              relations={relations}
+              selectedNoteId={selectedNoteId}
+              onSelectNote={setSelectedNoteId}
+              onOpenNote={openNoteInProject}
+            />
+          </Suspense>
         ) : null}
 
         {mode === "llm" ? <LLMWorkspace selectedProject={selectedProject} modelHealth={modelHealth} /> : null}
