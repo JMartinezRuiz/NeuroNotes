@@ -301,6 +301,21 @@ async function api<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+// Synapse agent-provenance colors. Drives note-card gutters, badges and (later)
+// map node rings — so "who authored this" is a consistent visual language.
+const AGENT_COLOR_VARS: Record<string, string> = {
+  user: "var(--agent-usuario)",
+  usuario: "var(--agent-usuario)",
+  claude: "var(--agent-claude)",
+  codex: "var(--agent-codex)",
+  qwen: "var(--agent-qwen)",
+  chatgpt: "var(--agent-chatgpt)",
+};
+
+function agentColor(agentId?: string | null): string {
+  return AGENT_COLOR_VARS[(agentId ?? "").toLowerCase()] ?? "var(--agent-usuario)";
+}
+
 function App() {
   const [mode, setMode] = useState<ViewMode>("notes");
   const [theme, setTheme] = useState<ThemeMode>(() => {
@@ -1142,7 +1157,7 @@ function NotesWorkspace({
             notes.map((note) => (
               <button
                 className={note.id === draft.id ? "note-card active" : "note-card"}
-                style={{ borderLeftColor: note.color }}
+                style={{ borderLeftColor: agentColor(note.created_by_agent_id) }}
                 type="button"
                 key={note.id}
                 onClick={() => setSelectedNoteId(note.id)}
