@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { api } from "./lib/api";
 import { defaultScope, fallbackDashboard, fallbackProject } from "./lib/constants";
-import { buildCountItems, notesPathForScope, projectScope } from "./lib/helpers";
+import { buildCountItems, projectScope } from "./lib/helpers";
+import { useModelHealth, useWorkspaceData } from "./hooks/useWorkspaceData";
 import type {
-  Dashboard,
   LibraryScope,
   ModelHealth,
   Note,
-  Relation,
+  ScopeType,
   SearchResult,
-  Task,
   ThemeMode,
   ViewMode,
 } from "./types";
@@ -19,86 +20,107 @@ import { NotesWorkspace } from "./components/NotesWorkspace";
 import { MapWorkspace } from "./components/MapWorkspace";
 import { LLMWorkspace } from "./components/LLMWorkspace";
 
+const FALLBACK_HEALTH: ModelHealth = {
+  online: false,
+  model: "qwen3:4b",
+  base_url: "http://localhost:11434",
+  message: "Modelo local no comprobado.",
+};
+
+function parseScopeParam(raw: string | null): LibraryScope {
+  if (!raw) return defaultScope;
+  const idx = raw.indexOf(":");
+  const type = (idx >= 0 ? raw.slice(0, idx) : raw) as ScopeType;
+  const id = idx >= 0 ? raw.slice(idx + 1) : "";
+  switch (type) {
+    case "all":
+      return { type: "all", id: "all", label: "All notes" };
+    case "loose":
+      return { type: "loose", id: "loose", label: "Loose notes" };
+    case "project":
+      return { type: "project", id: id || fallbackProject.id, label: id || fallbackProject.name };
+    case "folder":
+      return { type: "folder", id, label: id };
+    case "category":
+      return { type: "category", id, label: id };
+    default:
+      return defaultScope;
+  }
+}
+
 function App() {
-  const [mode, setMode] = useState<ViewMode>("notes");
+  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const saved = window.localStorage.getItem("neuronotes-theme");
     if (saved === "dark" || saved === "light") return saved;
     return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
-  const [dashboard, setDashboard] = useState<Dashboard>(fallbackDashboard);
-  const [scope, setScope] = useState<LibraryScope>(defaultScope);
-  const [selectedProjectId, setSelectedProjectId] = useState(fallbackProject.id);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [allNotes, setAllNotes] = useState<Note[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [relations, setRelations] = useState<Relation[]>([]);
-  const [selectedNoteId, setSelectedNoteId] = useState("");
+  const [mode, setMode] = useState<ViewMode>(() => {
+    const value = searchParams.get("mode");
+    return value === "map" || value === "llm" ? value : "notes";
+  });
+  const [scope, setScope] = useState<LibraryScope>(() => parseScopeParam(searchParams.get("scope")));
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    scope.type === "project" ? scope.id : fallbackProject.id,
+  );
+  const [selectedNoteId, setSelectedNoteId] = useState(() => searchParams.get("note") ?? "");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [aiWorking, setAiWorking] = useState(false);
-  const [modelHealth, setModelHealth] = useState<ModelHealth>({
-    online: false,
-    model: "qwen3:4b",
-    base_url: "http://localhost:11434",
-    message: "Modelo local no comprobado.",
-  });
+
+  const workspace = useWorkspaceData(scope, selectedProjectId);
+  const dashboard = workspace.data?.dashboard ?? fallbackDashboard;
+  const notes = workspace.data?.notes ?? [];
+  const allNotes = workspace.data?.allNotes ?? [];
+  const tasks = workspace.data?.tasks ?? [];
+  const relations = workspace.data?.relations ?? [];
+
+  const healthQuery = useModelHealth();
+  const modelHealth: ModelHealth = healthQuery.data ?? {
+    ...FALLBACK_HEALTH,
+    message: healthQuery.isError
+      ? "Qwen no responde; notas, tareas y mapa siguen activos."
+      : FALLBACK_HEALTH.message,
+  };
 
   const selectedProject =
     dashboard.projects.find((project) => project.id === selectedProjectId) ?? dashboard.project;
   const folders = useMemo(() => buildCountItems(allNotes, (note) => note.folder), [allNotes]);
-  const categories = useMemo(() => buildCountItems(allNotes, (note) => note.category || "General"), [allNotes]);
+  const categories = useMemo(
+    () => buildCountItems(allNotes, (note) => note.category || "General"),
+    [allNotes],
+  );
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem("neuronotes-theme", theme);
   }, [theme]);
 
-  async function refresh(nextScope: LibraryScope = scope) {
-    const dashboardProjectId = nextScope.type === "project" ? nextScope.id : selectedProjectId || fallbackProject.id;
-    const scopedNotesPath = notesPathForScope(nextScope);
-    const taskPath =
-      nextScope.type === "project" ? `/api/tasks?project_id=${encodeURIComponent(nextScope.id)}` : "/api/tasks";
-    const relationPath =
-      nextScope.type === "project"
-        ? `/api/relations?project_id=${encodeURIComponent(nextScope.id)}`
-        : "/api/relations";
-
-    const [dash, noteRows, allNoteRows, taskRows, relationRows] = await Promise.all([
-      api<Dashboard>(`/api/dashboard?project_id=${encodeURIComponent(dashboardProjectId)}`),
-      api<Note[]>(scopedNotesPath),
-      api<Note[]>("/api/notes"),
-      api<Task[]>(taskPath),
-      api<Relation[]>(relationPath),
-    ]);
-
-    const nextProjectId = nextScope.type === "project" ? dash.project.id : noteRows[0]?.project_id ?? dashboardProjectId;
-    setDashboard(dash);
-    setSelectedProjectId(nextProjectId);
-    setNotes(noteRows);
-    setAllNotes(allNoteRows);
-    setTasks(taskRows);
-    setRelations(relationRows);
-    setSelectedNoteId((current) => (noteRows.some((note) => note.id === current) ? current : noteRows[0]?.id || ""));
-
-    try {
-      setModelHealth(await api<ModelHealth>("/api/health/model"));
-    } catch {
-      setModelHealth((current) => ({
-        ...current,
-        online: false,
-        message: "Qwen no responde; notas, tareas y mapa siguen activos.",
-      }));
-    }
-  }
-
+  // Keep the URL in sync with navigation state so deep links and reload restore
+  // the same view (replace = no history spam from derived note reconciliation).
   useEffect(() => {
-    refresh(defaultScope).catch(() => undefined);
-  }, []);
+    const next = new URLSearchParams();
+    next.set("mode", mode);
+    next.set("scope", `${scope.type}:${scope.id}`);
+    if (selectedNoteId) next.set("note", selectedNoteId);
+    setSearchParams(next, { replace: true });
+  }, [mode, scope.type, scope.id, selectedNoteId, setSearchParams]);
 
+  // Track the active project context from the fetched data.
+  useEffect(() => {
+    const data = workspace.data;
+    if (!data) return;
+    setSelectedProjectId((prev) =>
+      scope.type === "project" ? data.dashboard.project.id : data.notes[0]?.project_id ?? prev,
+    );
+  }, [workspace.data, scope.type]);
+
+  // Keep a valid note selected within the current scope.
   useEffect(() => {
     if (!notes.length) {
-      setSelectedNoteId("");
+      if (selectedNoteId) setSelectedNoteId("");
       return;
     }
     if (!selectedNoteId || !notes.some((note) => note.id === selectedNoteId)) {
@@ -124,21 +146,26 @@ function App() {
     };
   }, [searchQuery]);
 
+  function refresh(): Promise<void> {
+    return queryClient.invalidateQueries({ queryKey: ["workspace"] });
+  }
+
   async function chooseScope(nextScope: LibraryScope) {
     setScope(nextScope);
     setSelectedNoteId("");
     if (nextScope.type === "project") {
       setSelectedProjectId(nextScope.id);
     }
-    await refresh(nextScope);
     setMode("notes");
   }
 
   async function openNoteInProject(note: Note) {
     const project = dashboard.projects.find((item) => item.id === note.project_id);
-    const nextScope = projectScope(project ?? { ...fallbackProject, id: note.project_id, name: note.project_id });
+    const nextScope = projectScope(
+      project ?? { ...fallbackProject, id: note.project_id, name: note.project_id },
+    );
     setScope(nextScope);
-    await refresh(nextScope);
+    setSelectedProjectId(nextScope.id);
     setSelectedNoteId(note.id);
     setMode("notes");
   }
@@ -146,7 +173,9 @@ function App() {
   async function openSearchResult(result: SearchResult) {
     if (result.project_id) {
       const project = dashboard.projects.find((item) => item.id === result.project_id);
-      const nextScope = projectScope(project ?? { ...fallbackProject, id: result.project_id, name: result.project_name });
+      const nextScope = projectScope(
+        project ?? { ...fallbackProject, id: result.project_id, name: result.project_name },
+      );
       await chooseScope(nextScope);
     }
     if (result.kind === "note") {
@@ -201,7 +230,7 @@ function App() {
             selectedNoteId={selectedNoteId}
             setSelectedNoteId={setSelectedNoteId}
             setMode={setMode}
-            refresh={() => refresh(scope)}
+            refresh={refresh}
             openNoteInProject={openNoteInProject}
             setAiWorking={setAiWorking}
           />
