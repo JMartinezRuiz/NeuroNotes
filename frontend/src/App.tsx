@@ -301,19 +301,32 @@ async function api<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-// Synapse agent-provenance colors. Drives note-card gutters, badges and (later)
-// map node rings — so "who authored this" is a consistent visual language.
-const AGENT_COLOR_VARS: Record<string, string> = {
-  user: "var(--agent-usuario)",
-  usuario: "var(--agent-usuario)",
-  claude: "var(--agent-claude)",
-  codex: "var(--agent-codex)",
-  qwen: "var(--agent-qwen)",
-  chatgpt: "var(--agent-chatgpt)",
+// Synapse agent-provenance colors. One normalizer maps an agent id OR display
+// name to a key, so "who authored this" is a consistent visual language across
+// note-card gutters, the editor, and the 3D map (which needs real hex, not vars).
+const AGENT_HEX: Record<string, string> = {
+  usuario: "#e8895e",
+  claude: "#e0a33b",
+  codex: "#8c99f0",
+  qwen: "#b388e8",
+  chatgpt: "#5dcaa5",
 };
 
-function agentColor(agentId?: string | null): string {
-  return AGENT_COLOR_VARS[(agentId ?? "").toLowerCase()] ?? "var(--agent-usuario)";
+function normalizeAgentKey(value?: string | null): keyof typeof AGENT_HEX {
+  const v = (value ?? "").toLowerCase();
+  if (v.includes("claude")) return "claude";
+  if (v.includes("codex")) return "codex";
+  if (v.includes("qwen")) return "qwen";
+  if (v.includes("chatgpt") || v.includes("gpt")) return "chatgpt";
+  return "usuario";
+}
+
+function agentColor(value?: string | null): string {
+  return `var(--agent-${normalizeAgentKey(value)})`;
+}
+
+function agentHex(value?: string | null): string {
+  return AGENT_HEX[normalizeAgentKey(value)];
 }
 
 function App() {
@@ -1265,6 +1278,11 @@ function NotesWorkspace({
           value={draft.title || ""}
           onChange={(event) => editDraft({ title: event.target.value })}
         />
+        <div className="note-attribution">
+          <span className="agent-dot" style={{ backgroundColor: agentColor(draft.created_by_agent_id) }} />
+          <span>{draft.agent || "Usuario"}</span>
+          {draft.status ? <span className="attribution-status">· {draft.status}</span> : null}
+        </div>
 
         {editorMode === "write" ? (
           <textarea
@@ -1418,7 +1436,10 @@ function MapWorkspace({
 }) {
   const [vectorMap, setVectorMap] = useState<VectorMap | null>(null);
   const [vectorLoading, setVectorLoading] = useState(false);
-  const graphNodes = useMemo(() => positionGraphNodes(vectorMap?.nodes ?? notes), [vectorMap, notes]);
+  const graphNodes = useMemo(
+    () => positionGraphNodes(vectorMap?.nodes ?? notes).map((node) => ({ ...node, color: agentHex(node.agent) })),
+    [vectorMap, notes],
+  );
   const graphNodeMap = useMemo(() => new Map(graphNodes.map((node) => [node.id, node])), [graphNodes]);
   const graphEdges = useMemo(
     () => (vectorMap?.edges ?? relationEdgesFromRows(relations)).filter((edge) => graphNodeMap.has(edge.from_id) && graphNodeMap.has(edge.to_id)),
