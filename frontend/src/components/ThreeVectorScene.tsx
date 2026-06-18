@@ -1,0 +1,509 @@
+import { useEffect, useMemo, useRef } from "react";
+import * as THREE from "three";
+import {
+  addLineSegments,
+  buildThreeNodePositions,
+  chooseVisibleEdges,
+  clamp,
+  createGlowTexture,
+  makeThreeColor,
+  trimText,
+} from "../lib/helpers";
+import type { GraphNode, VectorEdge } from "../types";
+
+export function ThreeVectorScene({
+  nodes,
+  edges,
+  selectedNoteId,
+  onSelectNote,
+}: {
+  nodes: GraphNode[];
+  edges: VectorEdge[];
+  selectedNoteId: string;
+  onSelectNote: (noteId: string) => void;
+}) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const canvasMountRef = useRef<HTMLDivElement | null>(null);
+  const layout = useMemo(() => buildThreeNodePositions(nodes, edges), [nodes, edges]);
+  const featuredNodes = useMemo(() => {
+    const selectedNode = nodes.find((node) => node.id === selectedNoteId);
+    return selectedNode ? [selectedNode] : [];
+  }, [nodes, selectedNoteId]);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    const mount = canvasMountRef.current;
+    if (!host || !mount || !nodes.length) return;
+    const hostElement: HTMLDivElement = host;
+    const mountElement: HTMLDivElement = mount;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x080b12, 0.014);
+
+    const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 1200);
+    camera.position.set(0, 8, 42);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true,
+      preserveDrawingBuffer: true,
+    });
+    renderer.setClearColor(0x080b12, 1);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.domElement.className = "three-map-canvas";
+    renderer.domElement.setAttribute("aria-label", "3D note memory map");
+    renderer.domElement.tabIndex = 0;
+    mountElement.appendChild(renderer.domElement);
+
+    const root = new THREE.Group();
+    root.rotation.x = -0.34;
+    root.rotation.y = 0.52;
+    scene.add(root);
+
+    const { positions, connectionCounts, clusters } = layout;
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const glowTexture = createGlowTexture();
+    const sphereGeometry = new THREE.SphereGeometry(0.42, 24, 14);
+    const pulseGeometry = new THREE.SphereGeometry(0.08, 12, 8);
+    const ringGeometry = new THREE.TorusGeometry(0.78, 0.014, 8, 80);
+    const materials = new Set<THREE.Material>();
+    const geometries = new Set<THREE.BufferGeometry>([sphereGeometry, pulseGeometry, ringGeometry]);
+    const clickable: THREE.Object3D[] = [];
+    const meshById = new Map<string, THREE.Mesh>();
+    const selectedRings: THREE.Mesh[] = [];
+
+    const ambient = new THREE.AmbientLight(0xc9d7ff, 0.72);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    keyLight.position.set(12, 18, 16);
+    const sideLight = new THREE.PointLight(0x63e6be, 3.6, 80);
+    sideLight.position.set(-16, 10, 20);
+    const rimLight = new THREE.PointLight(0x7aa7ff, 2.8, 90);
+    rimLight.position.set(20, 4, -22);
+    scene.add(ambient, keyLight, sideLight, rimLight);
+
+    const grid = new THREE.GridHelper(58, 12, 0x273144, 0x111722);
+    grid.position.y = -9.8;
+    const gridMaterial = grid.material as THREE.Material;
+    gridMaterial.transparent = true;
+    gridMaterial.opacity = 0.2;
+    root.add(grid);
+
+    const clusterDiscs = clusters.map((cluster) => {
+      const color = makeThreeColor(cluster.color);
+      const fillMaterial = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.045,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const ringMaterial = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const fillGeometry = new THREE.CircleGeometry(cluster.radius, 80);
+      const ringGeometryForCluster = new THREE.RingGeometry(cluster.radius * 0.98, cluster.radius * 1.02, 96);
+      materials.add(fillMaterial);
+      materials.add(ringMaterial);
+      geometries.add(fillGeometry);
+      geometries.add(ringGeometryForCluster);
+      const disc = new THREE.Mesh(fillGeometry, fillMaterial);
+      const ring = new THREE.Mesh(ringGeometryForCluster, ringMaterial);
+      disc.position.set(cluster.position.x, -9.55, cluster.position.z);
+      ring.position.copy(disc.position);
+      disc.rotation.x = -Math.PI / 2;
+      ring.rotation.x = Math.PI / 2;
+      root.add(disc);
+      root.add(ring);
+      return ring;
+    });
+
+    const relationLinePositions: number[] = [];
+    const semanticLinePositions: number[] = [];
+    const visibleEdges = chooseVisibleEdges(edges, selectedNoteId, nodes.length);
+    visibleEdges.forEach((edge) => {
+      const from = positions.get(edge.from_id);
+      const to = positions.get(edge.to_id);
+      if (!from || !to) return;
+      const target = edge.source === "relation" ? relationLinePositions : semanticLinePositions;
+      target.push(from.x, from.y, from.z, to.x, to.y, to.z);
+    });
+
+    const relationLineMaterial = new THREE.LineBasicMaterial({
+      color: 0x78f0d4,
+      transparent: true,
+      opacity: 0.5,
+    });
+    const semanticLineMaterial = new THREE.LineBasicMaterial({
+      color: 0x8ab4ff,
+      transparent: true,
+      opacity: 0.18,
+    });
+    materials.add(relationLineMaterial);
+    materials.add(semanticLineMaterial);
+    addLineSegments(root, relationLinePositions, relationLineMaterial, geometries);
+    addLineSegments(root, semanticLinePositions, semanticLineMaterial, geometries);
+
+    nodes.forEach((node) => {
+      const position = positions.get(node.id);
+      if (!position) return;
+      const selected = node.id === selectedNoteId;
+      const color = makeThreeColor(node.color);
+      const material = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color.clone().multiplyScalar(0.26),
+        emissiveIntensity: selected ? 0.85 : 0.42,
+        metalness: 0.08,
+        roughness: 0.72,
+      });
+      materials.add(material);
+
+      const mesh = new THREE.Mesh(sphereGeometry, material);
+      const connections = connectionCounts.get(node.id) ?? 0;
+      const baseScale = Math.min(1.45, 0.74 + node.linkCount * 0.045 + connections * 0.025);
+      mesh.position.copy(position);
+      mesh.scale.setScalar(selected ? baseScale * 1.32 : baseScale);
+      mesh.userData = { baseScale, noteId: node.id };
+      clickable.push(mesh);
+      meshById.set(node.id, mesh);
+      root.add(mesh);
+
+      if (selected) {
+        const glowMaterial = new THREE.SpriteMaterial({
+          map: glowTexture,
+          color,
+          transparent: true,
+          opacity: 0.44,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        });
+        materials.add(glowMaterial);
+        const glow = new THREE.Sprite(glowMaterial);
+        glow.position.copy(position);
+        glow.scale.setScalar(5.4 * baseScale);
+        root.add(glow);
+      }
+
+      if (selected) {
+        const ringMaterial = new THREE.MeshBasicMaterial({
+          color: 0xf6d365,
+          transparent: true,
+          opacity: 0.9,
+          depthWrite: false,
+        });
+        materials.add(ringMaterial);
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        ring.position.copy(position);
+        ring.scale.setScalar(baseScale * 1.56);
+        ring.lookAt(camera.position);
+        ring.userData = { baseScale };
+        selectedRings.push(ring);
+        root.add(ring);
+      }
+    });
+
+    const animatedEdges = visibleEdges
+      .slice()
+      .sort((a, b) => Number(b.source === "relation") - Number(a.source === "relation") || b.score - a.score)
+      .slice(0, 22);
+    const pulses: Array<{ mesh: THREE.Mesh; from: THREE.Vector3; to: THREE.Vector3; offset: number; speed: number }> = [];
+    animatedEdges.forEach((edge, index) => {
+      const from = positions.get(edge.from_id);
+      const to = positions.get(edge.to_id);
+      if (!from || !to) return;
+      const material = new THREE.MeshBasicMaterial({
+        color: edge.source === "relation" ? 0x7cf5d9 : 0x9dbdff,
+        transparent: true,
+        opacity: edge.source === "relation" ? 0.52 : 0.28,
+        depthWrite: false,
+      });
+      materials.add(material);
+      const pulse = new THREE.Mesh(pulseGeometry, material);
+      root.add(pulse);
+      pulses.push({
+        mesh: pulse,
+        from: from.clone(),
+        to: to.clone(),
+        offset: (index * 0.137) % 1,
+        speed: edge.source === "relation" ? 0.18 : 0.12,
+      });
+    });
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let targetRotationX = -0.34;
+    let targetRotationY = 0.52;
+    let targetCameraZ = 42;
+    let isDragging = false;
+    let moved = false;
+    let lastX = 0;
+    let lastY = 0;
+    let animationTimer = 0;
+    let frame = 0;
+    const startTime = window.performance.now();
+
+    function resize() {
+      const width = Math.max(1, hostElement.clientWidth);
+      const height = Math.max(1, hostElement.clientHeight);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+    }
+
+    function noteIdAtPoint(clientX: number, clientY: number) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(clickable, false)[0];
+      const noteId = hit?.object.userData.noteId;
+      if (typeof noteId === "string") return noteId;
+
+      root.updateMatrixWorld();
+      camera.updateMatrixWorld();
+      let nearestNoteId = "";
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      positions.forEach((position, projectedNoteId) => {
+        const projected = position.clone().applyMatrix4(root.matrixWorld).project(camera);
+        if (projected.z < -1 || projected.z > 1) return;
+        const x = rect.left + (projected.x * 0.5 + 0.5) * rect.width;
+        const y = rect.top + (-projected.y * 0.5 + 0.5) * rect.height;
+        const radius = 18 + Math.min(14, (connectionCounts.get(projectedNoteId) || 0) * 2.2);
+        const distance = Math.hypot(clientX - x, clientY - y);
+        if (distance <= radius && distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestNoteId = projectedNoteId;
+        }
+      });
+      return nearestNoteId;
+    }
+
+    function pickNode(clientX: number, clientY: number) {
+      const noteId = noteIdAtPoint(clientX, clientY);
+      if (noteId) onSelectNote(noteId);
+    }
+
+    function hideHoverLabel() {
+      const label = hostElement.querySelector<HTMLElement>(".three-hover-label");
+      if (label) label.style.opacity = "0";
+      renderer.domElement.style.cursor = "grab";
+    }
+
+    function showHoverLabel(event: PointerEvent) {
+      const noteId = noteIdAtPoint(event.clientX, event.clientY);
+      const note = noteId ? nodeById.get(noteId) : null;
+      const label = hostElement.querySelector<HTMLElement>(".three-hover-label");
+      if (!label || !note) {
+        hideHoverLabel();
+        return;
+      }
+      const rect = hostElement.getBoundingClientRect();
+      const x = clamp(event.clientX - rect.left + 14, 70, Math.max(70, rect.width - 70));
+      const y = clamp(event.clientY - rect.top - 16, 28, Math.max(28, rect.height - 28));
+      label.textContent = note.title;
+      label.style.opacity = "1";
+      label.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -100%)`;
+      renderer.domElement.style.cursor = "pointer";
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      isDragging = true;
+      moved = false;
+      lastX = event.clientX;
+      lastY = event.clientY;
+      renderer.domElement.setPointerCapture(event.pointerId);
+    }
+
+    function onPointerMove(event: PointerEvent) {
+      if (!isDragging) {
+        showHoverLabel(event);
+        return;
+      }
+      const dx = event.clientX - lastX;
+      const dy = event.clientY - lastY;
+      if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+      targetRotationY += dx * 0.006;
+      targetRotationX = clamp(targetRotationX + dy * 0.0045, -1.0, 0.28);
+      lastX = event.clientX;
+      lastY = event.clientY;
+    }
+
+    function onPointerUp(event: PointerEvent) {
+      if (!moved) pickNode(event.clientX, event.clientY);
+      isDragging = false;
+      renderer.domElement.releasePointerCapture(event.pointerId);
+    }
+
+    function onPointerCancel() {
+      isDragging = false;
+      hideHoverLabel();
+    }
+
+    function onWheel(event: WheelEvent) {
+      event.preventDefault();
+      targetCameraZ = clamp(targetCameraZ + event.deltaY * 0.025, 24, 66);
+    }
+
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(hostElement);
+    resize();
+
+    renderer.domElement.addEventListener("pointerdown", onPointerDown);
+    renderer.domElement.addEventListener("pointermove", onPointerMove);
+    renderer.domElement.addEventListener("pointerup", onPointerUp);
+    renderer.domElement.addEventListener("pointercancel", onPointerCancel);
+    renderer.domElement.addEventListener("pointerleave", hideHoverLabel);
+    renderer.domElement.addEventListener("wheel", onWheel, { passive: false });
+
+    function updateLabels() {
+      const labels = hostElement.querySelectorAll<HTMLElement>(".three-node-label");
+      const clusterLabels = hostElement.querySelectorAll<HTMLElement>(".three-cluster-label");
+      root.updateMatrixWorld();
+      camera.updateMatrixWorld();
+      labels.forEach((label) => {
+        const noteId = label.dataset.nodeId;
+        const position = noteId ? positions.get(noteId) : null;
+        if (!position) {
+          label.style.opacity = "0";
+          return;
+        }
+        const projected = position.clone().applyMatrix4(root.matrixWorld).project(camera);
+        const visible = projected.z > -1 && projected.z < 1;
+        const hostWidth = hostElement.clientWidth;
+        const hostHeight = hostElement.clientHeight;
+        const x = clamp((projected.x * 0.5 + 0.5) * hostWidth, 92, Math.max(92, hostWidth - 92));
+        const y = clamp((-projected.y * 0.5 + 0.5) * hostHeight, 42, Math.max(42, hostHeight - 42));
+        const isSelected = noteId === selectedNoteId;
+        const depthOpacity = clamp(1.12 - projected.z, 0.18, 1);
+        label.style.opacity = visible ? String(isSelected ? 1 : depthOpacity * 0.88) : "0";
+        label.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
+        label.style.zIndex = String(Math.round((1 - projected.z) * 1000));
+      });
+      clusterLabels.forEach((label) => {
+        const cluster = clusters.find((item) => item.id === label.dataset.clusterId);
+        const position = cluster?.labelPosition;
+        if (!position) {
+          label.style.opacity = "0";
+          return;
+        }
+        const projected = position.clone().applyMatrix4(root.matrixWorld).project(camera);
+        const visible = projected.z > -1 && projected.z < 1;
+        const hostWidth = hostElement.clientWidth;
+        const hostHeight = hostElement.clientHeight;
+        const x = clamp((projected.x * 0.5 + 0.5) * hostWidth, 72, Math.max(72, hostWidth - 72));
+        const y = clamp((-projected.y * 0.5 + 0.5) * hostHeight, 38, Math.max(38, hostHeight - 38));
+        label.style.opacity = visible ? "0.82" : "0";
+        label.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
+        label.style.zIndex = String(Math.round((1 - projected.z) * 700));
+      });
+    }
+
+    function animate() {
+      frame += 1;
+      const elapsed = (window.performance.now() - startTime) / 1000;
+      if (!isDragging) targetRotationY += 0.0015;
+      root.rotation.x += (targetRotationX - root.rotation.x) * 0.08;
+      root.rotation.y += (targetRotationY - root.rotation.y) * 0.08;
+      camera.position.z += (targetCameraZ - camera.position.z) * 0.08;
+      camera.lookAt(0, 0, 0);
+
+      relationLineMaterial.opacity = 0.42 + Math.sin(elapsed * 1.35) * 0.05;
+      semanticLineMaterial.opacity = 0.14 + Math.sin(elapsed * 0.9) * 0.035;
+      sideLight.intensity = 2.8 + Math.sin(elapsed * 1.2) * 0.35;
+      rimLight.intensity = 2.5 + Math.cos(elapsed * 0.9) * 0.32;
+
+      clusterDiscs.forEach((ring, index) => {
+        ring.rotation.z += 0.00035 + index * 0.00004;
+      });
+
+      meshById.forEach((mesh, noteId) => {
+        const baseScale = Number(mesh.userData.baseScale) || 1;
+        const selected = noteId === selectedNoteId;
+        const pulse = Math.sin(elapsed * (selected ? 2.4 : 1.4) + baseScale * 2) * (selected ? 0.055 : 0.018);
+        mesh.scale.setScalar(baseScale * (selected ? 1.32 : 1) * (1 + pulse));
+      });
+
+      selectedRings.forEach((ring) => {
+        const baseScale = Number(ring.userData.baseScale) || 1;
+        ring.lookAt(camera.position);
+        ring.scale.setScalar(baseScale * (1.58 + Math.sin(elapsed * 2.8) * 0.08));
+      });
+
+      pulses.forEach((pulse) => {
+        const t = (elapsed * pulse.speed + pulse.offset) % 1;
+        pulse.mesh.position.lerpVectors(pulse.from, pulse.to, t);
+        const material = pulse.mesh.material as THREE.MeshBasicMaterial;
+        material.opacity = 0.2 + Math.sin(t * Math.PI) * 0.62;
+      });
+
+      updateLabels();
+      renderer.render(scene, camera);
+      hostElement.dataset.frame = String(frame);
+      hostElement.dataset.rotation = root.rotation.y.toFixed(4);
+      animationTimer = window.setTimeout(animate, 33);
+    }
+
+    animate();
+
+    return () => {
+      window.clearTimeout(animationTimer);
+      resizeObserver.disconnect();
+      renderer.domElement.removeEventListener("pointerdown", onPointerDown);
+      renderer.domElement.removeEventListener("pointermove", onPointerMove);
+      renderer.domElement.removeEventListener("pointerup", onPointerUp);
+      renderer.domElement.removeEventListener("pointercancel", onPointerCancel);
+      renderer.domElement.removeEventListener("pointerleave", hideHoverLabel);
+      renderer.domElement.removeEventListener("wheel", onWheel);
+      if (renderer.domElement.parentElement === mountElement) mountElement.removeChild(renderer.domElement);
+      scene.traverse((object) => {
+        const maybeDisposable = object as { geometry?: THREE.BufferGeometry; material?: THREE.Material | THREE.Material[] };
+        if (maybeDisposable.geometry) geometries.add(maybeDisposable.geometry);
+        if (Array.isArray(maybeDisposable.material)) {
+          maybeDisposable.material.forEach((material) => materials.add(material));
+        } else if (maybeDisposable.material) {
+          materials.add(maybeDisposable.material);
+        }
+      });
+      geometries.forEach((geometry) => geometry.dispose());
+      materials.forEach((material) => material.dispose());
+      glowTexture.dispose();
+      renderer.dispose();
+    };
+  }, [nodes, edges, layout, selectedNoteId, onSelectNote]);
+
+  return (
+    <div className="three-map-host" ref={hostRef}>
+      <div className="three-canvas-mount" ref={canvasMountRef} />
+      <div className="three-label-layer">
+        <div className="three-hover-label" />
+        {layout.clusters.map((cluster) => (
+          <div className="three-cluster-label" data-cluster-id={cluster.id} key={cluster.id}>
+            <span>{cluster.label}</span>
+            <small>{cluster.count}</small>
+          </div>
+        ))}
+        {featuredNodes.map((node) => (
+          <button
+            className={node.id === selectedNoteId ? "three-node-label selected" : "three-node-label"}
+            data-node-id={node.id}
+            key={node.id}
+            onClick={() => onSelectNote(node.id)}
+            type="button"
+          >
+            <span style={{ backgroundColor: node.color }} />
+            {trimText(node.title, 28)}
+          </button>
+        ))}
+      </div>
+      <div className="three-map-count">
+        <strong>{nodes.length}</strong>
+        <span>{layout.clusters.length} grupos</span>
+      </div>
+    </div>
+  );
+}
