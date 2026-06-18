@@ -32,11 +32,13 @@ from .database import (
   insert_agent_run,
   insert_memory_patch,
   list_activity,
+  list_memory_patches,
   list_notes,
   list_projects,
   list_relations,
   list_tasks,
   rebuild_note_vectors,
+  reject_memory_patch,
   search_memory,
   semantic_search_notes,
   update_note,
@@ -536,6 +538,20 @@ def apply_patch(request: ApplyMemoryRequest) -> dict[str, Any]:
     return apply_memory_patch(request.project_id, request.agent_id, request.proposal)
   except ValueError as error:
     raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/api/memory-patches")
+def list_patches(status: str | None = None, project_id: str | None = None) -> list[dict[str, Any]]:
+  return list_memory_patches(status, project_id)
+
+
+@app.post("/api/memory-patches/{patch_id}/reject")
+def reject_patch(patch_id: str) -> dict[str, Any]:
+  try:
+    return reject_memory_patch(patch_id)
+  except ValueError as error:
+    detail = str(error)
+    raise HTTPException(status_code=409 if "already" in detail else 404, detail=detail) from error
 
 
 def heuristic_proposal(content: str, source_agent: str | None) -> dict[str, Any]:

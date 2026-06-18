@@ -1,10 +1,46 @@
 import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy } from "lucide-react";
+import { api, agentColor } from "../lib/api";
 import type { ModelHealth, Project } from "../types";
 import { AIBadge } from "./AIBadge";
 
+type MemoryPatch = {
+  id: string;
+  agent: string;
+  agent_id: string;
+  status: string;
+  summary: string;
+  proposed_notes: number;
+  proposed_tasks: number;
+  proposed_decisions: number;
+  created_at: string;
+};
+
 export function LLMWorkspace({ selectedProject, modelHealth }: { selectedProject: Project; modelHealth: ModelHealth }) {
   const [copied, setCopied] = useState("");
+  const queryClient = useQueryClient();
+  const patchesQuery = useQuery({
+    queryKey: ["patches", "pending", selectedProject.id],
+    queryFn: ({ signal }) =>
+      api<MemoryPatch[]>(
+        `/api/memory-patches?status=pending&project_id=${encodeURIComponent(selectedProject.id)}`,
+        { signal },
+      ),
+  });
+  const patches = patchesQuery.data ?? [];
+
+  async function approvePatch(id: string) {
+    await api("/api/memory/apply", { method: "POST", body: JSON.stringify({ patch_id: id, approved: true }) });
+    await queryClient.invalidateQueries({ queryKey: ["patches"] });
+    await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+  }
+
+  async function rejectPatch(id: string) {
+    await api(`/api/memory-patches/${id}/reject`, { method: "POST" });
+    await queryClient.invalidateQueries({ queryKey: ["patches"] });
+  }
+
   const prompt = `Use Neuronotes 2.0 as the shared brain.
 Project id: ${selectedProject.id}
 
@@ -41,6 +77,58 @@ Rules:
         <span>Agent-neutral access</span>
         <h1>One brain for any LLM</h1>
         <p>Codex, Claude, Qwen, ChatGPT or another client can read, write, link and classify shared memory.</p>
+      </section>
+      <section className="llm-panel">
+        <h2>Memory review — {patches.length} pendiente{patches.length === 1 ? "" : "s"}</h2>
+        {patchesQuery.isLoading ? (
+          <p>Cargando…</p>
+        ) : patches.length === 0 ? (
+          <p>No hay parches de memoria pendientes de revisión.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {patches.map((patch) => (
+              <div
+                key={patch.id}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 500 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 999, background: agentColor(patch.agent_id) }} />
+                  {patch.agent}
+                  <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--faint)" }}>
+                    {patch.proposed_notes} notas · {patch.proposed_tasks} tareas · {patch.proposed_decisions} decisiones
+                  </span>
+                </span>
+                <p style={{ margin: 0, fontSize: 13 }}>{patch.summary || "(sin resumen)"}</p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="primary-button small" type="button" onClick={() => approvePatch(patch.id)}>
+                    Aprobar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => rejectPatch(patch.id)}
+                    style={{
+                      border: "1px solid var(--border-strong)",
+                      borderRadius: "var(--radius-sm)",
+                      background: "transparent",
+                      color: "var(--muted)",
+                      padding: "6px 12px",
+                      fontSize: 13,
+                    }}
+                  >
+                    Rechazar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
       <div className="llm-grid">
         <section className="llm-panel">

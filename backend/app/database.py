@@ -1523,6 +1523,67 @@ def insert_inbox_item(
   return item_id
 
 
+def list_memory_patches(status: str | None = None, project_id: str | None = None) -> list[dict[str, Any]]:
+  init_database()
+  clauses: list[str] = []
+  params: list[Any] = []
+  if status:
+    clauses.append("memory_patches.status = ?")
+    params.append(status)
+  if project_id:
+    clauses.append("memory_patches.project_id = ?")
+    params.append(project_id)
+  where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+  with connect() as connection:
+    rows = connection.execute(
+      f"""
+      SELECT memory_patches.*, agents.name AS agent_name, agents.color AS agent_color
+      FROM memory_patches
+      LEFT JOIN agents ON agents.id = memory_patches.agent_id
+      {where}
+      ORDER BY memory_patches.created_at DESC
+      LIMIT 200
+      """,
+      params,
+    ).fetchall()
+  patches = []
+  for row in rows:
+    try:
+      payload = json.loads(row["payload"]) if row["payload"] else {}
+    except (TypeError, ValueError):
+      payload = {}
+    keys = row.keys()
+    patches.append(
+      {
+        "id": row["id"],
+        "project_id": row["project_id"],
+        "agent_id": row["agent_id"],
+        "agent": row["agent_name"] if "agent_name" in keys and row["agent_name"] else row["agent_id"],
+        "agent_color": row["agent_color"] if "agent_color" in keys else None,
+        "status": row["status"],
+        "summary": str(payload.get("summary") or ""),
+        "proposed_notes": len(payload.get("proposed_notes", []) or []),
+        "proposed_tasks": len(payload.get("proposed_tasks", []) or []),
+        "proposed_decisions": len(payload.get("proposed_decisions", []) or []),
+        "created_at": row["created_at"],
+      }
+    )
+  return patches
+
+
+def reject_memory_patch(patch_id: str) -> dict[str, Any]:
+  init_database()
+  with connect() as connection:
+    row = connection.execute("SELECT id, status FROM memory_patches WHERE id = ?", (patch_id,)).fetchone()
+    if row is None:
+      raise ValueError("Memory patch not found")
+    if row["status"] != "pending":
+      raise ValueError(f"Patch already {row['status']}")
+    connection.execute("UPDATE memory_patches SET status = 'rejected' WHERE id = ?", (patch_id,))
+    connection.commit()
+  return {"id": patch_id, "status": "rejected"}
+
+
 def delete_note(note_id: str) -> dict[str, Any]:
   init_database()
   with connect() as connection:
