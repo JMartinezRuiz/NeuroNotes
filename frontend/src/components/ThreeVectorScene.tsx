@@ -28,6 +28,16 @@ export function ThreeVectorScene({
     return selectedNode ? [selectedNode] : [];
   }, [nodes, selectedNoteId]);
 
+  // Selection + callback live in refs so the scene is built ONCE and a click
+  // only updates visuals imperatively — it never tears down and rebuilds the
+  // scene (which used to reset rotation/zoom and make nodes appear to jump).
+  const selectedIdRef = useRef(selectedNoteId);
+  const onSelectRef = useRef(onSelectNote);
+  onSelectRef.current = onSelectNote;
+  useEffect(() => {
+    selectedIdRef.current = selectedNoteId;
+  }, [selectedNoteId]);
+
   useEffect(() => {
     const host = hostRef.current;
     const mount = canvasMountRef.current;
@@ -36,17 +46,13 @@ export function ThreeVectorScene({
     const mountElement: HTMLDivElement = mount;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x080b12, 0.014);
+    scene.fog = new THREE.FogExp2(0x080b12, 0.013);
 
     const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 1200);
     camera.position.set(0, 8, 42);
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: true,
-      preserveDrawingBuffer: true,
-    });
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setClearColor(0x080b12, 1);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -65,19 +71,18 @@ export function ThreeVectorScene({
     const glowTexture = createGlowTexture();
     const sphereGeometry = new THREE.SphereGeometry(0.42, 24, 14);
     const pulseGeometry = new THREE.SphereGeometry(0.08, 12, 8);
-    const ringGeometry = new THREE.TorusGeometry(0.78, 0.014, 8, 80);
+    const ringGeometry = new THREE.TorusGeometry(0.78, 0.02, 10, 90);
     const materials = new Set<THREE.Material>();
     const geometries = new Set<THREE.BufferGeometry>([sphereGeometry, pulseGeometry, ringGeometry]);
     const clickable: THREE.Object3D[] = [];
     const meshById = new Map<string, THREE.Mesh>();
-    const selectedRings: THREE.Mesh[] = [];
 
-    const ambient = new THREE.AmbientLight(0xc9d7ff, 0.72);
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    const ambient = new THREE.AmbientLight(0xc9d7ff, 0.78);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.9);
     keyLight.position.set(12, 18, 16);
-    const sideLight = new THREE.PointLight(0x63e6be, 3.6, 80);
+    const sideLight = new THREE.PointLight(0x2ee6d6, 3.6, 80);
     sideLight.position.set(-16, 10, 20);
-    const rimLight = new THREE.PointLight(0x7aa7ff, 2.8, 90);
+    const rimLight = new THREE.PointLight(0x8c99f0, 2.8, 90);
     rimLight.position.set(20, 4, -22);
     scene.add(ambient, keyLight, sideLight, rimLight);
 
@@ -90,20 +95,8 @@ export function ThreeVectorScene({
 
     const clusterDiscs = clusters.map((cluster) => {
       const color = makeThreeColor(cluster.color);
-      const fillMaterial = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: 0.045,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-      const ringMaterial = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: 0.22,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
+      const fillMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.05, depthWrite: false, side: THREE.DoubleSide });
+      const ringMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide });
       const fillGeometry = new THREE.CircleGeometry(cluster.radius, 80);
       const ringGeometryForCluster = new THREE.RingGeometry(cluster.radius * 0.98, cluster.radius * 1.02, 96);
       materials.add(fillMaterial);
@@ -121,9 +114,10 @@ export function ThreeVectorScene({
       return ring;
     });
 
+    // Edges are computed ONCE (no selection bias) so they stay put on click.
     const relationLinePositions: number[] = [];
     const semanticLinePositions: number[] = [];
-    const visibleEdges = chooseVisibleEdges(edges, selectedNoteId, nodes.length);
+    const visibleEdges = chooseVisibleEdges(edges, "", nodes.length);
     visibleEdges.forEach((edge) => {
       const from = positions.get(edge.from_id);
       const to = positions.get(edge.to_id);
@@ -132,16 +126,8 @@ export function ThreeVectorScene({
       target.push(from.x, from.y, from.z, to.x, to.y, to.z);
     });
 
-    const relationLineMaterial = new THREE.LineBasicMaterial({
-      color: 0x78f0d4,
-      transparent: true,
-      opacity: 0.5,
-    });
-    const semanticLineMaterial = new THREE.LineBasicMaterial({
-      color: 0x8ab4ff,
-      transparent: true,
-      opacity: 0.18,
-    });
+    const relationLineMaterial = new THREE.LineBasicMaterial({ color: 0x2ee6d6, transparent: true, opacity: 0.5 });
+    const semanticLineMaterial = new THREE.LineBasicMaterial({ color: 0x8c99f0, transparent: true, opacity: 0.16 });
     materials.add(relationLineMaterial);
     materials.add(semanticLineMaterial);
     addLineSegments(root, relationLinePositions, relationLineMaterial, geometries);
@@ -150,60 +136,62 @@ export function ThreeVectorScene({
     nodes.forEach((node) => {
       const position = positions.get(node.id);
       if (!position) return;
-      const selected = node.id === selectedNoteId;
       const color = makeThreeColor(node.color);
       const material = new THREE.MeshStandardMaterial({
         color,
-        emissive: color.clone().multiplyScalar(0.26),
-        emissiveIntensity: selected ? 0.85 : 0.42,
-        metalness: 0.08,
-        roughness: 0.72,
+        emissive: color.clone().multiplyScalar(0.32),
+        emissiveIntensity: 0.5,
+        metalness: 0.1,
+        roughness: 0.66,
       });
       materials.add(material);
 
       const mesh = new THREE.Mesh(sphereGeometry, material);
       const connections = connectionCounts.get(node.id) ?? 0;
-      const baseScale = Math.min(1.45, 0.74 + node.linkCount * 0.045 + connections * 0.025);
+      const baseScale = Math.min(1.5, 0.74 + node.linkCount * 0.045 + connections * 0.025);
       mesh.position.copy(position);
-      mesh.scale.setScalar(selected ? baseScale * 1.32 : baseScale);
+      mesh.scale.setScalar(baseScale);
       mesh.userData = { baseScale, noteId: node.id };
       clickable.push(mesh);
       meshById.set(node.id, mesh);
       root.add(mesh);
 
-      if (selected) {
-        const glowMaterial = new THREE.SpriteMaterial({
-          map: glowTexture,
-          color,
-          transparent: true,
-          opacity: 0.44,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        });
-        materials.add(glowMaterial);
-        const glow = new THREE.Sprite(glowMaterial);
-        glow.position.copy(position);
-        glow.scale.setScalar(5.4 * baseScale);
-        root.add(glow);
-      }
-
-      if (selected) {
-        const ringMaterial = new THREE.MeshBasicMaterial({
-          color: 0xf6d365,
-          transparent: true,
-          opacity: 0.9,
-          depthWrite: false,
-        });
-        materials.add(ringMaterial);
-        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-        ring.position.copy(position);
-        ring.scale.setScalar(baseScale * 1.56);
-        ring.lookAt(camera.position);
-        ring.userData = { baseScale };
-        selectedRings.push(ring);
-        root.add(ring);
-      }
+      // Soft per-node halo for a luminous "constellation" look.
+      const haloMaterial = new THREE.SpriteMaterial({
+        map: glowTexture,
+        color,
+        transparent: true,
+        opacity: 0.12 + Math.min(0.16, baseScale * 0.09),
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      materials.add(haloMaterial);
+      const halo = new THREE.Sprite(haloMaterial);
+      halo.position.copy(position);
+      halo.scale.setScalar(3.1 * baseScale);
+      root.add(halo);
     });
+
+    // Reusable selection highlight (ring + glow) that FOLLOWS the selected node
+    // each frame — created once, never rebuilt.
+    const selectionRingMaterial = new THREE.MeshBasicMaterial({ color: 0x2ee6d6, transparent: true, opacity: 0.95, depthWrite: false });
+    materials.add(selectionRingMaterial);
+    const selectionRing = new THREE.Mesh(ringGeometry, selectionRingMaterial);
+    selectionRing.visible = false;
+    root.add(selectionRing);
+
+    const selectionGlowMaterial = new THREE.SpriteMaterial({
+      map: glowTexture,
+      color: 0x2ee6d6,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    materials.add(selectionGlowMaterial);
+    const selectionGlow = new THREE.Sprite(selectionGlowMaterial);
+    selectionGlow.visible = false;
+    root.add(selectionGlow);
 
     const animatedEdges = visibleEdges
       .slice()
@@ -215,9 +203,9 @@ export function ThreeVectorScene({
       const to = positions.get(edge.to_id);
       if (!from || !to) return;
       const material = new THREE.MeshBasicMaterial({
-        color: edge.source === "relation" ? 0x7cf5d9 : 0x9dbdff,
+        color: edge.source === "relation" ? 0x2ee6d6 : 0x8c99f0,
         transparent: true,
-        opacity: edge.source === "relation" ? 0.52 : 0.28,
+        opacity: edge.source === "relation" ? 0.55 : 0.3,
         depthWrite: false,
       });
       materials.add(material);
@@ -241,7 +229,7 @@ export function ThreeVectorScene({
     let moved = false;
     let lastX = 0;
     let lastY = 0;
-    let animationTimer = 0;
+    let rafId = 0;
     let frame = 0;
     const startTime = window.performance.now();
 
@@ -283,7 +271,7 @@ export function ThreeVectorScene({
 
     function pickNode(clientX: number, clientY: number) {
       const noteId = noteIdAtPoint(clientX, clientY);
-      if (noteId) onSelectNote(noteId);
+      if (noteId) onSelectRef.current(noteId);
     }
 
     function hideHoverLabel() {
@@ -363,6 +351,7 @@ export function ThreeVectorScene({
       const clusterLabels = hostElement.querySelectorAll<HTMLElement>(".three-cluster-label");
       root.updateMatrixWorld();
       camera.updateMatrixWorld();
+      const selectedId = selectedIdRef.current;
       labels.forEach((label) => {
         const noteId = label.dataset.nodeId;
         const position = noteId ? positions.get(noteId) : null;
@@ -376,7 +365,7 @@ export function ThreeVectorScene({
         const hostHeight = hostElement.clientHeight;
         const x = clamp((projected.x * 0.5 + 0.5) * hostWidth, 92, Math.max(92, hostWidth - 92));
         const y = clamp((-projected.y * 0.5 + 0.5) * hostHeight, 42, Math.max(42, hostHeight - 42));
-        const isSelected = noteId === selectedNoteId;
+        const isSelected = noteId === selectedId;
         const depthOpacity = clamp(1.12 - projected.z, 0.18, 1);
         label.style.opacity = visible ? String(isSelected ? 1 : depthOpacity * 0.88) : "0";
         label.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
@@ -404,14 +393,14 @@ export function ThreeVectorScene({
     function animate() {
       frame += 1;
       const elapsed = (window.performance.now() - startTime) / 1000;
-      if (!isDragging) targetRotationY += 0.0015;
+      if (!isDragging) targetRotationY += 0.0008;
       root.rotation.x += (targetRotationX - root.rotation.x) * 0.08;
       root.rotation.y += (targetRotationY - root.rotation.y) * 0.08;
       camera.position.z += (targetCameraZ - camera.position.z) * 0.08;
       camera.lookAt(0, 0, 0);
 
       relationLineMaterial.opacity = 0.42 + Math.sin(elapsed * 1.35) * 0.05;
-      semanticLineMaterial.opacity = 0.14 + Math.sin(elapsed * 0.9) * 0.035;
+      semanticLineMaterial.opacity = 0.13 + Math.sin(elapsed * 0.9) * 0.035;
       sideLight.intensity = 2.8 + Math.sin(elapsed * 1.2) * 0.35;
       rimLight.intensity = 2.5 + Math.cos(elapsed * 0.9) * 0.32;
 
@@ -419,18 +408,30 @@ export function ThreeVectorScene({
         ring.rotation.z += 0.00035 + index * 0.00004;
       });
 
+      const selectedId = selectedIdRef.current;
       meshById.forEach((mesh, noteId) => {
         const baseScale = Number(mesh.userData.baseScale) || 1;
-        const selected = noteId === selectedNoteId;
-        const pulse = Math.sin(elapsed * (selected ? 2.4 : 1.4) + baseScale * 2) * (selected ? 0.055 : 0.018);
-        mesh.scale.setScalar(baseScale * (selected ? 1.32 : 1) * (1 + pulse));
+        const selected = noteId === selectedId;
+        const pulse = Math.sin(elapsed * (selected ? 2.4 : 1.4) + baseScale * 2) * (selected ? 0.06 : 0.018);
+        mesh.scale.setScalar(baseScale * (selected ? 1.34 : 1) * (1 + pulse));
+        (mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = selected ? 0.98 : 0.5;
       });
 
-      selectedRings.forEach((ring) => {
-        const baseScale = Number(ring.userData.baseScale) || 1;
-        ring.lookAt(camera.position);
-        ring.scale.setScalar(baseScale * (1.58 + Math.sin(elapsed * 2.8) * 0.08));
-      });
+      const selectedMesh = selectedId ? meshById.get(selectedId) : undefined;
+      if (selectedMesh) {
+        const sBase = Number(selectedMesh.userData.baseScale) || 1;
+        selectionRing.visible = true;
+        selectionGlow.visible = true;
+        selectionRing.position.copy(selectedMesh.position);
+        selectionGlow.position.copy(selectedMesh.position);
+        selectionRing.lookAt(camera.position);
+        selectionRing.scale.setScalar(sBase * (1.7 + Math.sin(elapsed * 2.8) * 0.1));
+        selectionGlow.scale.setScalar(sBase * 6);
+        selectionGlowMaterial.opacity = 0.42 + Math.sin(elapsed * 2.6) * 0.12;
+      } else {
+        selectionRing.visible = false;
+        selectionGlow.visible = false;
+      }
 
       pulses.forEach((pulse) => {
         const t = (elapsed * pulse.speed + pulse.offset) % 1;
@@ -443,13 +444,30 @@ export function ThreeVectorScene({
       renderer.render(scene, camera);
       hostElement.dataset.frame = String(frame);
       hostElement.dataset.rotation = root.rotation.y.toFixed(4);
-      animationTimer = window.setTimeout(animate, 33);
+      rafId = window.requestAnimationFrame(animate);
     }
 
+    function startLoop() {
+      if (!rafId) rafId = window.requestAnimationFrame(animate);
+    }
+    function stopLoop() {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+        rafId = 0;
+      }
+    }
+    function onVisibility() {
+      if (document.visibilityState === "visible") startLoop();
+      else stopLoop();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    // Render one frame synchronously so the map is never blank before
+    // requestAnimationFrame kicks in (RAF is paused while the tab is hidden).
     animate();
 
     return () => {
-      window.clearTimeout(animationTimer);
+      stopLoop();
+      document.removeEventListener("visibilitychange", onVisibility);
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
       renderer.domElement.removeEventListener("pointermove", onPointerMove);
@@ -472,7 +490,7 @@ export function ThreeVectorScene({
       glowTexture.dispose();
       renderer.dispose();
     };
-  }, [nodes, edges, layout, selectedNoteId, onSelectNote]);
+  }, [nodes, edges, layout]);
 
   return (
     <div className="three-map-host" ref={hostRef}>

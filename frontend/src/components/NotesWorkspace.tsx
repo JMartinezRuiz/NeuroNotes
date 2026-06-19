@@ -20,6 +20,17 @@ import { estimateTokens, newDraftForScope, projectName, readFileAsDataUrl, scope
 import type { AiMode, CountItem, LibraryScope, Note, Project, Relation, Task, ViewMode } from "../types";
 import { MarkdownPreview } from "./MarkdownPreview";
 
+type AiProposal = {
+  title?: string;
+  content?: string;
+  type?: string;
+  status?: string;
+  folder?: string;
+  category?: string;
+  tasks?: Array<{ title: string }>;
+  related_note_ids?: string[];
+};
+
 export function NotesWorkspace({
   projects,
   selectedProject,
@@ -60,6 +71,7 @@ export function NotesWorkspace({
   const [dirty, setDirty] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [activeAiMode, setActiveAiMode] = useState<AiMode | "">("");
+  const [aiProposal, setAiProposal] = useState<AiProposal | null>(null);
   const [editorMode, setEditorMode] = useState<"write" | "preview">("write");
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const loadedNoteIdRef = useRef<string>("");
@@ -169,26 +181,48 @@ export function NotesWorkspace({
   async function runAiMode(item: (typeof aiModes)[number]) {
     setAiWorking(true);
     setActiveAiMode(item.id);
+    setSaveError("");
     try {
       const target = await saveNote();
       if (!target?.id) return;
-      const result = await api<{ note: Note }>(`/api/notes/${target.id}/improve`, {
+      // Ask for a PROPOSAL (preview), never auto-overwrite the note.
+      const result = await api<{ proposal: AiProposal }>(`/api/notes/${target.id}/improve`, {
         method: "POST",
-        body: JSON.stringify({
-          agent_id: "qwen",
-          mode: item.id,
-          goal: item.goal,
-        }),
+        body: JSON.stringify({ agent_id: "qwen", mode: item.id, goal: item.goal, preview: true }),
+      });
+      setAiProposal(result.proposal);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "La IA no pudo generar una propuesta.");
+    } finally {
+      setActiveAiMode("");
+      setAiWorking(false);
+    }
+  }
+
+  async function acceptProposal() {
+    if (!aiProposal || !draft.id) return;
+    const proposal = aiProposal;
+    setAiProposal(null);
+    setAiWorking(true);
+    try {
+      const result = await api<{ note: Note }>(`/api/notes/${draft.id}/improve/apply`, {
+        method: "POST",
+        body: JSON.stringify({ agent_id: "qwen", proposal }),
       });
       setDraft(result.note);
       setSelectedNoteId(result.note.id);
       loadedNoteIdRef.current = result.note.id;
       setDirty(false);
       await refresh();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "No se pudo aplicar la propuesta.");
     } finally {
-      setActiveAiMode("");
       setAiWorking(false);
     }
+  }
+
+  function rejectProposal() {
+    setAiProposal(null);
   }
 
   function newNote() {
@@ -415,6 +449,59 @@ export function NotesWorkspace({
           <span>{draft.agent || "Usuario"}</span>
           {draft.status ? <span className="attribution-status">· {draft.status}</span> : null}
         </div>
+
+        {aiProposal ? (
+          <div
+            style={{
+              margin: "0 24px 12px",
+              border: "1px solid var(--accent)",
+              borderRadius: "var(--radius-sm)",
+              background: "var(--accent-soft)",
+              padding: 12,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <strong style={{ fontSize: 13 }}>Propuesta de IA — revisar antes de aplicar</strong>
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>
+              {aiProposal.type || draft.type} · {aiProposal.category || draft.category}
+              {aiProposal.tasks?.length ? ` · ${aiProposal.tasks.length} tarea(s)` : ""}
+            </span>
+            <pre
+              style={{
+                margin: 0,
+                maxHeight: 220,
+                overflow: "auto",
+                whiteSpace: "pre-wrap",
+                fontSize: 12.5,
+                fontFamily: "inherit",
+                color: "var(--text)",
+              }}
+            >
+              {aiProposal.content}
+            </pre>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="primary-button small" type="button" onClick={acceptProposal}>
+                Aceptar
+              </button>
+              <button
+                type="button"
+                onClick={rejectProposal}
+                style={{
+                  border: "1px solid var(--border-strong)",
+                  borderRadius: "var(--radius-sm)",
+                  background: "transparent",
+                  color: "var(--muted)",
+                  padding: "6px 12px",
+                  fontSize: 13,
+                }}
+              >
+                Rechazar
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {editorMode === "write" ? (
           <textarea

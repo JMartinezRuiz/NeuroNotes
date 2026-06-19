@@ -171,6 +171,12 @@ class ImproveNoteRequest(BaseModel):
   agent_id: str = "qwen"
   mode: str = "format"
   goal: str = "Format and polish this quick note without adding new information."
+  preview: bool = False
+
+
+class ApplyImprovementRequest(BaseModel):
+  agent_id: str = "qwen"
+  proposal: dict[str, Any]
 
 
 class SettingsRequest(BaseModel):
@@ -347,11 +353,23 @@ Candidate related notes:
     improvement["folder"] = note.get("folder", "")
   if not str(improvement.get("category") or "").strip():
     improvement["category"] = note.get("category", "General")
+  if request.preview:
+    return {"preview": True, "proposal": improvement}
   try:
     result = apply_note_improvement(note_id, improvement, request.agent_id)
   except ValueError as error:
     raise HTTPException(status_code=404, detail=str(error)) from error
   result["proposal"] = improvement
+  return result
+
+
+@app.post("/api/notes/{note_id}/improve/apply")
+def apply_note_improvement_endpoint(note_id: str, request: ApplyImprovementRequest) -> dict[str, Any]:
+  try:
+    result = apply_note_improvement(note_id, request.proposal, request.agent_id)
+  except ValueError as error:
+    raise HTTPException(status_code=404, detail=str(error)) from error
+  result["proposal"] = request.proposal
   return result
 
 
