@@ -86,33 +86,7 @@ export function ThreeVectorScene({
     rimLight.position.set(20, 4, -22);
     scene.add(ambient, keyLight, sideLight, rimLight);
 
-    const grid = new THREE.GridHelper(58, 12, 0x273144, 0x111722);
-    grid.position.y = -9.8;
-    const gridMaterial = grid.material as THREE.Material;
-    gridMaterial.transparent = true;
-    gridMaterial.opacity = 0.2;
-    root.add(grid);
-
-    const clusterDiscs = clusters.map((cluster) => {
-      const color = makeThreeColor(cluster.color);
-      const fillMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.05, depthWrite: false, side: THREE.DoubleSide });
-      const ringMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide });
-      const fillGeometry = new THREE.CircleGeometry(cluster.radius, 80);
-      const ringGeometryForCluster = new THREE.RingGeometry(cluster.radius * 0.98, cluster.radius * 1.02, 96);
-      materials.add(fillMaterial);
-      materials.add(ringMaterial);
-      geometries.add(fillGeometry);
-      geometries.add(ringGeometryForCluster);
-      const disc = new THREE.Mesh(fillGeometry, fillMaterial);
-      const ring = new THREE.Mesh(ringGeometryForCluster, ringMaterial);
-      disc.position.set(cluster.position.x, -9.55, cluster.position.z);
-      ring.position.copy(disc.position);
-      disc.rotation.x = -Math.PI / 2;
-      ring.rotation.x = Math.PI / 2;
-      root.add(disc);
-      root.add(ring);
-      return ring;
-    });
+    // No floor grid or cluster discs — the organic node cloud is the visual.
 
     // Edges are computed ONCE (no selection bias) so they stay put on click.
     const relationLinePositions: number[] = [];
@@ -161,14 +135,14 @@ export function ThreeVectorScene({
         map: glowTexture,
         color,
         transparent: true,
-        opacity: 0.12 + Math.min(0.16, baseScale * 0.09),
+        opacity: 0.2 + Math.min(0.24, baseScale * 0.13),
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       });
       materials.add(haloMaterial);
       const halo = new THREE.Sprite(haloMaterial);
       halo.position.copy(position);
-      halo.scale.setScalar(3.1 * baseScale);
+      halo.scale.setScalar(3.7 * baseScale);
       root.add(halo);
     });
 
@@ -403,10 +377,6 @@ export function ThreeVectorScene({
       semanticLineMaterial.opacity = 0.13 + Math.sin(elapsed * 0.9) * 0.035;
       sideLight.intensity = 2.8 + Math.sin(elapsed * 1.2) * 0.35;
       rimLight.intensity = 2.5 + Math.cos(elapsed * 0.9) * 0.32;
-
-      clusterDiscs.forEach((ring, index) => {
-        ring.rotation.z += 0.00035 + index * 0.00004;
-      });
 
       const selectedId = selectedIdRef.current;
       meshById.forEach((mesh, noteId) => {
