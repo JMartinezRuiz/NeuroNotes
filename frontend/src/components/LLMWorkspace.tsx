@@ -17,6 +17,13 @@ type MemoryPatch = {
   created_at: string;
 };
 
+type ActivityEvent = {
+  id: string;
+  agent: string;
+  action: string;
+  time: string;
+};
+
 export function LLMWorkspace({ selectedProject, modelHealth }: { selectedProject: Project; modelHealth: ModelHealth }) {
   const [copied, setCopied] = useState("");
   const queryClient = useQueryClient();
@@ -29,6 +36,12 @@ export function LLMWorkspace({ selectedProject, modelHealth }: { selectedProject
       ),
   });
   const patches = patchesQuery.data ?? [];
+  const activityQuery = useQuery({
+    queryKey: ["activity", selectedProject.id],
+    queryFn: ({ signal }) =>
+      api<ActivityEvent[]>(`/api/activity?project_id=${encodeURIComponent(selectedProject.id)}`, { signal }),
+  });
+  const activity = activityQuery.data ?? [];
 
   async function approvePatch(id: string) {
     await api("/api/memory/apply", { method: "POST", body: JSON.stringify({ patch_id: id, approved: true }) });
@@ -149,6 +162,24 @@ Rules:
           <h2>Local model</h2>
           <AIBadge working={false} modelHealth={modelHealth} />
           <p>{modelHealth.message}</p>
+        </section>
+        <section className="llm-panel">
+          <h2>Actividad reciente</h2>
+          {activity.length === 0 ? (
+            <p>Sin actividad todavía.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {activity.slice(0, 12).map((event) => (
+                <div key={event.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 13 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 999, background: agentColor(event.agent), flex: "none", alignSelf: "center" }} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <strong style={{ fontWeight: 500 }}>{event.agent}</strong> {event.action}
+                  </span>
+                  <span className="mono" style={{ fontSize: 11, color: "var(--faint)", flex: "none" }}>{event.time}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>

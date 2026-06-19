@@ -45,6 +45,36 @@ export function MapWorkspace({
     () => (vectorMap?.edges ?? relationEdgesFromRows(relations)).filter((edge) => graphNodeMap.has(edge.from_id) && graphNodeMap.has(edge.to_id)),
     [vectorMap, relations, graphNodeMap],
   );
+  const [mapFilter, setMapFilter] = useState<string>("all");
+  const linkedIds = useMemo(() => {
+    const ids = new Set<string>();
+    graphEdges.forEach((edge) => {
+      ids.add(edge.from_id);
+      ids.add(edge.to_id);
+    });
+    return ids;
+  }, [graphEdges]);
+  const agentsPresent = useMemo(() => {
+    const seen: string[] = [];
+    graphNodes.forEach((node) => {
+      const agent = node.agent || "—";
+      if (!seen.includes(agent)) seen.push(agent);
+    });
+    return seen.slice(0, 6);
+  }, [graphNodes]);
+  const displayNodes = useMemo(() => {
+    if (mapFilter === "orphans") return graphNodes.filter((node) => !linkedIds.has(node.id));
+    if (mapFilter.startsWith("agent:")) {
+      const agent = mapFilter.slice(6);
+      return graphNodes.filter((node) => (node.agent || "—") === agent);
+    }
+    return graphNodes;
+  }, [graphNodes, mapFilter, linkedIds]);
+  const displayNodeIds = useMemo(() => new Set(displayNodes.map((node) => node.id)), [displayNodes]);
+  const displayEdges = useMemo(
+    () => graphEdges.filter((edge) => displayNodeIds.has(edge.from_id) && displayNodeIds.has(edge.to_id)),
+    [graphEdges, displayNodeIds],
+  );
   const selectedNote =
     graphNodes.find((note) => note.id === selectedNoteId) ?? graphNodes[0] ?? allNotes.find((note) => note.id === selectedNoteId);
   const selectedConnections = selectedNote ? connectedNotes(selectedNote.id, allNotes, relations) : [];
@@ -96,10 +126,46 @@ export function MapWorkspace({
         </div>
       </section>
 
+      <div
+        className="map-filter-bar"
+        style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "0 0 12px" }}
+      >
+        <span style={{ fontSize: 11, color: "var(--faint)", textTransform: "uppercase", letterSpacing: ".04em" }}>Filtro</span>
+        {[
+          { key: "all", label: "Todas", color: "" },
+          { key: "orphans", label: "Huérfanas", color: "" },
+          ...agentsPresent.map((agent) => ({ key: `agent:${agent}`, label: agent, color: agentHex(agent) })),
+        ].map((option) => {
+          const active = mapFilter === option.key;
+          return (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => setMapFilter(option.key)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12,
+                padding: "5px 11px",
+                borderRadius: 999,
+                cursor: "pointer",
+                border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                background: active ? "var(--accent-soft)" : "var(--panel)",
+                color: active ? "var(--accent)" : "var(--muted)",
+              }}
+            >
+              {option.color ? <span style={{ width: 8, height: 8, borderRadius: 999, background: option.color }} /> : null}
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="map-layout">
         <section className="map-canvas">
-          {graphNodes.length ? (
-            <ThreeVectorScene nodes={graphNodes} edges={graphEdges} selectedNoteId={selectedNote?.id ?? ""} onSelectNote={onSelectNote} />
+          {displayNodes.length ? (
+            <ThreeVectorScene nodes={displayNodes} edges={displayEdges} selectedNoteId={selectedNote?.id ?? ""} onSelectNote={onSelectNote} />
           ) : (
             <div className="empty-map">
                 <FileText size={18} />
