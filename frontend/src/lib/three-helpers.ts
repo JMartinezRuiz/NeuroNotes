@@ -4,15 +4,13 @@ import type { GraphNode, ThreeCluster, VectorEdge } from "../types";
 
 // three.js-dependent scene helpers, kept in their own module so `three` only
 // loads inside the lazy Map chunk (never the initial bundle).
-// Organic, force-directed layout: edges (manual relations + semantic proximity)
-// act as springs and every node repels every other, so PROXIMITY encodes
-// relatedness — related notes drift together into natural clusters instead of
-// sitting on a geometric ring. Seeded deterministically so it doesn't jump
-// between loads, then settled and frozen (no continuous motion).
+// Embedding-space layout: node positions come from the backend's PCA projection
+// of the note VECTORS (x/y/z), so distance in the map = distance in vector space —
+// how an LLM would "see" the notes near/far. NOT arbitrary. A light repulsion-only
+// pass (no edge springs) just declutters overlapping points so the cloud stays
+// breathable while preserving the embedding-space arrangement. Deterministic.
 export function buildThreeNodePositions(nodes: GraphNode[], edges: VectorEdge[]) {
   const count = nodes.length;
-  const indexById = new Map<string, number>();
-  nodes.forEach((node, i) => indexById.set(node.id, i));
 
   const connectionCounts = new Map<string, number>();
   edges.forEach((edge) => {
@@ -24,35 +22,28 @@ export function buildThreeNodePositions(nodes: GraphNode[], edges: VectorEdge[])
   const py = new Float64Array(count);
   const pz = new Float64Array(count);
   nodes.forEach((node, i) => {
-    const theta = hashUnit(`${node.id}-t`) * Math.PI * 2;
-    const phi = Math.acos(hashUnit(`${node.id}-u`) * 2 - 1);
-    const radius = 9 + hashUnit(`${node.id}-r`) * 7;
-    px[i] = radius * Math.sin(phi) * Math.cos(theta);
-    py[i] = radius * Math.cos(phi) * 0.62;
-    pz[i] = radius * Math.sin(phi) * Math.sin(theta);
+    if ("x" in node && typeof node.x === "number") {
+      px[i] = node.x * 14;
+      py[i] = node.y * 9;
+      pz[i] = node.z * 14;
+    } else {
+      const theta = hashUnit(`${node.id}-t`) * Math.PI * 2;
+      const phi = Math.acos(hashUnit(`${node.id}-u`) * 2 - 1);
+      const radius = 10 + hashUnit(`${node.id}-r`) * 6;
+      px[i] = radius * Math.sin(phi) * Math.cos(theta);
+      py[i] = radius * Math.cos(phi) * 0.6;
+      pz[i] = radius * Math.sin(phi) * Math.sin(theta);
+    }
   });
 
-  const links: Array<{ a: number; b: number; w: number }> = [];
-  edges.forEach((edge) => {
-    const a = indexById.get(edge.from_id);
-    const b = indexById.get(edge.to_id);
-    if (a === undefined || b === undefined || a === b) return;
-    links.push({ a, b, w: edge.source === "relation" ? 1 : Math.max(0.3, edge.score) });
-  });
-
-  const iterations = count > 320 ? 150 : 260;
-  const repulsion = 30;
-  const springLength = 5.5;
   const dx = new Float64Array(count);
   const dy = new Float64Array(count);
   const dz = new Float64Array(count);
-
-  for (let iter = 0; iter < iterations; iter += 1) {
-    const cooling = 1 - iter / iterations;
+  const relaxIterations = count > 320 ? 8 : 18;
+  for (let iter = 0; iter < relaxIterations; iter += 1) {
     dx.fill(0);
     dy.fill(0);
     dz.fill(0);
-
     for (let i = 0; i < count; i += 1) {
       for (let j = i + 1; j < count; j += 1) {
         let ex = px[i] - px[j];
@@ -64,7 +55,7 @@ export function buildThreeNodePositions(nodes: GraphNode[], edges: VectorEdge[])
           ex = hashUnit(`${i}-${j}`) - 0.5;
         }
         const dist = Math.sqrt(distSq);
-        const force = repulsion / distSq;
+        const force = 6 / distSq;
         const fx = (ex / dist) * force;
         const fy = (ey / dist) * force;
         const fz = (ez / dist) * force;
@@ -76,28 +67,9 @@ export function buildThreeNodePositions(nodes: GraphNode[], edges: VectorEdge[])
         dz[j] -= fz;
       }
     }
-
-    links.forEach((link) => {
-      const ex = px[link.a] - px[link.b];
-      const ey = py[link.a] - py[link.b];
-      const ez = pz[link.a] - pz[link.b];
-      const dist = Math.sqrt(ex * ex + ey * ey + ez * ez) || 0.01;
-      const force = ((dist - springLength) / dist) * 0.07 * link.w;
-      dx[link.a] -= ex * force;
-      dy[link.a] -= ey * force;
-      dz[link.a] -= ez * force;
-      dx[link.b] += ex * force;
-      dy[link.b] += ey * force;
-      dz[link.b] += ez * force;
-    });
-
-    const maxStep = 2.6 * cooling + 0.18;
     for (let i = 0; i < count; i += 1) {
-      dx[i] -= px[i] * 0.013;
-      dy[i] -= py[i] * 0.013;
-      dz[i] -= pz[i] * 0.013;
       const len = Math.sqrt(dx[i] * dx[i] + dy[i] * dy[i] + dz[i] * dz[i]) || 1;
-      const step = clamp(len, 0, maxStep);
+      const step = clamp(len, 0, 1.4);
       px[i] += (dx[i] / len) * step;
       py[i] += (dy[i] / len) * step;
       pz[i] += (dz[i] / len) * step;
@@ -106,7 +78,6 @@ export function buildThreeNodePositions(nodes: GraphNode[], edges: VectorEdge[])
 
   let maxExtent = 1;
   for (let i = 0; i < count; i += 1) {
-    py[i] *= 0.72;
     maxExtent = Math.max(maxExtent, Math.hypot(px[i], py[i], pz[i]));
   }
   const scale = 16 / maxExtent;

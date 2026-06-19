@@ -772,6 +772,59 @@ def project_embedding(vector: list[float]) -> tuple[float, float, float]:
   return (round(x / scale, 6), round(y / scale, 6), round(z / scale, 6))
 
 
+def pca_project_3d(vectors: list[list[float]]) -> list[tuple[float, float, float]]:
+  """Project note embedding vectors to 3D with PCA (power iteration, no deps) so
+  distance in the map reflects distance in vector space — how an LLM would "see"
+  the notes near/far. Deterministic and per-axis normalized for stable framing."""
+  count = len(vectors)
+  if count == 0:
+    return []
+  dim = len(vectors[0]) if vectors[0] else 0
+  if dim == 0 or count == 1:
+    return [(0.0, 0.0, 0.0) for _ in range(count)]
+
+  mean = [0.0] * dim
+  for vector in vectors:
+    for i in range(dim):
+      mean[i] += vector[i]
+  for i in range(dim):
+    mean[i] /= count
+  centered = [[vector[i] - mean[i] for i in range(dim)] for vector in vectors]
+
+  data = [row[:] for row in centered]
+  components: list[list[float]] = []
+  iterations = 40 if count <= 80 else 22
+  for axis in range(3):
+    component = [math.sin((i + 1) * (axis + 1) * 0.7) + 0.001 for i in range(dim)]
+    norm = math.sqrt(sum(value * value for value in component)) or 1.0
+    component = [value / norm for value in component]
+    for _ in range(iterations):
+      projected = [sum(data[r][i] * component[i] for i in range(dim)) for r in range(count)]
+      accum = [0.0] * dim
+      for r in range(count):
+        weight = projected[r]
+        row = data[r]
+        for i in range(dim):
+          accum[i] += row[i] * weight
+      norm = math.sqrt(sum(value * value for value in accum)) or 1.0
+      component = [value / norm for value in accum]
+    components.append(component)
+    for r in range(count):
+      score = sum(data[r][i] * component[i] for i in range(dim))
+      row = data[r]
+      for i in range(dim):
+        row[i] -= score * component[i]
+
+  coords = [[sum(centered[r][i] * components[axis][i] for i in range(dim)) for axis in range(3)] for r in range(count)]
+  for axis in range(3):
+    values = [coord[axis] for coord in coords]
+    low = min(values)
+    span = (max(values) - low) or 1.0
+    for coord in coords:
+      coord[axis] = (coord[axis] - low) / span * 2 - 1
+  return [(round(c[0], 5), round(c[1], 5), round(c[2], 5)) for c in coords]
+
+
 def upsert_note_vector(
   connection: sqlite3.Connection, row: sqlite3.Row, embedder: tuple[str, int, Any] | None = None
 ) -> dict[str, Any]:
@@ -989,7 +1042,13 @@ def vector_memory_map(
         }
       )
 
-  clean_nodes = [{key: value for key, value in node.items() if key != "vector"} for node in nodes]
+  projection = pca_project_3d([node["vector"] for node in nodes])
+  clean_nodes = []
+  for position, node in enumerate(nodes):
+    clean = {key: value for key, value in node.items() if key != "vector"}
+    if position < len(projection):
+      clean["x"], clean["y"], clean["z"] = projection[position]
+    clean_nodes.append(clean)
   return {
     "nodes": clean_nodes,
     "edges": relation_edges + semantic_edges[: max(80, len(nodes) * 2)],
