@@ -782,9 +782,10 @@ def pca_project_3d(vectors: list[list[float]]) -> list[tuple[float, float, float
   count = len(vectors)
   if count == 0:
     return []
-  dim = len(vectors[0]) if vectors[0] else 0
+  dim = max((len(vector) for vector in vectors), default=0)
   if dim == 0 or count == 1:
     return [(0.0, 0.0, 0.0) for _ in range(count)]
+  vectors = [vector if len(vector) == dim else vector + [0.0] * (dim - len(vector)) for vector in vectors]
 
   mean = [0.0] * dim
   for vector in vectors:
@@ -876,6 +877,22 @@ def upsert_note_vector(
   return vector_row_payload(row, vector_row)
 
 
+def read_or_embed_vector(
+  connection: sqlite3.Connection, row: sqlite3.Row, embedder: tuple[str, int, Any] | None = None
+) -> dict[str, Any]:
+  """Read a note's stored vector (whatever model) WITHOUT writing. Only embeds —
+  and writes — a note that has no vector for its current content, so map/search
+  GETs never trigger a re-embed storm or take a write lock on a read."""
+  fingerprint = source_hash(vector_source(row))
+  existing = connection.execute(
+    "SELECT * FROM note_vectors WHERE note_id = ? AND source_hash = ?",
+    (row["id"], fingerprint),
+  ).fetchone()
+  if existing is not None:
+    return vector_row_payload(row, existing)
+  return upsert_note_vector(connection, row, embedder)
+
+
 def vector_row_payload(note_row: sqlite3.Row, vector_row: sqlite3.Row) -> dict[str, Any]:
   return {
     "id": note_row["id"],
@@ -959,7 +976,7 @@ def semantic_search_notes(query: str, limit: int = 8, project_id: str | None = N
   query_terms = set(vector_tokens(query))
   with connect() as connection:
     rows = note_rows_for_vectors(connection, project_id=project_id)
-    payloads = [(row, upsert_note_vector(connection, row, embedder)) for row in rows]
+    payloads = [(row, read_or_embed_vector(connection, row, embedder)) for row in rows]
     connection.commit()
   is_neural = model_tag != VECTOR_MODEL
   lexical_weight = 0.3 if is_neural else 0.85
@@ -995,7 +1012,7 @@ def vector_memory_map(
   model_tag, dims_hint, _embed_fn = embedder
   with connect() as connection:
     rows = note_rows_for_vectors(connection, project_id=project_id, folder=folder, category=category)
-    nodes = [upsert_note_vector(connection, row, embedder) for row in rows]
+    nodes = [read_or_embed_vector(connection, row, embedder) for row in rows]
     connection.commit()
   relation_rows = list_relations(project_id)
 
@@ -1017,8 +1034,10 @@ def vector_memory_map(
   ]
 
   semantic_threshold = 0.55 if model_tag != VECTOR_MODEL else 0.18
+  # Above ~140 nodes the pairwise semantic edges are both slow (O(n^2)) and an
+  # illegible hairball; the PCA positions already convey proximity, so skip them.
   semantic_edges: list[dict[str, Any]] = []
-  for left_index, left in enumerate(nodes):
+  for left_index, left in enumerate(nodes if len(nodes) <= 140 else []):
     scores: list[tuple[float, str]] = []
     for right_index, right in enumerate(nodes):
       if left_index == right_index:
