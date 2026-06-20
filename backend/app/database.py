@@ -701,12 +701,15 @@ def fetch_remote_embedding(
         response.raise_for_status()
         vector = response.json()["data"][0]["embedding"]
       else:
-        response = client.post(f"{base}/api/embeddings", json={"model": model, "prompt": text})
+        # Modern Ollama embedding endpoint (/api/embed with `input` -> `embeddings`).
+        response = client.post(f"{base}/api/embed", json={"model": model, "input": text})
         response.raise_for_status()
         payload = response.json()
-        vector = payload.get("embedding")
-        if not vector and isinstance(payload.get("embeddings"), list):
+        vector = None
+        if isinstance(payload.get("embeddings"), list) and payload["embeddings"]:
           vector = payload["embeddings"][0]
+        elif isinstance(payload.get("embedding"), list):
+          vector = payload["embedding"]
       if not vector:
         return None
       return l2_normalize([float(value) for value in vector])
