@@ -117,7 +117,7 @@ export function MapWorkspace({
         <div className="map-stats">
           <strong>{graphNodes.length}</strong>
           <span>notes</span>
-          <strong>{vectorMap?.dimensions ?? 96}</strong>
+          <strong>{vectorMap?.dimensions ?? "—"}</strong>
           <span>dims</span>
           <button className="secondary-button map-refresh" type="button" onClick={() => loadVectorMap(true)} disabled={vectorLoading}>
             {vectorLoading ? <Loader2 size={15} /> : <RefreshCw size={15} />}
@@ -180,7 +180,7 @@ export function MapWorkspace({
             <span>
               <i className="legend-dot semantic" /> semantic
             </span>
-            <span>{vectorMap?.model ?? "local-hash-v1"}</span>
+            <span>{vectorMap?.model ?? "—"}</span>
           </div>
         </section>
 

@@ -149,8 +149,6 @@ export type VectorMap = {
 };
 
 export type GraphNode = (VectorNode | Note) & {
-  graphX: number;
-  graphY: number;
   linkCount: number;
 };
 

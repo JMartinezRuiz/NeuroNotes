@@ -112,36 +112,18 @@ export function relationEdgesFromRows(relations: Relation[]): VectorEdge[] {
     }));
 }
 
+// 3D positions come from the backend PCA projection (x/y/z) and are computed in
+// three-helpers.ts; here we only attach linkCount (used to size nodes in the scene).
 export function positionGraphNodes(items: Array<VectorNode | Note>): GraphNode[] {
-  const values = items.map((item, index) => {
-    const hasVectorPosition = "x" in item && typeof item.x === "number";
-    const fallbackAngle = (Math.PI * 2 * index) / Math.max(items.length, 1);
-    const rawX = hasVectorPosition ? item.x : Math.cos(fallbackAngle) * hashUnit(item.id);
-    const rawY = hasVectorPosition ? item.y : Math.sin(fallbackAngle) * hashUnit(item.title);
-    return { item, rawX, rawY };
-  });
-  const xs = values.map((value) => value.rawX);
-  const ys = values.map((value) => value.rawY);
-  const minX = Math.min(...xs, -1);
-  const maxX = Math.max(...xs, 1);
-  const minY = Math.min(...ys, -1);
-  const maxY = Math.max(...ys, 1);
-  const xRange = maxX - minX || 1;
-  const yRange = maxY - minY || 1;
   const linkCounts = new Map<string, number>();
   items.forEach((item) => {
     const sameCategory = items.filter((candidate) => candidate.category === item.category).length;
     linkCounts.set(item.id, sameCategory > 1 ? Math.min(5, sameCategory - 1) : 0);
   });
-  return values.map(({ item, rawX, rawY }, index) => {
-    const jitter = (hashUnit(`${item.id}-${index}`) - 0.5) * 18;
-    return {
-      ...item,
-      graphX: 70 + ((rawX - minX) / xRange) * 860 + jitter,
-      graphY: 60 + ((rawY - minY) / yRange) * 530 - jitter,
-      linkCount: linkCounts.get(item.id) ?? 0,
-    };
-  });
+  return items.map((item) => ({
+    ...item,
+    linkCount: linkCounts.get(item.id) ?? 0,
+  }));
 }
 
 export function hashUnit(value: string) {
