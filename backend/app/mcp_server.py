@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -29,7 +30,16 @@ from .database import (
   update_task as db_update_task,
 )
 
-mcp = FastMCP("neuronotes-2")
+# Base URL used to build citation links in ChatGPT search/fetch results.
+APP_URL = os.getenv("NEURONOTES_PUBLIC_URL", "http://localhost:5173")
+
+# Host/port matter only for the HTTP/SSE transport (used by ChatGPT). The
+# stdio transport (Claude/Codex local) ignores them.
+mcp = FastMCP(
+  "neuronotes-2",
+  host=os.getenv("NEURONOTES_MCP_HOST", "127.0.0.1"),
+  port=int(os.getenv("NEURONOTES_MCP_PORT", "8788")),
+)
 
 
 @mcp.tool()
@@ -300,6 +310,57 @@ def approve_memory_patch(patch_id: str) -> dict[str, Any]:
     return {"error": "invalid", "id": patch_id, "detail": str(error)}
 
 
+@mcp.tool()
+def search(query: str) -> dict[str, Any]:
+  """Search the Neuronotes brain by meaning and return matching notes.
+
+  ChatGPT connector / deep-research entry point. Returns {results: [{id, title, url}]}.
+  Use the returned id with the `fetch` tool to read the full note.
+  """
+  hits = db_vector_search(query, 10, None)
+  results = [
+    {
+      "id": hit["id"],
+      "title": hit.get("title") or "(sin título)",
+      "url": f"{APP_URL}/?note={hit['id']}",
+    }
+    for hit in hits
+  ]
+  return {"results": results}
+
+
+@mcp.tool()
+def fetch(id: str) -> dict[str, Any]:
+  """Fetch the full text of one note by id.
+
+  ChatGPT connector / deep-research entry point. Returns {id, title, text, url, metadata}.
+  """
+  note = get_note_by_id(id)
+  if note is None:
+    return {"id": id, "title": "(no encontrada)", "text": "", "url": "", "metadata": None}
+  return {
+    "id": note["id"],
+    "title": note.get("title") or "(sin título)",
+    "text": note.get("content") or "",
+    "url": f"{APP_URL}/?note={note['id']}",
+    "metadata": {
+      "project_id": note.get("project_id"),
+      "category": note.get("category"),
+      "folder": note.get("folder"),
+      "status": note.get("status"),
+      "agent": note.get("created_by_agent_id"),
+    },
+  }
+
+
 if __name__ == "__main__":
   init_database()
-  mcp.run()
+  # Default stdio (Claude/Codex local). Set NEURONOTES_MCP_TRANSPORT=sse for
+  # ChatGPT (remote): serves the SSE endpoint at /sse on NEURONOTES_MCP_PORT.
+  transport = os.getenv("NEURONOTES_MCP_TRANSPORT", "stdio").lower()
+  if transport == "sse":
+    mcp.run(transport="sse")
+  elif transport in ("http", "streamable-http"):
+    mcp.run(transport="streamable-http")
+  else:
+    mcp.run()

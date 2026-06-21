@@ -8,7 +8,8 @@
     "dev:frontend": "npm --prefix frontend run dev",
     "desktop": "npm run build && electron electron/main.cjs",
     "build": "npm --prefix frontend run build",
-    "mcp": "cd backend && ..\\.venv\\Scripts\\python -m app.mcp_server"
+    "mcp": "cd backend && ..\\.venv\\Scripts\\python -m app.mcp_server",
+    "mcp:http": "cd backend && set \"NEURONOTES_MCP_TRANSPORT=sse\" && ..\\.venv\\Scripts\\python -m app.mcp_server"
   },
   "devDependencies": {
     "concurrently": "^10.0.3",
