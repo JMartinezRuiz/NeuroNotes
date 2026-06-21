@@ -197,9 +197,16 @@ def init_database() -> None:
       """
     )
 
+    seeded = connection.execute("SELECT 1 FROM app_settings WHERE key = 'seeded'").fetchone() is not None
     count = connection.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
-    if count == 0:
+    if count == 0 and not seeded:
       seed_database(connection)
+    # Record that the one-time demo seed has run, so emptying the DB later
+    # (e.g. deleting every project) never re-creates the demo content.
+    connection.execute(
+      "INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES ('seeded', '1', ?)",
+      (utc_now(),),
+    )
     ensure_note_metadata_columns(connection)
     ensure_seed_relations(connection)
     ensure_default_settings(connection)
