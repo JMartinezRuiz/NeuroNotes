@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import socket
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -195,6 +196,38 @@ async def health() -> dict[str, str]:
 @app.get("/api/health/model")
 async def model_health() -> dict[str, Any]:
   return await get_model_health()
+
+
+@app.get("/api/mcp/status")
+def mcp_status() -> dict[str, Any]:
+  """Status of the remote (HTTP/SSE) MCP server used by ChatGPT — is it up, where, how to connect."""
+  host = os.getenv("NEURONOTES_MCP_HOST", "127.0.0.1")
+  port = int(os.getenv("NEURONOTES_MCP_PORT", "8788"))
+  running = False
+  try:
+    with socket.create_connection((host, port), timeout=0.4):
+      running = True
+  except OSError:
+    running = False
+  tools: int | None = None
+  try:
+    import asyncio
+
+    from .mcp_server import mcp as _mcp
+
+    tools = len(asyncio.run(_mcp.list_tools()))
+  except Exception:
+    tools = None
+  return {
+    "running": running,
+    "transport": "sse",
+    "host": host,
+    "port": port,
+    "endpoint": f"http://{host}:{port}/sse",
+    "auth": "none",
+    "tools": tools,
+    "start_command": "npm run mcp:http",
+  }
 
 
 @app.get("/api/dashboard")

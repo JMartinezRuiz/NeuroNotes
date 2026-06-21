@@ -24,6 +24,17 @@ type ActivityEvent = {
   time: string;
 };
 
+type McpStatus = {
+  running: boolean;
+  transport: string;
+  host: string;
+  port: number;
+  endpoint: string;
+  auth: string;
+  tools: number | null;
+  start_command: string;
+};
+
 export function LLMWorkspace({ selectedProject, modelHealth }: { selectedProject: Project; modelHealth: ModelHealth }) {
   const [copied, setCopied] = useState("");
   const queryClient = useQueryClient();
@@ -42,6 +53,12 @@ export function LLMWorkspace({ selectedProject, modelHealth }: { selectedProject
       api<ActivityEvent[]>(`/api/activity?project_id=${encodeURIComponent(selectedProject.id)}`, { signal }),
   });
   const activity = activityQuery.data ?? [];
+  const mcpQuery = useQuery({
+    queryKey: ["mcp-status"],
+    queryFn: ({ signal }) => api<McpStatus>("/api/mcp/status", { signal }),
+    refetchInterval: 5000,
+  });
+  const mcp = mcpQuery.data;
 
   async function approvePatch(id: string) {
     await api("/api/memory/apply", { method: "POST", body: JSON.stringify({ patch_id: id, approved: true }) });
@@ -65,7 +82,8 @@ Rules:
 - Create tasks from actionable work.
 - Keep private data local unless the user exports it.`;
   const rows = [
-    ["MCP", "npm run mcp"],
+    ["MCP (local)", "npm run mcp"],
+    ["MCP (ChatGPT/SSE)", "npm run mcp:http"],
     ["Search", "GET /api/search?query=..."],
     ["All notes", "GET /api/notes"],
     ["Folder", "GET /api/notes?folder=..."],
@@ -90,6 +108,50 @@ Rules:
         <span>Agent-neutral access</span>
         <h1>One brain for any LLM</h1>
         <p>Codex, Claude, Qwen, ChatGPT or another client can read, write, link and classify shared memory.</p>
+      </section>
+      <section className="llm-panel">
+        <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          Servidor MCP · ChatGPT
+          <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500 }}>
+            <span
+              style={{
+                width: 9,
+                height: 9,
+                borderRadius: 999,
+                background: mcp?.running ? "#1D9E75" : "var(--faint)",
+                boxShadow: mcp?.running ? "0 0 0 3px rgba(29,158,117,0.18)" : "none",
+              }}
+            />
+            {mcpQuery.isLoading ? "…" : mcp?.running ? "Activo" : "Apagado"}
+          </span>
+        </h2>
+        {mcp?.running ? (
+          <>
+            <button className="copy-row" type="button" onClick={() => copy(mcp.endpoint)}>
+              <span>Endpoint local</span>
+              <code>{mcp.endpoint}</code>
+              {copied === mcp.endpoint ? <Check size={16} /> : <Copy size={16} />}
+            </button>
+            <p style={{ fontSize: 13, color: "var(--muted)", margin: "10px 0 0" }}>
+              Transporte SSE · Auth <strong>Ninguna</strong> · {mcp.tools ?? "?"} herramientas (incluye <code>search</code> y <code>fetch</code>).
+            </p>
+            <p style={{ fontSize: 13, color: "var(--muted)", margin: "6px 0 0" }}>
+              Para ChatGPT: expón el puerto {mcp.port} con un túnel HTTPS (cloudflared/ngrok) y pega la URL acabada en <code>/sse</code>. En el campo
+              de autenticación elige <strong>No authentication</strong>.
+            </p>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 10px" }}>
+              El servidor MCP remoto no está corriendo. Arráncalo para conectarlo a ChatGPT:
+            </p>
+            <button className="copy-row" type="button" onClick={() => copy(mcp?.start_command ?? "npm run mcp:http")}>
+              <span>Arrancar</span>
+              <code>{mcp?.start_command ?? "npm run mcp:http"}</code>
+              {copied === (mcp?.start_command ?? "npm run mcp:http") ? <Check size={16} /> : <Copy size={16} />}
+            </button>
+          </>
+        )}
       </section>
       <section className="llm-panel">
         <h2>Memory review — {patches.length} pendiente{patches.length === 1 ? "" : "s"}</h2>
