@@ -28,6 +28,8 @@ type AiProposal = {
   category?: string;
   tasks?: Array<{ title: string }>;
   related_note_ids?: string[];
+  local_fallback?: boolean;
+  used_model?: string;
 };
 
 export function NotesWorkspace({
@@ -489,7 +491,24 @@ export function NotesWorkspace({
               gap: 8,
             }}
           >
-            <strong style={{ fontSize: 13 }}>Propuesta de IA — revisar antes de aplicar</strong>
+            <strong style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+              Propuesta de IA — revisar antes de aplicar
+              <span
+                title={aiProposal.local_fallback ? "El modelo local no respondió; propuesta generada con la heurística offline." : "Generado por el modelo local."}
+                style={{
+                  marginLeft: "auto",
+                  fontSize: 10.5,
+                  fontWeight: 500,
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                  border: "1px solid var(--border-strong)",
+                  color: "var(--muted)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {aiProposal.local_fallback ? "Modo offline (sin modelo)" : aiProposal.used_model || "modelo local"}
+              </span>
+            </strong>
             <span style={{ fontSize: 11, color: "var(--muted)" }}>
               {aiProposal.type || draft.type} · {aiProposal.category || draft.category}
               {aiProposal.tasks?.length ? ` · ${aiProposal.tasks.length} tarea(s)` : ""}

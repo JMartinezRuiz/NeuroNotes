@@ -61,19 +61,9 @@ export const modes: Array<{ id: ViewMode; label: string; icon: typeof FileText }
 
 export const aiModes: Array<{ id: AiMode; label: string; goal: string }> = [
   {
-    id: "grammar",
-    label: "Grammar",
-    goal: "Only correct grammar, spelling, punctuation and casing. Preserve the note structure.",
-  },
-  {
-    id: "clean",
-    label: "Clean",
-    goal: "Turn this messy capture into a clean note with concise headings or bullets. Do not add facts.",
-  },
-  {
-    id: "format",
-    label: "Format",
-    goal: "Format and polish this quick note. Correct phrasing and structure without adding information.",
+    id: "tidy",
+    label: "Tidy",
+    goal: "Tidy this note: fix grammar, spelling and punctuation, and turn messy capture into clean prose with concise headings or bullets. Do NOT add facts.",
   },
   {
     id: "categorize",

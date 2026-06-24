@@ -118,8 +118,8 @@ Rules:
                 width: 9,
                 height: 9,
                 borderRadius: 999,
-                background: mcp?.running ? "#1D9E75" : "var(--faint)",
-                boxShadow: mcp?.running ? "0 0 0 3px rgba(29,158,117,0.18)" : "none",
+                background: mcp?.running ? "var(--accent)" : "var(--faint)",
+                boxShadow: mcp?.running ? "0 0 0 3px var(--accent-soft)" : "none",
               }}
             />
             {mcpQuery.isLoading ? "…" : mcp?.running ? "Activo" : "Apagado"}
@@ -207,23 +207,54 @@ Rules:
       </section>
       <div className="llm-grid">
         <section className="llm-panel">
-          <h2>Connect</h2>
-          {rows.map(([label, value]) => (
+          <h2>Conectar</h2>
+          {rows.slice(0, 2).map(([label, value]) => (
             <button className="copy-row" type="button" key={label} onClick={() => copy(value)}>
               <span>{label}</span>
               <code>{value}</code>
               {copied === value ? <Check size={16} /> : <Copy size={16} />}
             </button>
           ))}
+          <details style={{ marginTop: 8 }}>
+            <summary style={{ cursor: "pointer", fontSize: 13, color: "var(--muted)", padding: "6px 0" }}>
+              API REST (avanzado)
+            </summary>
+            <div style={{ marginTop: 6 }}>
+              {rows.slice(2).map(([label, value]) => (
+                <button className="copy-row" type="button" key={label} onClick={() => copy(value)}>
+                  <span>{label}</span>
+                  <code>{value}</code>
+                  {copied === value ? <Check size={16} /> : <Copy size={16} />}
+                </button>
+              ))}
+            </div>
+          </details>
         </section>
         <section className="llm-panel">
           <h2>Agent prompt</h2>
           <pre>{prompt}</pre>
         </section>
         <section className="llm-panel status-panel">
-          <h2>Local model</h2>
+          <h2>Modelo local</h2>
           <AIBadge working={false} modelHealth={modelHealth} />
-          <p>{modelHealth.message}</p>
+          <p style={{ margin: "4px 0 0" }}>{modelHealth.message}</p>
+          <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "8px 0 0" }}>
+            Todo se ejecuta en tu equipo vía {modelHealth.provider ?? "Ollama"} ({modelHealth.base_url}). Ningún texto sale de este dispositivo.
+          </p>
+          {!modelHealth.online ? (
+            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+              <button className="copy-row" type="button" onClick={() => copy("ollama serve")}>
+                <span>Arrancar</span>
+                <code>ollama serve</code>
+                {copied === "ollama serve" ? <Check size={16} /> : <Copy size={16} />}
+              </button>
+              <button className="copy-row" type="button" onClick={() => copy(`ollama pull ${modelHealth.model}`)}>
+                <span>Instalar modelo</span>
+                <code>ollama pull {modelHealth.model}</code>
+                {copied === `ollama pull ${modelHealth.model}` ? <Check size={16} /> : <Copy size={16} />}
+              </button>
+            </div>
+          ) : null}
         </section>
         <section className="llm-panel">
           <h2>Actividad reciente</h2>

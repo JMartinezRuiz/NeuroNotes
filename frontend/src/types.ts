@@ -3,7 +3,7 @@ import type * as THREE from "three";
 export type ViewMode = "notes" | "map" | "llm";
 export type ThemeMode = "light" | "dark";
 export type ScopeType = "all" | "project" | "folder" | "category" | "loose";
-export type AiMode = "grammar" | "clean" | "format" | "categorize";
+export type AiMode = "tidy" | "categorize";
 export type SidebarSectionId = "library" | "folders" | "categories" | "projects";
 
 export type LibraryScope = {

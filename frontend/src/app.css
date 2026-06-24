@@ -17,12 +17,13 @@
   --blue-soft: #e5e8fa;
   --warning: #b45309;
 
-  /* Agent provenance colors (light) */
-  --agent-usuario: #c9663f;
-  --agent-claude: #b5793a;
-  --agent-codex: #5b6ad0;
-  --agent-qwen: #7a4fb8;
-  --agent-chatgpt: #2e9e6e;
+  /* Agent provenance colors — one canonical Synapse palette, shared by both
+     themes and by AGENT_HEX (lib/api.ts) so note gutters match the 3D map. */
+  --agent-usuario: #e8895e;
+  --agent-claude: #e0a33b;
+  --agent-codex: #8c99f0;
+  --agent-qwen: #b388e8;
+  --agent-chatgpt: #5dcaa5;
 
   /* Scales */
   --radius: 10px;
@@ -737,7 +738,17 @@ p {
 .empty-list strong,
 .empty-map strong {
   color: var(--text);
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* Keep the compact empties (tasks, memory panels) small and sans. */
+.empty-list.small strong {
+  font-family: inherit;
   font-size: 13px;
+  font-weight: 600;
 }
 
 .editor-surface {
@@ -1286,7 +1297,7 @@ p {
 
 .three-node-label:hover,
 .three-node-label.selected {
-  border-color: rgba(246, 211, 101, 0.64);
+  border-color: var(--accent);
   background: rgba(18, 20, 25, 0.86);
 }
 
