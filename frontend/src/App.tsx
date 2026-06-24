@@ -109,7 +109,7 @@ function App() {
     const next = new URLSearchParams();
     next.set("mode", mode);
     next.set("scope", `${scope.type}:${scope.id}`);
-    if (selectedNoteId) next.set("note", selectedNoteId);
+    if (selectedNoteId && selectedNoteId !== "new") next.set("note", selectedNoteId);
     setSearchParams(next, { replace: true });
   }, [mode, scope.type, scope.id, selectedNoteId, setSearchParams]);
 
@@ -117,13 +117,23 @@ function App() {
   useEffect(() => {
     const data = workspace.data;
     if (!data) return;
+    const resolvedId = data.dashboard.project.id;
+    // A project scope can point at a missing/stale id (old deep link, deleted
+    // project); the backend resolved a real project, so reconcile the scope to it
+    // — otherwise the note list and new-note capture target a dead id.
+    if (scope.type === "project" && scope.id !== resolvedId) {
+      setScope({ type: "project", id: resolvedId, label: data.dashboard.project.name });
+      setSelectedProjectId(resolvedId);
+      return;
+    }
     setSelectedProjectId((prev) =>
-      scope.type === "project" ? data.dashboard.project.id : data.notes[0]?.project_id ?? prev,
+      scope.type === "project" ? resolvedId : data.notes[0]?.project_id ?? prev,
     );
-  }, [workspace.data, scope.type]);
+  }, [workspace.data, scope.type, scope.id]);
 
   // Keep a valid note selected within the current scope.
   useEffect(() => {
+    if (selectedNoteId === "new") return; // composing a brand-new note — don't auto-pick
     if (!notes.length) {
       if (selectedNoteId) setSelectedNoteId("");
       return;

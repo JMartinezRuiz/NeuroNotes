@@ -55,14 +55,14 @@ def vector_search(query: str, limit: int = 8, project_id: str | None = None) -> 
 
 
 @mcp.tool()
-def list_notes(project_id: str = "agent-memory-hub") -> list[dict[str, Any]]:
+def list_notes(project_id: str = "inbox") -> list[dict[str, Any]]:
   """List notes for a project."""
   return db_list_notes(project_id)
 
 
 @mcp.tool()
 def get_project_context(
-  project_id: str = "agent-memory-hub",
+  project_id: str = "inbox",
   target_agent: str = "Claude",
   goal: str = "Use the current project memory",
   token_budget: int = 3000,
@@ -133,7 +133,7 @@ def update_note(
 
 
 @mcp.tool()
-def list_tasks(project_id: str = "agent-memory-hub") -> list[dict[str, Any]]:
+def list_tasks(project_id: str = "inbox") -> list[dict[str, Any]]:
   """List project tasks."""
   return db_list_tasks(project_id)
 
@@ -179,7 +179,7 @@ def update_task(
 
 
 @mcp.tool()
-def list_relations(project_id: str = "agent-memory-hub") -> list[dict[str, Any]]:
+def list_relations(project_id: str = "inbox") -> list[dict[str, Any]]:
   """List active relations between notes, tasks, and decisions."""
   return db_list_relations(project_id)
 

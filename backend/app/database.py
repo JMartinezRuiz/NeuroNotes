@@ -1119,6 +1119,12 @@ def create_note(data: dict[str, Any]) -> dict[str, Any]:
     if agent is None:
       agent_id = "user"
       agent = connection.execute("SELECT color FROM agents WHERE id = 'user'").fetchone()
+    # Repoint a missing/stale project_id (e.g. a stale deep-link scope) to a real
+    # project so capture never fails the FK constraint.
+    if connection.execute("SELECT 1 FROM projects WHERE id = ?", (project_id,)).fetchone() is None:
+      fallback_project = connection.execute("SELECT id FROM projects ORDER BY created_at LIMIT 1").fetchone()
+      if fallback_project is not None:
+        project_id = fallback_project["id"]
     connection.execute(
       """
       INSERT INTO notes (id, project_id, title, content, type, status, folder, category, created_by_agent_id, color, token_count, created_at)
@@ -1917,6 +1923,10 @@ def get_project_context(
   token_budget: int = 2500,
 ) -> str:
   dashboard = get_dashboard(project_id)
+  # get_project may have resolved a different (fallback) project than requested;
+  # retrieve vectors for the project the dashboard actually returned so the pack
+  # is internally consistent.
+  project_id = dashboard["project"]["id"]
   vector_limit = max(4, min(12, token_budget // 650))
   vector_hits = semantic_search_notes(goal or dashboard["project"]["summary"], limit=vector_limit, project_id=project_id)
   decisions = "\n".join(f"- {decision['text']}" for decision in dashboard["decisions"] if decision["status"] != "superseded")

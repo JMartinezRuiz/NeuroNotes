@@ -170,8 +170,8 @@ class RelationRequest(BaseModel):
 
 class ImproveNoteRequest(BaseModel):
   agent_id: str = "qwen"
-  mode: str = "format"
-  goal: str = "Format and polish this quick note without adding new information."
+  mode: str = "tidy"
+  goal: str = "Tidy this quick note without adding new information."
   preview: bool = False
 
 
@@ -312,11 +312,10 @@ async def improve_note_endpoint(note_id: str, request: ImproveNoteRequest) -> di
   existing_notes = list_notes()
   folders = sorted({item.get("folder", "") for item in existing_notes if item.get("folder")})
   categories = sorted({item.get("category", "General") for item in existing_notes if item.get("category")})
-  mode = request.mode if request.mode in {"format", "grammar", "clean", "categorize"} else "format"
+  # "tidy" merges the old grammar/clean/format intents; "categorize" assigns metadata.
+  mode = request.mode if request.mode in {"tidy", "categorize"} else "tidy"
   mode_rules = {
-    "format": "Improve formatting, casing, punctuation and scannability. Do not add new information.",
-    "grammar": "Only correct grammar, spelling, punctuation and casing. Preserve structure and length.",
-    "clean": "Turn the quick note into a clean version with concise headings or bullets when useful. Do not invent facts.",
+    "tidy": "Fix grammar, spelling, punctuation and casing, and turn messy capture into clean prose with concise headings or bullets when useful. Do not add new information.",
     "categorize": "Prioritize project_id, folder, category and type assignment. Keep content almost unchanged except obvious typos.",
   }[mode]
   system_prompt = """

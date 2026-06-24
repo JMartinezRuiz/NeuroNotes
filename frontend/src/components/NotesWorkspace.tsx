@@ -69,6 +69,7 @@ export function NotesWorkspace({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [saveSignal, setSaveSignal] = useState(0);
   const [activeAiMode, setActiveAiMode] = useState<AiMode | "">("");
   const [aiProposal, setAiProposal] = useState<AiProposal | null>(null);
   const [editorMode, setEditorMode] = useState<"write" | "preview">("write");
@@ -175,6 +176,9 @@ export function NotesWorkspace({
     } finally {
       inFlightRef.current = false;
       if (!silent) setSaving(false);
+      // Re-evaluate autosave once a save settles, so a trailing burst of edits
+      // that arrived during an in-flight save still gets flushed.
+      setSaveSignal((value) => value + 1);
     }
   }
 
@@ -188,7 +192,7 @@ export function NotesWorkspace({
       void saveNote({ silent: true });
     }, 800);
     return () => window.clearTimeout(handle);
-  }, [dirty, saveError, draft.id, draft.title, draft.content, draft.folder, draft.category, draft.type, draft.status, draft.project_id]);
+  }, [dirty, saveError, saveSignal, draft.id, draft.title, draft.content, draft.folder, draft.category, draft.type, draft.status, draft.project_id]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -248,7 +252,7 @@ export function NotesWorkspace({
   }
 
   function newNote() {
-    setSelectedNoteId("");
+    setSelectedNoteId("new"); // sentinel: composing — App won't auto-pick notes[0]
     setDraft(newDraftForScope(scope, selectedProject));
     loadedNoteIdRef.current = "";
     setDirty(false);
