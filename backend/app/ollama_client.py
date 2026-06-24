@@ -49,7 +49,7 @@ async def get_model_health() -> dict[str, Any]:
       "message": "Endpoint local no responde. Revisa Ollama/LM Studio y la configuracion.",
     }
 
-  has_model = model in names or not names
+  has_model = model in names
   return {
     "online": has_model,
     "provider": provider,

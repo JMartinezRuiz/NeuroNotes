@@ -9,13 +9,16 @@ import type {
   ViewMode,
 } from "../types";
 
+// Neutral default that mirrors the backend's guaranteed starter project (id "inbox").
+// Used as the pre-load scope and as the fallback when the API is unreachable —
+// never demo content, so a fresh vault opens clean.
 export const fallbackProject: Project = {
-  id: "agent-memory-hub",
-  name: "Agent Memory Hub",
-  goal: "Crear una app local-first donde humanos y agentes compartan memoria.",
-  status: "MVP",
-  summary: "Single brain local para notas, tareas, relaciones y contexto de LLMs.",
-  tags: ["single-brain", "LLM", "local-first"],
+  id: "inbox",
+  name: "Notas",
+  goal: "",
+  status: "active",
+  summary: "",
+  tags: [],
 };
 
 export const fallbackDashboard: Dashboard = {

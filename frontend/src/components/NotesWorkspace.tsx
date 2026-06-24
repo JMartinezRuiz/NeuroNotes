@@ -7,7 +7,6 @@ import {
   Image as ImageIcon,
   Link,
   Loader2,
-  Network,
   Pencil,
   Plus,
   Save,
@@ -17,7 +16,7 @@ import {
 import { api, agentColor } from "../lib/api";
 import { aiModes, emptyDraft } from "../lib/constants";
 import { estimateTokens, newDraftForScope, projectName, readFileAsDataUrl, scopeDescriptor } from "../lib/helpers";
-import type { AiMode, CountItem, LibraryScope, Note, Project, Relation, Task, ViewMode } from "../types";
+import type { AiMode, CountItem, LibraryScope, Note, Project, Relation, Task } from "../types";
 import { MarkdownPreview } from "./MarkdownPreview";
 
 type AiProposal = {
@@ -43,7 +42,6 @@ export function NotesWorkspace({
   relations,
   selectedNoteId,
   setSelectedNoteId,
-  setMode,
   refresh,
   openNoteInProject,
   setAiWorking,
@@ -59,7 +57,6 @@ export function NotesWorkspace({
   relations: Relation[];
   selectedNoteId: string;
   setSelectedNoteId: (noteId: string) => void;
-  setMode: (mode: ViewMode) => void;
   refresh: () => Promise<void>;
   openNoteInProject: (note: Note) => Promise<void>;
   setAiWorking: (working: boolean) => void;
@@ -74,13 +71,22 @@ export function NotesWorkspace({
   const [aiProposal, setAiProposal] = useState<AiProposal | null>(null);
   const [editorMode, setEditorMode] = useState<"write" | "preview">("write");
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const titleRef = useRef<HTMLInputElement | null>(null);
   const loadedNoteIdRef = useRef<string>("");
   const scopeKeyRef = useRef<string>("");
+  const inFlightRef = useRef(false);
 
   function editDraft(patch: Partial<Note>) {
     setDraft((current) => ({ ...current, ...patch }));
     setDirty(true);
+    // Re-arm autosave after a previous failure once the user keeps editing.
+    if (saveError) setSaveError("");
   }
+
+  // Focus the title for a fresh draft so capture starts with the keyboard.
+  useEffect(() => {
+    if (!selectedNoteId) titleRef.current?.focus();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const scopeKey = `${scope.type}:${scope.id}:${selectedProject.id}`;
@@ -125,6 +131,11 @@ export function NotesWorkspace({
 
   async function saveNote(opts?: { silent?: boolean }): Promise<Note | undefined> {
     const silent = opts?.silent === true;
+    // Never stack a silent autosave on an in-flight save — that is how a brand-new
+    // (id-less) note could be POSTed twice and duplicated.
+    if (silent && inFlightRef.current) return undefined;
+    inFlightRef.current = true;
+    const wasNew = !draft.id;
     if (!silent) setSaving(true);
     setDirty(false);
     const payload = {
@@ -145,7 +156,11 @@ export function NotesWorkspace({
       setSaveError("");
       // Silent autosave must NOT overwrite the live draft or trigger a refresh:
       // the user may have typed more characters while the request was in flight.
-      if (!silent) {
+      if (silent) {
+        // Adopt the new id WITHOUT clobbering in-flight keystrokes (merge only the
+        // id) so the next autosave PUTs instead of creating a duplicate note.
+        if (wasNew) setDraft((current) => (current.id ? current : { ...current, id: note.id }));
+      } else {
         setDraft(note);
         setSelectedNoteId(note.id);
         await refresh();
@@ -156,17 +171,22 @@ export function NotesWorkspace({
       setSaveError(error instanceof Error ? error.message : "No se pudo guardar la nota.");
       return undefined;
     } finally {
+      inFlightRef.current = false;
       if (!silent) setSaving(false);
     }
   }
 
   useEffect(() => {
-    if (!dirty || !draft.id) return;
+    // Autosave on a debounce. A brand-new (id-less) note autosaves once it has
+    // real content (never persist an empty draft); after a failed save we pause
+    // until the next edit (editDraft clears saveError) to avoid a retry storm.
+    if (!dirty || saveError) return;
+    if (!draft.id && !(draft.title?.trim() || draft.content?.trim())) return;
     const handle = window.setTimeout(() => {
       void saveNote({ silent: true });
     }, 800);
     return () => window.clearTimeout(handle);
-  }, [dirty, draft.id, draft.title, draft.content, draft.folder, draft.category, draft.type, draft.status, draft.project_id]);
+  }, [dirty, saveError, draft.id, draft.title, draft.content, draft.folder, draft.category, draft.type, draft.status, draft.project_id]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -232,6 +252,7 @@ export function NotesWorkspace({
     setDirty(false);
     setSaveError("");
     setEditorMode("write");
+    window.setTimeout(() => titleRef.current?.focus(), 0);
   }
 
   async function deleteNote() {
@@ -352,8 +373,16 @@ export function NotesWorkspace({
           ) : (
             <div className="empty-list">
               <FileText size={18} />
-              <strong>No notes here yet</strong>
-              <p>Create a note or use another folder/category from the sidebar.</p>
+              <strong>{allNotes.length === 0 ? "Write your first note" : "No notes here yet"}</strong>
+              <p>
+                {allNotes.length === 0
+                  ? "Just start typing — it autosaves. Organize later."
+                  : "Create a note or pick another folder/category from the sidebar."}
+              </p>
+              <button className="primary-button" type="button" onClick={newNote} style={{ marginTop: 4 }}>
+                <Plus size={16} />
+                New note
+              </button>
             </div>
           )}
         </div>
@@ -422,10 +451,6 @@ export function NotesWorkspace({
             </button>
             <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={insertImage} />
           </div>
-          <button className="secondary-button toolbar-command" type="button" onClick={() => setMode("map")}>
-            <Network size={16} />
-            Map
-          </button>
           <datalist id="folder-options">
             {folders.map((folder) => (
               <option key={folder.id} value={folder.label} />
@@ -439,6 +464,7 @@ export function NotesWorkspace({
         </div>
 
         <input
+          ref={titleRef}
           className="title-input"
           placeholder="Untitled"
           value={draft.title || ""}

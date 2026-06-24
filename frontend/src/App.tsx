@@ -234,7 +234,6 @@ function App() {
             relations={relations}
             selectedNoteId={selectedNoteId}
             setSelectedNoteId={setSelectedNoteId}
-            setMode={setMode}
             refresh={refresh}
             openNoteInProject={openNoteInProject}
             setAiWorking={setAiWorking}

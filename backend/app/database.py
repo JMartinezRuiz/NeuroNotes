@@ -210,6 +210,7 @@ def init_database() -> None:
     ensure_note_metadata_columns(connection)
     ensure_seed_relations(connection)
     ensure_default_settings(connection)
+    ensure_default_project(connection)
     connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     connection.commit()
   _DB_INITIALIZED = True
@@ -392,6 +393,22 @@ def ensure_seed_relations(connection: sqlite3.Connection) -> None:
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """,
     relations,
+  )
+
+
+def ensure_default_project(connection: sqlite3.Connection) -> None:
+  # Notes carry a FOREIGN KEY to projects, so the app must always have at least
+  # one real project. On a fresh / emptied vault, create a single neutral home
+  # project (never demo content) so the dashboard, sidebar and capture all work.
+  count = connection.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
+  if count:
+    return
+  connection.execute(
+    """
+    INSERT INTO projects (id, name, goal, status, canonical_summary, tags, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """,
+    ("inbox", "Notas", "", "active", "", json.dumps([]), utc_now()),
   )
 
 
@@ -1755,9 +1772,12 @@ def update_settings(data: dict[str, Any]) -> dict[str, str]:
 
 
 def get_project(connection: sqlite3.Connection, project_id: str | None) -> dict[str, Any]:
+  row = None
   if project_id:
     row = connection.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
-  else:
+  # Fall back to the first project when the requested id is missing (stale scope,
+  # deleted project, or the neutral default) so the dashboard never 404s.
+  if row is None:
     row = connection.execute("SELECT * FROM projects ORDER BY created_at LIMIT 1").fetchone()
 
   if row is None:
