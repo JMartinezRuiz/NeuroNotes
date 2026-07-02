@@ -19,7 +19,7 @@ vector (embeddings locales) y de ahí se deriva todo:
 
 - Frontend: React 19 + Vite + TypeScript (+ three.js para el mapa, lazy)
 - Backend: FastAPI + SQLite (3 tablas: `notes`, `note_vectors`, `app_settings`)
-- Embeddings: `nomic-embed-text` (768d) vía Ollama, con fallback hash offline
+- Embeddings: `bge-m3` (1024d, multilingüe) vía Ollama, con fallback hash offline
 - Chat local: `qwen3:4b` (opcional — todo funciona sin él)
 - Escritorio: Electron · Agentes: MCP (`backend/app/mcp_server.py`)
 
@@ -33,7 +33,7 @@ npm run mcp:http   # MCP SSE en :8788 (ChatGPT — túnel HTTPS + /sse)
 ```
 
 Requisitos: Python 3.12 (`.venv` en la raíz), Node 20+, y [Ollama](https://ollama.com)
-con `ollama pull nomic-embed-text` (y opcionalmente `ollama pull qwen3:4b`).
+con `ollama pull bge-m3` (y opcionalmente `ollama pull qwen3:4b` para respuestas y etiquetas IA).
 
 ## API
 

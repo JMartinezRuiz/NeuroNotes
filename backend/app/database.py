@@ -111,7 +111,7 @@ def init_database() -> None:
       "model_provider": os.getenv("MODEL_PROVIDER", "ollama"),
       "model_base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
       "model_name": os.getenv("QWEN_MODEL", "qwen3:4b"),
-      "embedding_model": os.getenv("NEURONOTES_EMBED_MODEL", "nomic-embed-text"),
+      "embedding_model": os.getenv("NEURONOTES_EMBED_MODEL", "bge-m3"),
       "privacy_mode": "local_first",
     }
     now = utc_now()
@@ -601,8 +601,21 @@ def search_notes(query: str, limit: int = 12) -> list[dict[str, Any]]:
   return _scored_notes(query, limit)
 
 
+def _mean_std(values: list[float]) -> tuple[float, float]:
+  if not values:
+    return (0.0, 0.0)
+  mean = sum(values) / len(values)
+  variance = sum((value - mean) ** 2 for value in values) / len(values)
+  return (mean, math.sqrt(variance))
+
+
 def related_notes(note_id: str, limit: int = 5) -> list[dict[str, Any]]:
-  """The AI-first replacement for manual links: nearest notes in embedding space."""
+  """The AI-first replacement for manual links: nearest notes in embedding space.
+
+  Uses a RELATIVE threshold (mean + 0.75·std of this note's score distribution)
+  instead of an absolute one, so 'close' adapts to the embedding model and to
+  the corpus — short same-language notes have a high noise floor that would
+  drown any fixed cutoff."""
   init_database()
   embedder = resolve_embedder()
   with connect() as connection:
@@ -623,6 +636,13 @@ def related_notes(note_id: str, limit: int = 5) -> list[dict[str, Any]]:
     item["score"] = round(score, 4)
     results.append(item)
   results.sort(key=lambda item: item["score"], reverse=True)
+  if len(results) >= 4:
+    mean, std = _mean_std([item["score"] for item in results])
+    floor = mean + 0.75 * std
+    filtered = [item for item in results if item["score"] >= floor]
+    # Always surface the single best neighbor so the strip is never empty
+    # just because the whole corpus is uniformly close.
+    results = filtered or results[:1]
   return results[: max(1, min(limit, 20))]
 
 
@@ -645,14 +665,22 @@ def memory_map() -> dict[str, Any]:
     node["x"], node["y"], node["z"] = x, y, z
     nodes.append(node)
 
-  # Semantic edges: top-3 neighbors per note above a similarity floor; the
-  # single best neighbor is marked "strong" (drawn in teal). Skipped above
-  # ~140 notes — at that scale edges are an illegible hairball and the PCA
+  # Semantic edges: top-3 neighbors per note above a RELATIVE floor
+  # (mean + 0.75·std of all pairwise scores), so edge density adapts to the
+  # embedding model and corpus instead of relying on a magic absolute number.
+  # The best neighbor is marked "strong" (drawn in teal). Skipped above ~140
+  # notes — at that scale edges are an illegible hairball and the PCA
   # positions already convey proximity.
-  semantic_threshold = 0.55 if model_tag != VECTOR_MODEL else 0.18
   edges: list[dict[str, Any]] = []
   seen_pairs: set[str] = set()
   if len(nodes) <= 140:
+    pair_scores: list[float] = []
+    for left_index in range(len(vectors)):
+      for right_index in range(left_index + 1, len(vectors)):
+        if len(vectors[left_index]) == len(vectors[right_index]):
+          pair_scores.append(dot_product(vectors[left_index], vectors[right_index]))
+    mean, std = _mean_std(pair_scores)
+    semantic_threshold = mean + 0.75 * std if len(pair_scores) >= 6 else 0.0
     for left_index in range(len(vectors)):
       scores: list[tuple[float, int]] = []
       for right_index in range(len(vectors)):

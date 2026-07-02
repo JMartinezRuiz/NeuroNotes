@@ -8,17 +8,21 @@ locally; privacy_mode=local_first blocks any non-loopback model call.
 from __future__ import annotations
 
 import asyncio
+import io
 import os
+import re
 import secrets
 import socket
+import zipfile
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from .database import (
   all_tags,
@@ -283,6 +287,32 @@ async def enrich_endpoint(note_id: str) -> dict[str, Any]:
     except Exception:
       pass
   return suggestion
+
+
+@app.get("/api/export")
+def export_endpoint() -> Response:
+  """Everything out, no lock-in: a zip of plain Markdown files with frontmatter."""
+  notes = list_notes(limit=2000)
+  buffer = io.BytesIO()
+  with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+    for note in notes:
+      slug = re.sub(r"[^a-z0-9]+", "-", note["title"].lower()).strip("-")[:60] or "nota"
+      frontmatter = (
+        "---\n"
+        f"title: {note['title']}\n"
+        f"tags: [{', '.join(note['tags'])}]\n"
+        f"created_by: {note['created_by']}\n"
+        f"created_at: {note['created_at']}\n"
+        f"updated_at: {note['updated_at']}\n"
+        "---\n\n"
+      )
+      archive.writestr(f"{slug}-{note['id'][-8:]}.md", frontmatter + note["content"])
+  stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+  return Response(
+    content=buffer.getvalue(),
+    media_type="application/zip",
+    headers={"Content-Disposition": f'attachment; filename="neuronotes-{stamp}.zip"'},
+  )
 
 
 @app.get("/api/settings")

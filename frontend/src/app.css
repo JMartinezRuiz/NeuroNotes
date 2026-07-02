@@ -1,25 +1,27 @@
 /* ============================================================
    NeuroNotes — Synapse
-   Graphite/paper canvas · one teal accent · serif voice ·
+   Notion-calm surfaces, modern-AI accents. One teal, serif voice,
    agent provenance colors. Theme follows the system.
    ============================================================ */
 
 :root {
   /* light "paper" */
-  --bg: #faf8f4;
-  --sidebar: #efede6;
+  --bg: #faf9f5;
+  --sidebar: #f2f0ea;
   --panel: #ffffff;
-  --panel-soft: #f4f2ec;
-  --text: #1c1d1b;
-  --muted: #65665f;
-  --faint: #8a8a80;
-  --border: #e4e0d6;
-  --border-strong: #cfc9bc;
-  --hover: #edeae2;
-  --selected: #e2f0ec;
+  --panel-soft: #f5f3ed;
+  --text: #1b1c1a;
+  --muted: #63645d;
+  --faint: #8f8f85;
+  --border: #e7e3d8;
+  --border-strong: #d2ccbf;
+  --hover: #edebe3;
+  --selected: #e0efeb;
   --accent: #0e8c8c;
   --accent-soft: #dcefec;
+  --accent-glow: rgba(14, 140, 140, 0.16);
   --danger: #b45309;
+  --overlay: rgba(24, 24, 20, 0.38);
 
   --agent-usuario: #e8895e;
   --agent-claude: #e0a33b;
@@ -27,8 +29,13 @@
   --agent-qwen: #b388e8;
   --agent-chatgpt: #5dcaa5;
 
-  --radius: 10px;
   --radius-sm: 7px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(20, 20, 16, 0.05);
+  --shadow-md: 0 6px 24px rgba(20, 20, 16, 0.09);
+  --shadow-lg: 0 24px 64px rgba(15, 15, 12, 0.22);
+  --ease: 0.14s ease;
   --font-serif: "Newsreader", "Source Serif 4", Georgia, "Iowan Old Style", serif;
 
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -43,20 +50,25 @@
 @media (prefers-color-scheme: dark) {
   :root {
     /* graphite "stage" */
-    --bg: #121311;
-    --sidebar: #171815;
+    --bg: #111210;
+    --sidebar: #161715;
     --panel: #1a1b18;
-    --panel-soft: #212220;
+    --panel-soft: #20211e;
     --text: #eceae2;
     --muted: #a3a39a;
-    --faint: #83837a;
-    --border: #2c2d29;
-    --border-strong: #41423c;
-    --hover: #232420;
-    --selected: #173531;
+    --faint: #7f7f76;
+    --border: #272823;
+    --border-strong: #3d3e38;
+    --hover: #21221f;
+    --selected: #16302c;
     --accent: #2ee6d6;
-    --accent-soft: #173531;
+    --accent-soft: #143430;
+    --accent-glow: rgba(46, 230, 214, 0.14);
     --danger: #fbbf24;
+    --overlay: rgba(5, 6, 8, 0.55);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.55);
     color-scheme: dark;
   }
 }
@@ -93,8 +105,24 @@ textarea {
   color: inherit;
 }
 
+:is(button, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: var(--radius-sm);
+}
+
 ::selection {
   background: var(--accent-soft);
+}
+
+kbd {
+  font: 500 10px/1 Inter, sans-serif;
+  color: var(--faint);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 2px 5px;
+  white-space: nowrap;
 }
 
 .spin {
@@ -106,11 +134,22 @@ textarea {
   }
 }
 
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ---------- layout ---------- */
 
 .app {
   display: grid;
-  grid-template-columns: 276px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
   height: 100%;
 }
 
@@ -136,14 +175,26 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 4px;
+  padding: 0 4px 2px;
 }
 
 .sidebar-brand strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-serif);
-  font-size: 17px;
+  font-size: 17.5px;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+.sidebar-brand strong::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow), 0 0 3px var(--accent);
 }
 
 .view-switch {
@@ -158,16 +209,21 @@ textarea {
 .view-switch button {
   display: grid;
   place-items: center;
-  width: 28px;
+  width: 30px;
   height: 24px;
   border-radius: 999px;
   color: var(--muted);
+  transition: background var(--ease), color var(--ease);
+}
+
+.view-switch button:hover {
+  color: var(--text);
 }
 
 .view-switch button.active {
   background: var(--panel);
   color: var(--accent);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .sidebar-search {
@@ -179,13 +235,19 @@ textarea {
   border-radius: var(--radius-sm);
   padding: 7px 10px;
   color: var(--faint);
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+
+.sidebar-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .sidebar-search input {
   flex: 1;
   min-width: 0;
   border: none;
-  outline: none;
+  outline: none !important;
   background: transparent;
   font-size: 13px;
   color: var(--text);
@@ -202,15 +264,16 @@ textarea {
   padding: 7px 10px;
   font-size: 12.5px;
   font-weight: 500;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  animation: rise 0.16s ease;
+}
+
+.ask-cta svg {
+  color: var(--accent);
 }
 
 .ask-cta kbd {
   margin-left: auto;
-  font-size: 10px;
-  color: var(--muted);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  padding: 0 4px;
 }
 
 .new-note {
@@ -224,10 +287,13 @@ textarea {
   padding: 8px 10px;
   font-size: 13px;
   font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  transition: filter var(--ease), box-shadow var(--ease);
 }
 
 .new-note:hover {
-  filter: brightness(1.06);
+  filter: brightness(1.07);
+  box-shadow: 0 2px 12px var(--accent-glow);
 }
 
 .tag-row {
@@ -242,8 +308,14 @@ textarea {
   color: var(--muted);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 2px 9px;
+  padding: 2.5px 10px;
   background: var(--panel);
+  transition: border-color var(--ease), color var(--ease), background var(--ease);
+}
+
+.tag-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
 }
 
 .tag-chip.active {
@@ -257,6 +329,7 @@ textarea {
   align-items: center;
   gap: 4px;
   background: var(--panel-soft);
+  border-color: transparent;
   color: var(--text);
 }
 
@@ -264,11 +337,14 @@ textarea {
   display: grid;
   place-items: center;
   color: var(--faint);
+  border-radius: 999px;
 }
 
 .tag-chip.solid button:hover {
   color: var(--danger);
 }
+
+/* Notion-style borderless rows with an agent provenance bar. */
 
 .note-list {
   flex: 1;
@@ -276,7 +352,7 @@ textarea {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
   padding: 2px;
   margin: 0 -2px;
 }
@@ -285,19 +361,30 @@ textarea {
   color: var(--faint);
   font-size: 12.5px;
   text-align: center;
-  padding: 24px 8px;
+  padding: 26px 8px;
 }
 
 .note-item {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   text-align: left;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  padding: 9px 10px;
+  padding: 8px 10px 8px 13px;
+  transition: background var(--ease);
+}
+
+/* Agent provenance bar (set per item via the --note-bar custom property). */
+.note-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--note-bar, var(--border-strong));
 }
 
 .note-item:hover {
@@ -306,7 +393,6 @@ textarea {
 
 .note-item.active {
   background: var(--selected);
-  border-color: var(--accent);
 }
 
 .note-item strong {
@@ -322,6 +408,9 @@ textarea {
   font-size: 12px;
   color: var(--muted);
   line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .note-item small {
@@ -330,6 +419,9 @@ textarea {
 }
 
 .sidebar-foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   border-top: 1px solid var(--border);
   padding-top: 8px;
 }
@@ -338,11 +430,13 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
   color: var(--muted);
-  padding: 5px 6px;
+  padding: 6px;
   border-radius: var(--radius-sm);
+  transition: background var(--ease);
 }
 
 .ai-status:hover {
@@ -359,7 +453,7 @@ textarea {
 
 .dot.on {
   background: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 0 8px var(--accent-glow);
 }
 
 /* ---------- editor ---------- */
@@ -370,10 +464,11 @@ textarea {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  max-width: 860px;
+  max-width: 840px;
   margin: 0 auto;
   width: 100%;
-  padding: 26px 34px 0;
+  padding: 30px 40px 0;
+  animation: rise 0.18s ease;
 }
 
 .editor.empty {
@@ -384,23 +479,24 @@ textarea {
 .editor-welcome {
   display: grid;
   place-items: center;
-  gap: 10px;
+  gap: 12px;
   text-align: center;
   color: var(--muted);
-  max-width: 380px;
+  max-width: 400px;
 }
 
 .editor-welcome strong {
   font-family: var(--font-serif);
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 500;
   color: var(--text);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 .editor-welcome p {
   margin: 0;
   font-size: 13.5px;
+  line-height: 1.55;
 }
 
 .editor-head {
@@ -413,11 +509,12 @@ textarea {
   flex: 1;
   min-width: 0;
   font-family: var(--font-serif);
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 500;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.018em;
+  line-height: 1.2;
   border: none;
-  outline: none;
+  outline: none !important;
   background: transparent;
   padding: 0;
 }
@@ -428,9 +525,9 @@ textarea {
 
 .editor-tools {
   display: flex;
-  gap: 4px;
-  opacity: 0.55;
-  transition: opacity 0.15s ease;
+  gap: 3px;
+  opacity: 0.45;
+  transition: opacity var(--ease);
 }
 
 .editor:hover .editor-tools,
@@ -445,6 +542,7 @@ textarea {
   height: 30px;
   border-radius: var(--radius-sm);
   color: var(--muted);
+  transition: background var(--ease), color var(--ease);
 }
 
 .icon-button:hover {
@@ -454,6 +552,7 @@ textarea {
 
 .icon-button.ai:hover {
   color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .icon-button.danger:hover {
@@ -469,7 +568,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 8px;
+  margin-top: 10px;
   min-height: 26px;
 }
 
@@ -478,6 +577,7 @@ textarea {
   height: 9px;
   border-radius: 999px;
   flex: none;
+  box-shadow: 0 0 6px currentColor;
 }
 
 .tag-editor {
@@ -493,7 +593,7 @@ textarea {
   flex: 1;
   min-width: 90px;
   border: none;
-  outline: none;
+  outline: none !important;
   background: transparent;
   font-size: 12px;
   color: var(--muted);
@@ -510,12 +610,14 @@ textarea {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 12px;
   border: 1px solid var(--accent);
   background: var(--accent-soft);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  border-radius: var(--radius);
+  padding: 11px 13px;
   font-size: 12.5px;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  animation: rise 0.16s ease;
 }
 
 .enrich-strip > svg {
@@ -530,7 +632,7 @@ textarea {
 }
 
 .enrich-line {
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .enrich-strip small {
@@ -547,13 +649,13 @@ textarea {
 .note-body {
   flex: 1;
   min-height: 0;
-  margin-top: 14px;
+  margin-top: 16px;
   border: none;
-  outline: none;
+  outline: none !important;
   resize: none;
   background: transparent;
-  font-size: 14.5px;
-  line-height: 1.65;
+  font-size: 15px;
+  line-height: 1.7;
   color: var(--text);
   padding: 0 0 18px;
 }
@@ -632,18 +734,22 @@ textarea {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 10px 0 16px;
+  padding: 10px 0 18px;
 }
 
 .related-head {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
+}
+
+.related-head svg {
+  color: var(--accent);
 }
 
 .related-empty {
@@ -658,13 +764,15 @@ textarea {
   border: 1px solid var(--border);
   background: var(--panel);
   border-radius: 999px;
-  padding: 4px 11px;
+  padding: 4.5px 12px;
   font-size: 12.5px;
+  transition: border-color var(--ease), background var(--ease), transform var(--ease);
 }
 
 .related-item:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
+  transform: translateY(-1px);
 }
 
 .related-item small {
@@ -684,10 +792,13 @@ textarea {
   padding: 7px 14px;
   font-size: 13px;
   font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  transition: filter var(--ease), box-shadow var(--ease);
 }
 
 .primary-button:hover {
-  filter: brightness(1.06);
+  filter: brightness(1.07);
+  box-shadow: 0 2px 12px var(--accent-glow);
 }
 
 .secondary-button {
@@ -699,6 +810,7 @@ textarea {
   border-radius: var(--radius-sm);
   padding: 6px 12px;
   font-size: 13px;
+  transition: background var(--ease), color var(--ease);
 }
 
 .secondary-button:hover {
@@ -735,9 +847,10 @@ textarea {
 
 .map-empty strong {
   font-family: var(--font-serif);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 500;
   color: var(--text);
+  letter-spacing: -0.01em;
 }
 
 .map-empty p {
@@ -745,20 +858,25 @@ textarea {
   font-size: 13px;
 }
 
+.map-empty svg {
+  color: var(--accent);
+}
+
 .map-hud {
   position: absolute;
-  left: 28px;
-  bottom: 28px;
+  left: 30px;
+  bottom: 30px;
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(10, 12, 18, 0.72);
+  background: rgba(10, 12, 18, 0.66);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: #dfe6f2;
   border-radius: 999px;
-  padding: 7px 14px;
+  padding: 7px 15px;
   font-size: 12px;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(10px);
+  animation: rise 0.2s ease;
 }
 
 .map-hud strong {
@@ -769,11 +887,11 @@ textarea {
   position: relative;
   flex: 1;
   min-width: 0;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border-strong);
   background: #080b12;
-  box-shadow: inset 0 0 60px rgba(46, 230, 214, 0.05);
+  box-shadow: inset 0 0 80px rgba(46, 230, 214, 0.05), var(--shadow-md);
 }
 
 .three-canvas-mount,
@@ -849,6 +967,7 @@ textarea {
   border-radius: 999px;
   padding: 4px 12px;
   transition: opacity 0.15s ease;
+  backdrop-filter: blur(6px);
 }
 
 .three-node-label span {
@@ -858,12 +977,13 @@ textarea {
   box-shadow: 0 0 12px currentColor;
 }
 
-/* ---------- overlays ---------- */
+/* ---------- overlays (glass) ---------- */
 
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(8, 10, 12, 0.45);
+  background: var(--overlay);
+  backdrop-filter: blur(7px);
   display: grid;
   place-items: center;
   padding: 24px;
@@ -872,13 +992,14 @@ textarea {
 
 .panel {
   width: min(560px, 100%);
-  max-height: min(72vh, 640px);
+  max-height: min(74vh, 660px);
   overflow-y: auto;
   background: var(--panel);
   border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  padding: 16px 18px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-lg);
+  animation: rise 0.18s ease;
 }
 
 .panel header {
@@ -892,7 +1013,7 @@ textarea {
   flex: 1;
   min-width: 0;
   font-family: var(--font-serif);
-  font-size: 16.5px;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -922,7 +1043,7 @@ textarea {
 .ask-answer {
   white-space: pre-wrap;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.65;
   margin-bottom: 14px;
 }
 
@@ -931,7 +1052,7 @@ textarea {
   flex-direction: column;
   gap: 6px;
   border-top: 1px solid var(--border);
-  padding-top: 10px;
+  padding-top: 12px;
 }
 
 .ask-sources button {
@@ -941,8 +1062,9 @@ textarea {
   text-align: left;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 8px 10px;
+  padding: 8px 11px;
   font-size: 13px;
+  transition: border-color var(--ease), background var(--ease);
 }
 
 .ask-sources button:hover {
@@ -991,6 +1113,7 @@ textarea {
 .ai-card .ai-row small {
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.45;
 }
 
 .ai-fix {
@@ -1007,11 +1130,12 @@ textarea {
 }
 
 .ai-privacy {
-  margin: 8px 0;
+  margin: 10px 0;
   font-size: 12px;
   color: var(--muted);
   border-left: 3px solid var(--accent);
   padding-left: 10px;
+  line-height: 1.5;
 }
 
 .ai-divider {
@@ -1028,10 +1152,12 @@ textarea {
   padding: 7px 10px;
   font-size: 12px;
   text-align: left;
+  transition: background var(--ease), border-color var(--ease);
 }
 
 .copy-row:hover {
   background: var(--hover);
+  border-color: var(--border-strong);
 }
 
 .copy-row span {

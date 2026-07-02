@@ -44,6 +44,8 @@ export function Editor({
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const loadedNoteIdRef = useRef<string>("");
   const inFlightRef = useRef(false);
+  const tagsTouchedRef = useRef(false);
+  const autoTaggedRef = useRef(false);
 
   const isReal = Boolean(noteId) && noteId !== "new";
 
@@ -59,7 +61,8 @@ export function Editor({
     enabled: Boolean(draft.id),
     staleTime: 30_000,
   });
-  const related = (relatedQuery.data ?? []).filter((item) => item.score === undefined || item.score >= 0.35);
+  // The backend applies a relative "actually close" threshold — trust it.
+  const related = relatedQuery.data ?? [];
 
   // Load the selected note into the draft — only when the SELECTION changes,
   // never when a background refetch hands us a fresh object for the same note
@@ -73,6 +76,8 @@ export function Editor({
         setSaveError("");
         setEnrichment(null);
         setEditorMode("write");
+        tagsTouchedRef.current = false;
+        autoTaggedRef.current = false;
         window.setTimeout(() => titleRef.current?.focus(), 0);
       }
       return;
@@ -119,6 +124,7 @@ export function Editor({
           tags: current.tags.length ? current.tags : note.tags,
         }));
         onNoteCreated(note.id);
+        void autoTagWithModel(note.id);
       }
       void queryClient.invalidateQueries({ queryKey: ["notes"] });
       void queryClient.invalidateQueries({ queryKey: ["tags"] });
@@ -158,8 +164,35 @@ export function Editor({
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
 
+  // AI-first: once the first save of a brand-new note lands, quietly ask the
+  // local model for better tags than the instant heuristic — and apply them
+  // only if the user hasn't touched tags meanwhile. Offline → no-op.
+  async function autoTagWithModel(targetNoteId: string) {
+    if (autoTaggedRef.current) return;
+    autoTaggedRef.current = true;
+    try {
+      const suggestion = await api<{ tags: string[]; local_fallback: boolean }>(
+        `/api/notes/${targetNoteId}/enrich`,
+        { method: "POST" },
+      );
+      if (suggestion.local_fallback || !suggestion.tags.length || tagsTouchedRef.current) return;
+      // The suggestion arrives seconds later — apply it ONLY if the editor still
+      // holds that same note (the user may have opened another one meanwhile).
+      let applied = false;
+      setDraft((current) => {
+        if (current.id !== targetNoteId) return current;
+        applied = true;
+        return { ...current, tags: suggestion.tags };
+      });
+      if (applied) setDirty(true);
+    } catch {
+      /* silent — the heuristic tags stay */
+    }
+  }
+
   function addTag(raw: string) {
     const tag = raw.trim().toLowerCase().replace(/,+$/, "");
+    tagsTouchedRef.current = true;
     if (!tag) return;
     if (!draft.tags.includes(tag)) editDraft({ tags: [...draft.tags, tag].slice(0, 8) });
     setTagInput("");
@@ -170,6 +203,7 @@ export function Editor({
       event.preventDefault();
       addTag(tagInput);
     } else if (event.key === "Backspace" && !tagInput && draft.tags.length) {
+      tagsTouchedRef.current = true;
       editDraft({ tags: draft.tags.slice(0, -1) });
     }
   }
@@ -240,6 +274,20 @@ export function Editor({
     );
   }
 
+  if (isReal && noteQuery.isError) {
+    return (
+      <section className="editor empty">
+        <div className="editor-welcome">
+          <strong>Esa nota ya no existe</strong>
+          <p>Puede que la borraras o que el enlace sea antiguo.</p>
+          <button className="primary-button" type="button" onClick={onNewNote}>
+            Nueva nota
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="editor">
       <div className="editor-head">
@@ -280,7 +328,14 @@ export function Editor({
           {draft.tags.map((tag) => (
             <span className="tag-chip solid" key={tag}>
               {tag}
-              <button type="button" aria-label={`Quitar ${tag}`} onClick={() => editDraft({ tags: draft.tags.filter((item) => item !== tag) })}>
+              <button
+                type="button"
+                aria-label={`Quitar ${tag}`}
+                onClick={() => {
+                  tagsTouchedRef.current = true;
+                  editDraft({ tags: draft.tags.filter((item) => item !== tag) });
+                }}
+              >
                 <X size={11} />
               </button>
             </span>

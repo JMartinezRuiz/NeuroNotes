@@ -1,5 +1,5 @@
-import { FileText, Network, Plus, Search, Sparkles } from "lucide-react";
-import { agentHex } from "../lib/api";
+import { Download, FileText, Network, Plus, Search, Sparkles } from "lucide-react";
+import { agentHex, apiUrl } from "../lib/api";
 import { relativeTime, trimText } from "../lib/utils";
 import type { ModelHealth, NoteLite, TagCount, View } from "../types";
 
@@ -69,6 +69,7 @@ export function Sidebar({
       <div className="sidebar-search">
         <Search size={14} />
         <input
+          id="global-search"
           placeholder="Buscar por significado…"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
@@ -78,6 +79,7 @@ export function Sidebar({
           }}
           aria-label="Buscar notas"
         />
+        {!searchQuery ? <kbd>Ctrl K</kbd> : null}
       </div>
       {searchQuery.trim().length >= 3 ? (
         <button className="ask-cta" type="button" onClick={onAsk}>
@@ -118,7 +120,7 @@ export function Sidebar({
               key={note.id}
               type="button"
               className={note.id === selectedNoteId ? "note-item active" : "note-item"}
-              style={{ borderLeftColor: agentHex(note.created_by) }}
+              style={{ "--note-bar": agentHex(note.created_by) } as React.CSSProperties}
               onClick={() => onSelectNote(note.id)}
             >
               <strong>{note.title || "Sin título"}</strong>
@@ -138,6 +140,20 @@ export function Sidebar({
         <button type="button" className="ai-status" onClick={onOpenAi} title={health.message}>
           <span className={aiReady ? "dot on" : "dot"} />
           IA local {health.online ? "lista" : health.embedding_online ? "parcial" : "apagada"}
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          title="Exportar todo (Markdown .zip)"
+          aria-label="Exportar todas las notas"
+          onClick={() => {
+            const link = document.createElement("a");
+            link.href = apiUrl("/api/export");
+            link.download = "neuronotes.zip";
+            link.click();
+          }}
+        >
+          <Download size={15} />
         </button>
       </footer>
     </aside>

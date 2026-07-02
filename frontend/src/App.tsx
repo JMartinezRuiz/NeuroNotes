@@ -36,6 +36,18 @@ function App() {
     return () => window.clearTimeout(handle);
   }, [searchQuery]);
 
+  // Ctrl/Cmd+K focuses the semantic search — the standard "find anything" reflex.
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        document.getElementById("global-search")?.focus();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   // URL sync (replace: no history spam) so deep links and reload restore the view.
   useEffect(() => {
     const next = new URLSearchParams();
@@ -72,21 +84,15 @@ function App() {
   });
   const health = healthQuery.data ?? FALLBACK_HEALTH;
 
-  // Keep a valid selection: pick the newest note when nothing is selected, but
-  // never while deliberately composing a new one ("new" sentinel).
+  // Pick the newest note when nothing is selected. Deliberately NOTHING more:
+  // never re-point an existing selection at notes[0] — right after creating a
+  // note the (stale) list doesn't contain its id yet, and that "repair" used to
+  // hijack the selection mid-edit. A truly missing note is handled by the
+  // Editor's not-found state.
   useEffect(() => {
-    if (selectedNoteId === "new" || isSearching) return;
-    if (!notes.length) {
-      if (selectedNoteId) setSelectedNoteId("");
-      return;
-    }
-    if (!selectedNoteId || (!activeTag && !notes.some((note) => note.id === selectedNoteId))) {
-      // Only auto-repair when the note truly disappeared (not merely filtered out).
-      if (!selectedNoteId || !notes.some((note) => note.id === selectedNoteId)) {
-        setSelectedNoteId(notes[0].id);
-      }
-    }
-  }, [notes, selectedNoteId, isSearching, activeTag]);
+    if (selectedNoteId || isSearching) return;
+    if (notes.length) setSelectedNoteId(notes[0].id);
+  }, [notes, selectedNoteId, isSearching]);
 
   const sidebarNotes = useMemo(() => notes, [notes]);
 

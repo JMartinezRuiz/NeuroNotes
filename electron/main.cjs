@@ -1,9 +1,13 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, Menu, Tray, globalShortcut, ipcMain, nativeImage, screen } = require("electron");
 const { spawn } = require("node:child_process");
 const http = require("node:http");
 const path = require("node:path");
 const fs = require("node:fs");
 const crypto = require("node:crypto");
+
+// 16x16 teal dot — the Synapse accent as tray icon (generated, no asset file).
+const TRAY_ICON_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAATElEQVR4nGNgGJ5A79k1ASCeCMTXoBjEFiBWsz8Q/8eB/YmxGZdmGMbtEqhTCRkwEZ8B14gw4BpNDaDYC5QFItQQ8qMRzSXkJaShBwCnW/EpwSdNNgAAAABJRU5ErkJggg==";
 
 const rootDir = path.resolve(__dirname, "..");
 const apiBase = process.env.NEURONOTES_API_BASE || "http://127.0.0.1:8787";
@@ -16,6 +20,9 @@ const apiToken = process.env.NEURONOTES_API_TOKEN || crypto.randomBytes(24).toSt
 process.env.NEURONOTES_API_TOKEN = apiToken;
 
 let backendProcess = null;
+let mainWindow = null;
+let captureWindow = null;
+let tray = null;
 
 function pythonExecutable() {
   const localPython = path.join(rootDir, ".venv", "Scripts", "python.exe");
@@ -98,7 +105,7 @@ async function createWindow() {
     console.error("El backend no respondio a tiempo; la ventana cargara igualmente.", error);
   });
 
-  const window = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1360,
     height: 860,
     minWidth: 1080,
@@ -112,15 +119,103 @@ async function createWindow() {
       nodeIntegration: false,
     },
   });
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
 
   if (process.env.NEURONOTES_APP_URL) {
-    await window.loadURL(process.env.NEURONOTES_APP_URL);
+    await mainWindow.loadURL(process.env.NEURONOTES_APP_URL);
   } else {
-    await window.loadFile(frontendEntry);
+    await mainWindow.loadFile(frontendEntry);
   }
 }
 
-app.whenReady().then(createWindow);
+// --- Quick capture: Ctrl+Alt+N anywhere -> a small always-on-top note pad. ---
+
+function ensureCaptureWindow() {
+  if (captureWindow && !captureWindow.isDestroyed()) return captureWindow;
+  captureWindow = new BrowserWindow({
+    width: 520,
+    height: 250,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  captureWindow.loadFile(path.join(__dirname, "capture.html"));
+  captureWindow.on("blur", () => {
+    if (captureWindow && captureWindow.isVisible()) captureWindow.hide();
+  });
+  captureWindow.on("closed", () => {
+    captureWindow = null;
+  });
+  return captureWindow;
+}
+
+function toggleCapture() {
+  const window = ensureCaptureWindow();
+  if (window.isVisible()) {
+    window.hide();
+    return;
+  }
+  // Center horizontally, upper third of the active display — reachable, not modal.
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const { x, y, width, height } = display.workArea;
+  window.setPosition(Math.round(x + (width - 520) / 2), Math.round(y + height * 0.18));
+  window.show();
+  window.focus();
+}
+
+function openMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  } else {
+    void createWindow();
+  }
+}
+
+ipcMain.on("capture:hide", () => {
+  if (captureWindow && captureWindow.isVisible()) captureWindow.hide();
+});
+ipcMain.on("capture:open-main", openMainWindow);
+
+function setupTrayAndShortcuts() {
+  const icon = nativeImage.createFromDataURL(TRAY_ICON_DATA_URL);
+  tray = new Tray(icon);
+  tray.setToolTip("NeuroNotes — captura rápida: Ctrl+Alt+N");
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: "Nueva nota rápida\tCtrl+Alt+N", click: toggleCapture },
+      { label: "Abrir NeuroNotes", click: openMainWindow },
+      { type: "separator" },
+      { label: "Salir", click: () => app.quit() },
+    ]),
+  );
+  tray.on("click", toggleCapture);
+
+  const registered = globalShortcut.register("Control+Alt+N", toggleCapture);
+  if (!registered) {
+    console.error("No se pudo registrar el atajo global Ctrl+Alt+N (¿en uso por otra app?).");
+  }
+}
+
+app.whenReady().then(async () => {
+  await createWindow();
+  setupTrayAndShortcuts();
+});
+
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

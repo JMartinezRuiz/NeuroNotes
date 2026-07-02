@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Captura rápida</title>
+    <style>
+      :root {
+        --bg: #16171a;
+        --panel: #1c1d20;
+        --text: #eceae2;
+        --muted: #a3a39a;
+        --border: #2e2f33;
+        --accent: #2ee6d6;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        font-family: Inter, ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px 6px;
+        font-size: 12.5px;
+        color: var(--muted);
+        -webkit-app-region: drag;
+        user-select: none;
+      }
+      header .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+      header strong { color: var(--text); font-weight: 600; }
+      header kbd {
+        margin-left: auto;
+        font-size: 10px;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 1px 6px;
+        -webkit-app-region: no-drag;
+      }
+      textarea {
+        flex: 1;
+        margin: 4px 14px;
+        background: transparent;
+        border: none;
+        outline: none;
+        resize: none;
+        color: var(--text);
+        font: 14px/1.55 Inter, sans-serif;
+      }
+      textarea::placeholder { color: #6c6c64; }
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px 12px;
+      }
+      footer small { color: var(--muted); font-size: 11px; flex: 1; }
+      button {
+        font: 600 12.5px Inter, sans-serif;
+        color: #101110;
+        background: var(--accent);
+        border: none;
+        border-radius: 8px;
+        padding: 7px 16px;
+        cursor: pointer;
+      }
+      button:disabled { opacity: 0.55; cursor: default; }
+      .ok { color: var(--accent); }
+      .err { color: #fbbf24; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="dot"></span>
+      <strong>NeuroNotes</strong>
+      <span>· captura rápida</span>
+      <kbd>Esc cierra · Ctrl+↵ guarda</kbd>
+    </header>
+    <textarea id="text" placeholder="Suéltalo aquí — el cerebro lo titula, etiqueta y conecta solo." autofocus></textarea>
+    <footer>
+      <small id="status">Se guarda en tu equipo. Nada sale de aquí.</small>
+      <button id="save" type="button">Guardar</button>
+    </footer>
+    <script>
+      const textarea = document.getElementById("text");
+      const saveButton = document.getElementById("save");
+      const status = document.getElementById("status");
+      const nn = window.neuronotes || {};
+
+      async function save() {
+        const content = textarea.value.trim();
+        if (!content) { hide(); return; }
+        saveButton.disabled = true;
+        status.textContent = "Guardando…";
+        status.className = "";
+        try {
+          const response = await fetch((nn.apiBase || "http://127.0.0.1:8787") + "/api/notes", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(nn.apiToken ? { "X-Neuronotes-Token": nn.apiToken } : {}),
+            },
+            body: JSON.stringify({ content, created_by: "user" }),
+          });
+          if (!response.ok) throw new Error(response.status);
+          const note = await response.json();
+          status.textContent = "Guardada: " + note.title;
+          status.className = "ok";
+          textarea.value = "";
+          setTimeout(hide, 650);
+        } catch (error) {
+          status.textContent = "No se pudo guardar (¿backend apagado?)";
+          status.className = "err";
+        } finally {
+          saveButton.disabled = false;
+        }
+      }
+
+      function hide() {
+        status.textContent = "Se guarda en tu equipo. Nada sale de aquí.";
+        status.className = "";
+        if (nn.hideCapture) nn.hideCapture();
+      }
+
+      saveButton.addEventListener("click", save);
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") hide();
+        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") save();
+      });
+      window.addEventListener("focus", () => textarea.focus());
+    </script>
+  </body>
+</html>
