@@ -1,36 +1,34 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { chooseVisibleEdges, clamp, trimText } from "../lib/helpers";
+import { agentHex } from "../lib/api";
+import { clamp, trimText } from "../lib/utils";
 import {
   addLineSegments,
-  buildThreeNodePositions,
+  buildNodeLayout,
+  chooseVisibleEdges,
   createGlowTexture,
   makeThreeColor,
 } from "../lib/three-helpers";
-import type { GraphNode, VectorEdge } from "../types";
+import type { MapEdge, MapNode } from "../types";
 
-export function ThreeVectorScene({
+// The "observatory": a luminous constellation of the user's notes, positioned by
+// PCA of their embeddings. Built ONCE per data change; selection is applied
+// imperatively every frame so clicking never rebuilds (or re-frames) the scene.
+export function Scene3D({
   nodes,
   edges,
   selectedNoteId,
   onSelectNote,
 }: {
-  nodes: GraphNode[];
-  edges: VectorEdge[];
+  nodes: MapNode[];
+  edges: MapEdge[];
   selectedNoteId: string;
   onSelectNote: (noteId: string) => void;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const canvasMountRef = useRef<HTMLDivElement | null>(null);
-  const layout = useMemo(() => buildThreeNodePositions(nodes, edges), [nodes, edges]);
-  const featuredNodes = useMemo(() => {
-    const selectedNode = nodes.find((node) => node.id === selectedNoteId);
-    return selectedNode ? [selectedNode] : [];
-  }, [nodes, selectedNoteId]);
+  const layout = useMemo(() => buildNodeLayout(nodes, edges), [nodes, edges]);
 
-  // Selection + callback live in refs so the scene is built ONCE and a click
-  // only updates visuals imperatively — it never tears down and rebuilds the
-  // scene (which used to reset rotation/zoom and make nodes appear to jump).
   const selectedIdRef = useRef(selectedNoteId);
   const onSelectRef = useRef(onSelectNote);
   onSelectRef.current = onSelectNote;
@@ -57,7 +55,7 @@ export function ThreeVectorScene({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.domElement.className = "three-map-canvas";
-    renderer.domElement.setAttribute("aria-label", "3D note memory map");
+    renderer.domElement.setAttribute("aria-label", "Mapa 3D de notas");
     renderer.domElement.tabIndex = 0;
     mountElement.appendChild(renderer.domElement);
 
@@ -66,7 +64,7 @@ export function ThreeVectorScene({
     root.rotation.y = 0.52;
     scene.add(root);
 
-    const { positions, connectionCounts, clusters } = layout;
+    const { positions, connectionCounts } = layout;
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
     const glowTexture = createGlowTexture();
     const sphereGeometry = new THREE.SphereGeometry(0.42, 24, 14);
@@ -86,31 +84,29 @@ export function ThreeVectorScene({
     rimLight.position.set(20, 4, -22);
     scene.add(ambient, keyLight, sideLight, rimLight);
 
-    // No floor grid or cluster discs — the organic node cloud is the visual.
-
-    // Edges are computed ONCE (no selection bias) so they stay put on click.
-    const relationLinePositions: number[] = [];
+    // Edges computed once — strong (best neighbor) in teal, the rest in indigo.
+    const strongLinePositions: number[] = [];
     const semanticLinePositions: number[] = [];
-    const visibleEdges = chooseVisibleEdges(edges, "", nodes.length);
+    const visibleEdges = chooseVisibleEdges(edges, nodes.length);
     visibleEdges.forEach((edge) => {
       const from = positions.get(edge.from_id);
       const to = positions.get(edge.to_id);
       if (!from || !to) return;
-      const target = edge.source === "relation" ? relationLinePositions : semanticLinePositions;
+      const target = edge.source === "strong" ? strongLinePositions : semanticLinePositions;
       target.push(from.x, from.y, from.z, to.x, to.y, to.z);
     });
 
-    const relationLineMaterial = new THREE.LineBasicMaterial({ color: 0x2ee6d6, transparent: true, opacity: 0.5 });
+    const strongLineMaterial = new THREE.LineBasicMaterial({ color: 0x2ee6d6, transparent: true, opacity: 0.5 });
     const semanticLineMaterial = new THREE.LineBasicMaterial({ color: 0x8c99f0, transparent: true, opacity: 0.16 });
-    materials.add(relationLineMaterial);
+    materials.add(strongLineMaterial);
     materials.add(semanticLineMaterial);
-    addLineSegments(root, relationLinePositions, relationLineMaterial, geometries);
+    addLineSegments(root, strongLinePositions, strongLineMaterial, geometries);
     addLineSegments(root, semanticLinePositions, semanticLineMaterial, geometries);
 
     nodes.forEach((node) => {
       const position = positions.get(node.id);
       if (!position) return;
-      const color = makeThreeColor(node.color);
+      const color = makeThreeColor(agentHex(node.created_by));
       const material = new THREE.MeshStandardMaterial({
         color,
         emissive: color.clone().multiplyScalar(0.32),
@@ -122,7 +118,7 @@ export function ThreeVectorScene({
 
       const mesh = new THREE.Mesh(sphereGeometry, material);
       const connections = connectionCounts.get(node.id) ?? 0;
-      const baseScale = Math.min(1.5, 0.74 + node.linkCount * 0.045 + connections * 0.025);
+      const baseScale = Math.min(1.5, 0.78 + connections * 0.06);
       mesh.position.copy(position);
       mesh.scale.setScalar(baseScale);
       mesh.userData = { baseScale, noteId: node.id };
@@ -130,7 +126,6 @@ export function ThreeVectorScene({
       meshById.set(node.id, mesh);
       root.add(mesh);
 
-      // Soft per-node halo for a luminous "constellation" look.
       const haloMaterial = new THREE.SpriteMaterial({
         map: glowTexture,
         color,
@@ -146,8 +141,6 @@ export function ThreeVectorScene({
       root.add(halo);
     });
 
-    // Reusable selection highlight (ring + glow) that FOLLOWS the selected node
-    // each frame — created once, never rebuilt.
     const selectionRingMaterial = new THREE.MeshBasicMaterial({ color: 0x2ee6d6, transparent: true, opacity: 0.95, depthWrite: false });
     materials.add(selectionRingMaterial);
     const selectionRing = new THREE.Mesh(ringGeometry, selectionRingMaterial);
@@ -167,9 +160,10 @@ export function ThreeVectorScene({
     selectionGlow.visible = false;
     root.add(selectionGlow);
 
+    // "Living" pulses travelling along the strongest connections.
     const animatedEdges = visibleEdges
       .slice()
-      .sort((a, b) => Number(b.source === "relation") - Number(a.source === "relation") || b.score - a.score)
+      .sort((a, b) => Number(b.source === "strong") - Number(a.source === "strong") || b.score - a.score)
       .slice(0, 22);
     const pulses: Array<{ mesh: THREE.Mesh; from: THREE.Vector3; to: THREE.Vector3; offset: number; speed: number }> = [];
     animatedEdges.forEach((edge, index) => {
@@ -177,9 +171,9 @@ export function ThreeVectorScene({
       const to = positions.get(edge.to_id);
       if (!from || !to) return;
       const material = new THREE.MeshBasicMaterial({
-        color: edge.source === "relation" ? 0x2ee6d6 : 0x8c99f0,
+        color: edge.source === "strong" ? 0x2ee6d6 : 0x8c99f0,
         transparent: true,
-        opacity: edge.source === "relation" ? 0.55 : 0.3,
+        opacity: edge.source === "strong" ? 0.55 : 0.3,
         depthWrite: false,
       });
       materials.add(material);
@@ -190,7 +184,7 @@ export function ThreeVectorScene({
         from: from.clone(),
         to: to.clone(),
         offset: (index * 0.137) % 1,
-        speed: edge.source === "relation" ? 0.18 : 0.12,
+        speed: edge.source === "strong" ? 0.18 : 0.12,
       });
     });
 
@@ -204,7 +198,6 @@ export function ThreeVectorScene({
     let lastX = 0;
     let lastY = 0;
     let rafId = 0;
-    let frame = 0;
     const startTime = window.performance.now();
 
     function resize() {
@@ -346,7 +339,7 @@ export function ThreeVectorScene({
         label.style.zIndex = String(Math.round((1 - projected.z) * 1000));
       });
       clusterLabels.forEach((label) => {
-        const cluster = clusters.find((item) => item.id === label.dataset.clusterId);
+        const cluster = layout.clusters.find((item) => item.id === label.dataset.clusterId);
         const position = cluster?.labelPosition;
         if (!position) {
           label.style.opacity = "0";
@@ -365,7 +358,6 @@ export function ThreeVectorScene({
     }
 
     function animate() {
-      frame += 1;
       const elapsed = (window.performance.now() - startTime) / 1000;
       if (!isDragging) targetRotationY += 0.0008;
       root.rotation.x += (targetRotationX - root.rotation.x) * 0.08;
@@ -373,7 +365,7 @@ export function ThreeVectorScene({
       camera.position.z += (targetCameraZ - camera.position.z) * 0.08;
       camera.lookAt(0, 0, 0);
 
-      relationLineMaterial.opacity = 0.42 + Math.sin(elapsed * 1.35) * 0.05;
+      strongLineMaterial.opacity = 0.42 + Math.sin(elapsed * 1.35) * 0.05;
       semanticLineMaterial.opacity = 0.13 + Math.sin(elapsed * 0.9) * 0.035;
       sideLight.intensity = 2.8 + Math.sin(elapsed * 1.2) * 0.35;
       rimLight.intensity = 2.5 + Math.cos(elapsed * 0.9) * 0.32;
@@ -412,8 +404,6 @@ export function ThreeVectorScene({
 
       updateLabels();
       renderer.render(scene, camera);
-      hostElement.dataset.frame = String(frame);
-      hostElement.dataset.rotation = root.rotation.y.toFixed(4);
       rafId = window.requestAnimationFrame(animate);
     }
 
@@ -431,8 +421,7 @@ export function ThreeVectorScene({
       else stopLoop();
     }
     document.addEventListener("visibilitychange", onVisibility);
-    // Render one frame synchronously so the map is never blank before
-    // requestAnimationFrame kicks in (RAF is paused while the tab is hidden).
+    // One synchronous frame so the map is never blank while RAF is paused.
     animate();
 
     return () => {
@@ -447,12 +436,12 @@ export function ThreeVectorScene({
       renderer.domElement.removeEventListener("wheel", onWheel);
       if (renderer.domElement.parentElement === mountElement) mountElement.removeChild(renderer.domElement);
       scene.traverse((object) => {
-        const maybeDisposable = object as { geometry?: THREE.BufferGeometry; material?: THREE.Material | THREE.Material[] };
-        if (maybeDisposable.geometry) geometries.add(maybeDisposable.geometry);
-        if (Array.isArray(maybeDisposable.material)) {
-          maybeDisposable.material.forEach((material) => materials.add(material));
-        } else if (maybeDisposable.material) {
-          materials.add(maybeDisposable.material);
+        const disposable = object as { geometry?: THREE.BufferGeometry; material?: THREE.Material | THREE.Material[] };
+        if (disposable.geometry) geometries.add(disposable.geometry);
+        if (Array.isArray(disposable.material)) {
+          disposable.material.forEach((material) => materials.add(material));
+        } else if (disposable.material) {
+          materials.add(disposable.material);
         }
       });
       geometries.forEach((geometry) => geometry.dispose());
@@ -461,6 +450,8 @@ export function ThreeVectorScene({
       renderer.dispose();
     };
   }, [nodes, edges, layout]);
+
+  const selectedNode = nodes.find((node) => node.id === selectedNoteId);
 
   return (
     <div className="three-map-host" ref={hostRef}>
@@ -473,22 +464,17 @@ export function ThreeVectorScene({
             <small>{cluster.count}</small>
           </div>
         ))}
-        {featuredNodes.map((node) => (
+        {selectedNode ? (
           <button
-            className={node.id === selectedNoteId ? "three-node-label selected" : "three-node-label"}
-            data-node-id={node.id}
-            key={node.id}
-            onClick={() => onSelectNote(node.id)}
+            className="three-node-label selected"
+            data-node-id={selectedNode.id}
+            onClick={() => onSelectNote(selectedNode.id)}
             type="button"
           >
-            <span style={{ backgroundColor: node.color }} />
-            {trimText(node.title, 28)}
+            <span style={{ backgroundColor: agentHex(selectedNode.created_by) }} />
+            {trimText(selectedNode.title, 28)}
           </button>
-        ))}
-      </div>
-      <div className="three-map-count">
-        <strong>{nodes.length}</strong>
-        <span>{layout.clusters.length} grupos</span>
+        ) : null}
       </div>
     </div>
   );

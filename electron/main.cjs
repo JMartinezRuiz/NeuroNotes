@@ -103,8 +103,8 @@ async function createWindow() {
     height: 860,
     minWidth: 1080,
     minHeight: 720,
-    title: "Neuronotes 2.0",
-    backgroundColor: "#f6f7f9",
+    title: "NeuroNotes",
+    backgroundColor: "#121311",
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),

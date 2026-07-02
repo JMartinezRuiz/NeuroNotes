@@ -1,15 +1,22 @@
 import * as THREE from "three";
-import { clamp, clusterIdForNode, clusterLabelFromId, hashUnit } from "./helpers";
-import type { GraphNode, ThreeCluster, VectorEdge } from "../types";
+import { clamp, hashUnit } from "./utils";
+import type { MapEdge, MapNode } from "../types";
 
-// three.js-dependent scene helpers, kept in their own module so `three` only
-// loads inside the lazy Map chunk (never the initial bundle).
-// Embedding-space layout: node positions come from the backend's PCA projection
-// of the note VECTORS (x/y/z), so distance in the map = distance in vector space —
-// how an LLM would "see" the notes near/far. NOT arbitrary. A light repulsion-only
-// pass (no edge springs) just declutters overlapping points so the cloud stays
-// breathable while preserving the embedding-space arrangement. Deterministic.
-export function buildThreeNodePositions(nodes: GraphNode[], edges: VectorEdge[]) {
+// three.js-dependent helpers, isolated so `three` only loads inside the lazy
+// Map chunk. Node positions come from the backend's PCA projection of the note
+// EMBEDDINGS (x/y/z): distance in the map = distance in meaning. A light
+// repulsion-only pass just declutters overlapping points — deterministic, and
+// it never reorganizes the embedding-space arrangement.
+
+export type ThreeCluster = {
+  id: string;
+  label: string;
+  count: number;
+  position: THREE.Vector3;
+  labelPosition: THREE.Vector3;
+};
+
+export function buildNodeLayout(nodes: MapNode[], edges: MapEdge[]) {
   const count = nodes.length;
 
   const connectionCounts = new Map<string, number>();
@@ -22,7 +29,7 @@ export function buildThreeNodePositions(nodes: GraphNode[], edges: VectorEdge[])
   const py = new Float64Array(count);
   const pz = new Float64Array(count);
   nodes.forEach((node, i) => {
-    if ("x" in node && typeof node.x === "number") {
+    if (typeof node.x === "number") {
       px[i] = node.x * 14;
       py[i] = node.y * 9;
       pz[i] = node.z * 14;
@@ -85,14 +92,19 @@ export function buildThreeNodePositions(nodes: GraphNode[], edges: VectorEdge[])
   const positions = new Map<string, THREE.Vector3>();
   nodes.forEach((node, i) => positions.set(node.id, new THREE.Vector3(px[i] * scale, py[i] * scale, pz[i] * scale)));
 
-  const groups = new Map<string, GraphNode[]>();
+  // Clusters = the notes' first tags (the AI's own organization), for quiet
+  // floating group labels.
+  const groups = new Map<string, MapNode[]>();
   nodes.forEach((node) => {
-    const id = clusterIdForNode(node);
-    groups.set(id, [...(groups.get(id) ?? []), node]);
+    const tag = (node.tags[0] || "").trim();
+    if (!tag) return;
+    groups.set(tag, [...(groups.get(tag) ?? []), node]);
   });
   const clusters: ThreeCluster[] = Array.from(groups.entries())
-    .sort((left, right) => right[1].length - left[1].length || clusterLabelFromId(left[0]).localeCompare(clusterLabelFromId(right[0])))
-    .map(([id, groupNodes]) => {
+    .filter(([, groupNodes]) => groupNodes.length >= 2)
+    .sort((left, right) => right[1].length - left[1].length || left[0].localeCompare(right[0]))
+    .slice(0, 8)
+    .map(([tag, groupNodes]) => {
       const center = new THREE.Vector3();
       groupNodes.forEach((node) => center.add(positions.get(node.id) as THREE.Vector3));
       center.multiplyScalar(1 / Math.max(1, groupNodes.length));
@@ -101,11 +113,9 @@ export function buildThreeNodePositions(nodes: GraphNode[], edges: VectorEdge[])
         radius = Math.max(radius, center.distanceTo(positions.get(node.id) as THREE.Vector3));
       });
       return {
-        id,
-        label: clusterLabelFromId(id),
+        id: tag,
+        label: tag,
         count: groupNodes.length,
-        radius,
-        color: groupNodes[0]?.color ?? "#6ee7d8",
         position: center.clone(),
         labelPosition: new THREE.Vector3(center.x, center.y + radius * 0.55 + 2, center.z),
       };
@@ -146,4 +156,17 @@ export function addLineSegments(root: THREE.Group, values: number[], material: T
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(values, 3));
   geometries.add(geometry);
   root.add(new THREE.LineSegments(geometry, material));
+}
+
+export function chooseVisibleEdges(edges: MapEdge[], nodeCount: number) {
+  const limit = Math.max(24, Math.min(edges.length, Math.round(nodeCount * 0.72)));
+  const strong = edges.filter((edge) => edge.source === "strong");
+  const semantic = edges.filter((edge) => edge.source === "semantic").sort((a, b) => b.score - a.score);
+  const edgeMap = new Map<string, MapEdge>();
+  [...strong, ...semantic].forEach((edge) => {
+    if (edgeMap.size >= limit) return;
+    const key = [edge.from_id, edge.to_id].sort().join("::");
+    if (!edgeMap.has(key)) edgeMap.set(key, edge);
+  });
+  return Array.from(edgeMap.values());
 }

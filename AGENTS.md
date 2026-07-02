@@ -1,44 +1,35 @@
-# Neuronotes 2.0
+# NeuroNotes — reglas para agentes
 
-## Product Direction
-Neuronotes 2.0 is a local-first desktop workspace where humans and AI agents share structured project memory.
+NeuroNotes es el cerebro compartido del usuario: notas locales convertidas a
+embeddings. Tú (Claude, Codex, ChatGPT, Qwen…) te conectas por MCP
+(`npm run mcp` stdio · `npm run mcp:http` SSE en :8788).
 
-The product should feel comfortable and Notion-like: quiet sidebar navigation, document-first project pages, compact tables, clear provenance, and a right-side agent panel. Avoid a giant chatbot as the primary interface. The center of the app is knowledge.
+## Herramientas MCP (10)
 
-## Local Agent
-- Default local model: `qwen3:4b`
-- Runtime: Ollama at `http://localhost:11434`
-- Use Qwen locally for categorization, tagging, summaries, task extraction, relation suggestions, and context compression.
-- Do not send private notes to external APIs unless the user explicitly approves it.
+- `search(query)` / `fetch(id)` — búsqueda semántica + lectura (contrato ChatGPT).
+- `list_notes(tag?, limit?)` · `get_note(note_id)`
+- `create_note(title?, content?, tags?, created_by)` — pon tu nombre en `created_by`
+  (claude/codex/chatgpt/qwen); título y etiquetas se derivan si los omites.
+- `update_note(note_id, …)` — parcial: pasa SOLO lo que cambias.
+- `delete_note(note_id)`
+- `related_notes(note_id)` — vecinas por significado (no hay enlaces manuales).
+- `ask_brain(question)` — recuperación con contenido para responder preguntas.
+- `rebuild_vectors()` — re-embeber todo (tras cambiar el modelo de embeddings).
 
-## MVP Priorities
-1. Projects
-2. Markdown notes
-3. Inbox
-4. Qwen 4B classification and summarization
-5. Agent colors and provenance
-6. Agent Activity Log
-7. Context Compiler
-8. AGENTS.md / context.md export
-9. Manual import of agent outputs
-10. Basic read-only MCP surface
+## Reglas
 
-## Memory Rules
-- Agent writes should arrive as structured memory patches.
-- Important writes require human approval before becoming canonical.
-- Canonical memory should be compact and reusable.
-- Preserve old notes but mark superseded decisions clearly.
+1. **Busca antes de afirmar** nada sobre el conocimiento del usuario (`search`/`ask_brain`).
+2. **Escribe conocimiento durable** cuando lo produzcas (`create_note` con tu `created_by`).
+3. No dupliques: si existe una nota cercana, `update_note` en vez de crear otra.
+4. Etiquetas: 2-4, minúsculas, temas — no frases.
+5. Los datos son privados y locales; no los exportes fuera sin que el usuario lo pida.
 
-## Current Stack
-- Desktop: Electron
-- Frontend: React + Vite + TypeScript
-- Backend: FastAPI + SQLite
-- Local model: configurable Ollama or LM Studio endpoint, default `qwen3:4b`
-- MCP: Python server scaffold in `backend/app/mcp_server.py`
+## Arquitectura (si tocas código)
 
-## Explicit Non-Goals For MVP
-- No cloud sync.
-- No mobile app.
-- No multi-user collaboration.
-- No canvas/graph editor.
-- No complex block editor; Markdown textarea is enough.
+- Backend FastAPI + SQLite: `backend/app/{database,main,mcp_server,ollama_client}.py`
+  (3 tablas: notes, note_vectors, app_settings; embeddings nomic-embed-text 768d
+  vía Ollama con fallback hash; PCA a 3D para el mapa).
+- Frontend React+Vite: `frontend/src/` (Sidebar, Editor, MapView/Scene3D,
+  AskPanel, AiCard). Identidad "Synapse": acento teal único, serif editorial,
+  colores de procedencia por agente.
+- Verifica siempre: `python -m py_compile` en backend + `npm run build` en frontend.

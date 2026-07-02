@@ -1,5 +1,13 @@
+"""NeuroNotes API — notes in, intelligence out.
+
+Minimal surface: note CRUD, semantic search, related notes, the 3D map,
+ask-your-brain, AI enrich (tags/title), settings and health. Everything runs
+locally; privacy_mode=local_first blocks any non-loopback model call.
+"""
+
 from __future__ import annotations
 
+import asyncio
 import os
 import secrets
 import socket
@@ -13,42 +21,23 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from .database import (
-  apply_memory_patch,
-  apply_note_improvement,
+  all_tags,
+  ask_context,
   create_note,
-  create_project,
-  create_relation,
-  create_task,
   delete_note,
-  delete_relation,
-  delete_task,
-  export_codex_context,
+  get_note,
   get_settings,
-  get_dashboard,
-  get_memory_patch,
-  get_note_by_id,
-  get_project_context,
   init_database,
-  insert_inbox_item,
-  insert_agent_run,
-  insert_memory_patch,
-  list_activity,
-  list_memory_patches,
   list_notes,
-  list_projects,
-  list_relations,
-  list_tasks,
+  memory_map,
   rebuild_note_vectors,
-  reject_memory_patch,
-  search_memory,
-  semantic_search_notes,
+  related_notes,
+  search_notes,
+  suggest_tags,
   update_note,
-  update_project,
   update_settings,
-  update_task,
-  vector_memory_map,
 )
-from .ollama_client import ask_qwen_json, get_model_health, model_settings
+from .ollama_client import ask_model_json, ask_model_text, get_model_health
 
 
 @asynccontextmanager
@@ -57,11 +46,11 @@ async def lifespan(_: FastAPI):
   yield
 
 
-app = FastAPI(title="Neuronotes 2.0 API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="NeuroNotes API", version="3.0.0", lifespan=lifespan)
 
 # Optional shared-secret token. When NEURONOTES_API_TOKEN is set (the desktop
 # app sets it automatically), every mutating request must present it. Read-only
-# GET requests stay open. This is defense-in-depth on top of the CORS lockdown.
+# GET requests stay open. Defense-in-depth on top of the CORS lockdown.
 API_TOKEN = os.getenv("NEURONOTES_API_TOKEN", "").strip()
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
@@ -80,10 +69,7 @@ async def enforce_api_token(request: Request, call_next):
   return await call_next(request)
 
 
-# Lock CORS down to local origins so an arbitrary website the user visits cannot
-# issue cross-origin writes to the local memory API. Override with a comma-
-# separated NEURONOTES_ALLOWED_ORIGINS when serving from a custom origin. The
-# "null" origin keeps the packaged Electron (file://) renderer working.
+# CORS locked to local origins; "null" keeps the packaged Electron renderer working.
 _allowed_origins_env = os.getenv("NEURONOTES_ALLOWED_ORIGINS", "").strip()
 if _allowed_origins_env:
   app.add_middleware(
@@ -104,93 +90,34 @@ else:
   )
 
 
-class AnalyzeRequest(BaseModel):
-  content: str = Field(min_length=1)
-  project_id: str = "agent-memory-hub"
-  source_agent: str | None = None
-
-
-class CompileRequest(BaseModel):
-  project_id: str = "agent-memory-hub"
-  target_agent: str = "Codex"
-  goal: str = "Continue the MVP"
-  token_budget: int = Field(default=2500, ge=400, le=20000)
-
-
-class PatchRequest(BaseModel):
-  project_id: str = "agent-memory-hub"
-  agent_id: str = "qwen"
-  payload: dict[str, Any]
-
-
-class ApplyMemoryRequest(BaseModel):
-  project_id: str = "agent-memory-hub"
-  agent_id: str = "qwen"
-  proposal: dict[str, Any] = Field(default_factory=dict)
-  patch_id: str | None = None
-  approved: bool = False
-
-
-class ProjectRequest(BaseModel):
-  name: str = Field(min_length=1)
-  goal: str = ""
-  status: str = "active"
-  summary: str = ""
-  tags: list[str] = []
-
-
 class NoteRequest(BaseModel):
-  project_id: str
-  title: str = Field(min_length=1)
+  title: str = ""
   content: str = ""
-  type: str = "Human Note"
-  status: str = "draft"
-  folder: str = ""
-  category: str = "General"
-  created_by_agent_id: str = "user"
+  tags: list[str] | None = None
+  created_by: str = "user"
 
 
-class TaskRequest(BaseModel):
-  project_id: str
-  title: str = Field(min_length=1)
-  status: str = "open"
-  source_note_id: str | None = None
-  source_agent_id: str = "user"
+class NoteUpdateRequest(BaseModel):
+  title: str | None = None
+  content: str | None = None
+  tags: list[str] | None = None
 
 
-class RelationRequest(BaseModel):
-  from_type: str = "note"
-  from_id: str
-  to_type: str = "note"
-  to_id: str
-  relation_type: str = "related"
-  created_by_agent_id: str = "user"
-  status: str = "active"
-
-
-class ImproveNoteRequest(BaseModel):
-  agent_id: str = "qwen"
-  mode: str = "tidy"
-  goal: str = "Tidy this quick note without adding new information."
-  preview: bool = False
-
-
-class ApplyImprovementRequest(BaseModel):
-  agent_id: str = "qwen"
-  proposal: dict[str, Any]
+class AskRequest(BaseModel):
+  question: str = Field(min_length=2)
 
 
 class SettingsRequest(BaseModel):
-  model_provider: str = "ollama"
-  model_base_url: str = "http://localhost:11434"
-  model_name: str = "qwen3:4b"
-  embedding_model: str = ""
-  privacy_mode: str = "local_first"
+  model_provider: str | None = None
+  model_base_url: str | None = None
+  model_name: str | None = None
+  embedding_model: str | None = None
+  privacy_mode: str | None = None
 
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
-  return {"status": "ok", "app": "Neuronotes 2.0"}
+  return {"status": "ok", "app": "NeuroNotes"}
 
 
 @app.get("/api/health/model")
@@ -200,7 +127,7 @@ async def model_health() -> dict[str, Any]:
 
 @app.get("/api/mcp/status")
 def mcp_status() -> dict[str, Any]:
-  """Status of the remote (HTTP/SSE) MCP server used by ChatGPT — is it up, where, how to connect."""
+  """Status of the remote (HTTP/SSE) MCP server used by ChatGPT."""
   host = os.getenv("NEURONOTES_MCP_HOST", "127.0.0.1")
   port = int(os.getenv("NEURONOTES_MCP_PORT", "8788"))
   running = False
@@ -209,10 +136,9 @@ def mcp_status() -> dict[str, Any]:
       running = True
   except OSError:
     running = False
+  # Tool count via a fresh loop (this sync handler runs in the threadpool).
   tools: int | None = None
   try:
-    import asyncio
-
     from .mcp_server import mcp as _mcp
 
     tools = len(asyncio.run(_mcp.list_tools()))
@@ -230,50 +156,36 @@ def mcp_status() -> dict[str, Any]:
   }
 
 
-@app.get("/api/dashboard")
-def dashboard(project_id: str | None = None) -> dict[str, Any]:
-  try:
-    return get_dashboard(project_id)
-  except ValueError as error:
-    raise HTTPException(status_code=404, detail=str(error)) from error
-
-
-@app.get("/api/projects")
-def projects() -> list[dict[str, Any]]:
-  return list_projects()
-
-
-@app.post("/api/projects")
-def create_project_endpoint(request: ProjectRequest) -> dict[str, Any]:
-  return create_project(request.model_dump())
-
-
-@app.put("/api/projects/{project_id}")
-def update_project_endpoint(project_id: str, request: ProjectRequest) -> dict[str, Any]:
-  try:
-    return update_project(project_id, request.model_dump())
-  except ValueError as error:
-    raise HTTPException(status_code=404, detail=str(error)) from error
-
-
 @app.get("/api/notes")
-def notes(
-  project_id: str | None = None,
-  folder: str | None = None,
-  category: str | None = None,
+def notes_endpoint(
+  q: str | None = None,
+  tag: str | None = None,
+  limit: int = Query(default=100, ge=1, le=500),
 ) -> list[dict[str, Any]]:
-  return list_notes(project_id, folder, category)
+  if q and q.strip():
+    return search_notes(q.strip(), limit)
+  return list_notes(tag=tag, limit=limit)
 
 
 @app.post("/api/notes")
 def create_note_endpoint(request: NoteRequest) -> dict[str, Any]:
+  if not request.title.strip() and not request.content.strip():
+    raise HTTPException(status_code=400, detail="La nota necesita título o contenido.")
   return create_note(request.model_dump())
 
 
+@app.get("/api/notes/{note_id}")
+def get_note_endpoint(note_id: str) -> dict[str, Any]:
+  note = get_note(note_id)
+  if note is None:
+    raise HTTPException(status_code=404, detail="Note not found")
+  return note
+
+
 @app.put("/api/notes/{note_id}")
-def update_note_endpoint(note_id: str, request: NoteRequest) -> dict[str, Any]:
+def update_note_endpoint(note_id: str, request: NoteUpdateRequest) -> dict[str, Any]:
   try:
-    return update_note(note_id, request.model_dump())
+    return update_note(note_id, request.model_dump(exclude_unset=True))
   except ValueError as error:
     raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -286,520 +198,98 @@ def delete_note_endpoint(note_id: str) -> dict[str, Any]:
     raise HTTPException(status_code=404, detail=str(error)) from error
 
 
-@app.delete("/api/tasks/{task_id}")
-def delete_task_endpoint(task_id: str) -> dict[str, Any]:
-  try:
-    return delete_task(task_id)
-  except ValueError as error:
-    raise HTTPException(status_code=404, detail=str(error)) from error
+@app.get("/api/notes/{note_id}/related")
+def related_endpoint(note_id: str, limit: int = Query(default=5, ge=1, le=20)) -> list[dict[str, Any]]:
+  return related_notes(note_id, limit)
 
 
-@app.delete("/api/relations/{relation_id}")
-def delete_relation_endpoint(relation_id: str) -> dict[str, Any]:
-  try:
-    return delete_relation(relation_id)
-  except ValueError as error:
-    raise HTTPException(status_code=404, detail=str(error)) from error
+@app.get("/api/tags")
+def tags_endpoint() -> list[dict[str, Any]]:
+  return all_tags()
 
 
-@app.post("/api/notes/{note_id}/improve")
-async def improve_note_endpoint(note_id: str, request: ImproveNoteRequest) -> dict[str, Any]:
-  note = get_note_by_id(note_id)
+@app.get("/api/map")
+def map_endpoint() -> dict[str, Any]:
+  return memory_map()
+
+
+@app.post("/api/vectors/rebuild")
+def rebuild_endpoint() -> dict[str, Any]:
+  return rebuild_note_vectors()
+
+
+@app.post("/api/ask")
+async def ask_endpoint(request: AskRequest) -> dict[str, Any]:
+  """Ask your brain: retrieve the closest notes; answer with the local model when
+  it is available, otherwise return the sources alone (retrieval never breaks)."""
+  question = request.question.strip()
+  sources = ask_context(question, limit=6)
+  strong_sources = [source for source in sources if source["score"] >= 0.3][:4] or sources[:2]
+
+  answer: str | None = None
+  local_fallback = True
+  health = await get_model_health()
+  if health.get("online") and strong_sources:
+    context = "\n\n".join(
+      f"[{index + 1}] {source['title']}\n{source['content'][:1200]}"
+      for index, source in enumerate(strong_sources)
+    )
+    try:
+      answer = await ask_model_text(
+        "Eres la memoria personal del usuario. Responde SOLO con la información de las notas dadas, "
+        "en español, breve y directo. Cita las notas como [1], [2]... Si las notas no contienen la "
+        "respuesta, dilo claramente.",
+        f"Pregunta: {question}\n\nNotas:\n{context}",
+      )
+      local_fallback = False
+    except Exception:
+      answer = None
+
+  for source in sources:
+    source.pop("content", None)
+  return {
+    "question": question,
+    "answer": answer,
+    "sources": sources,
+    "local_fallback": local_fallback,
+    "model": health.get("model"),
+  }
+
+
+@app.post("/api/notes/{note_id}/enrich")
+async def enrich_endpoint(note_id: str) -> dict[str, Any]:
+  """AI organize: suggest a better title + tags for the note (never auto-applies)."""
+  note = get_note(note_id)
   if note is None:
     raise HTTPException(status_code=404, detail="Note not found")
-  sibling_notes = [item for item in list_notes(note["project_id"]) if item["id"] != note_id]
-  project_catalog = list_projects()
-  existing_notes = list_notes()
-  folders = sorted({item.get("folder", "") for item in existing_notes if item.get("folder")})
-  categories = sorted({item.get("category", "General") for item in existing_notes if item.get("category")})
-  # "tidy" merges the old grammar/clean/format intents; "categorize" assigns metadata.
-  mode = request.mode if request.mode in {"tidy", "categorize"} else "tidy"
-  mode_rules = {
-    "tidy": "Fix grammar, spelling, punctuation and casing, and turn messy capture into clean prose with concise headings or bullets when useful. Do not add new information.",
-    "categorize": "Prioritize project_id, folder, category and type assignment. Keep content almost unchanged except obvious typos.",
-  }[mode]
-  system_prompt = """
-You format and polish quick notes for Neuronotes 2.0.
-Return strict JSON:
-{
-  "project_id": string,
-  "folder": string,
-  "category": string,
-  "title": string,
-  "content": string,
-  "type": "Human Note" | "Project Note" | "Research" | "Decision" | "Meeting" | "Task Source" | "Agent Draft",
-  "status": "draft" | "review" | "canonical",
-  "tasks": [{"title": string}],
-  "related_note_ids": string[],
-  "relation_type": string
-}
-Rules:
-- Preserve the user's meaning and facts.
-- Do not add new claims, examples, analysis, or filler.
-- Keep the note close to the original length unless formatting requires short headings or bullets.
-- Correct grammar, spelling, punctuation, casing, and messy phrasing.
-- Use clean Spanish Markdown.
-- Add headings only when they make the existing note easier to scan.
-- Extract tasks only when the original note clearly contains action items.
-- Choose a better project_id, folder, and category only if the existing options make the assignment obvious.
-"""
-  system_prompt += f"\nMode: {mode}\nMode-specific rule: {mode_rules}\n"
-  related_catalog = "\n".join(f"- {item['id']}: {item['title']} :: {item['excerpt']}" for item in sibling_notes[:16])
-  project_options = "\n".join(f"- {project['id']}: {project['name']} :: {project['summary']}" for project in project_catalog)
-  user_prompt = f"""
-Goal: {request.goal}
-
-Candidate projects:
-{project_options}
-
-Existing folders:
-{", ".join(folders) or "none"}
-
-Existing categories:
-{", ".join(categories) or "General"}
-
-Current note:
-Title: {note['title']}
-Type: {note['type']}
-Status: {note['status']}
-Folder: {note.get('folder', '')}
-Category: {note.get('category', 'General')}
-Content:
-{note['content']}
-
-Candidate related notes:
-{related_catalog}
-"""
-  try:
-    improvement = await ask_qwen_json(system_prompt, user_prompt)
-    improvement["local_fallback"] = False
-    improvement["used_model"] = model_settings()["model"]
-  except Exception:
-    improvement = heuristic_note_improvement(note, sibling_notes)
-
-  improvement = normalize_improvement(improvement, note)
-  valid_project_ids = {project["id"] for project in project_catalog}
-  if improvement.get("project_id") not in valid_project_ids:
-    improvement["project_id"] = note["project_id"]
-  if improvement.get("folder") is None:
-    improvement["folder"] = note.get("folder", "")
-  if not str(improvement.get("category") or "").strip():
-    improvement["category"] = note.get("category", "General")
-  if request.preview:
-    return {"preview": True, "proposal": improvement}
-  try:
-    result = apply_note_improvement(note_id, improvement, request.agent_id)
-  except ValueError as error:
-    raise HTTPException(status_code=404, detail=str(error)) from error
-  result["proposal"] = improvement
-  return result
-
-
-@app.post("/api/notes/{note_id}/improve/apply")
-def apply_note_improvement_endpoint(note_id: str, request: ApplyImprovementRequest) -> dict[str, Any]:
-  try:
-    result = apply_note_improvement(note_id, request.proposal, request.agent_id)
-  except ValueError as error:
-    raise HTTPException(status_code=404, detail=str(error)) from error
-  result["proposal"] = request.proposal
-  return result
-
-
-@app.get("/api/tasks")
-def tasks(project_id: str | None = None) -> list[dict[str, Any]]:
-  return list_tasks(project_id)
-
-
-@app.post("/api/tasks")
-def create_task_endpoint(request: TaskRequest) -> dict[str, Any]:
-  return create_task(request.model_dump())
-
-
-@app.put("/api/tasks/{task_id}")
-def update_task_endpoint(task_id: str, request: TaskRequest) -> dict[str, Any]:
-  try:
-    return update_task(task_id, request.model_dump())
-  except ValueError as error:
-    raise HTTPException(status_code=404, detail=str(error)) from error
-
-
-@app.get("/api/relations")
-def relations(project_id: str | None = None) -> list[dict[str, Any]]:
-  return list_relations(project_id)
-
-
-@app.post("/api/relations")
-def create_relation_endpoint(request: RelationRequest) -> dict[str, Any]:
-  return create_relation(request.model_dump())
-
-
-@app.get("/api/activity")
-def activity(project_id: str | None = None) -> list[dict[str, Any]]:
-  return list_activity(project_id)
+  suggestion = {
+    "title": note["title"] if note["title"] != "Sin título" else "",
+    "tags": suggest_tags(note["title"], note["content"], limit=4),
+    "local_fallback": True,
+  }
+  health = await get_model_health()
+  if health.get("online"):
+    try:
+      result = await ask_model_json(
+        'Organizas notas personales. Devuelve JSON estricto: {"title": string, "tags": string[]}. '
+        "El título: corto (máx 8 palabras), en el idioma de la nota, fiel al contenido. "
+        "tags: 2-4 temas en minúsculas, una o dos palabras cada uno.",
+        f"Título actual: {note['title']}\n\nNota:\n{note['content'][:2400]}",
+      )
+      title = str(result.get("title") or "").strip()
+      tags = [str(tag).strip().lower() for tag in result.get("tags", []) if str(tag).strip()][:4]
+      if title or tags:
+        suggestion = {"title": title or note["title"], "tags": tags or suggestion["tags"], "local_fallback": False}
+    except Exception:
+      pass
+  return suggestion
 
 
 @app.get("/api/settings")
-def settings() -> dict[str, str]:
+def settings_endpoint() -> dict[str, str]:
   return get_settings()
 
 
 @app.put("/api/settings")
-def save_settings(request: SettingsRequest) -> dict[str, str]:
-  return update_settings(request.model_dump())
-
-
-@app.get("/api/search")
-def search(query: str, limit: int = Query(8, ge=1, le=100), project_id: str | None = None) -> list[dict[str, Any]]:
-  return search_memory(query, limit, project_id)
-
-
-@app.post("/api/vectors/rebuild")
-def rebuild_vectors(project_id: str | None = None) -> dict[str, Any]:
-  return rebuild_note_vectors(project_id)
-
-
-@app.get("/api/vectors/search")
-def vector_search(query: str, limit: int = Query(8, ge=1, le=100), project_id: str | None = None) -> list[dict[str, Any]]:
-  if len(query.strip()) < 2:
-    return []
-  return semantic_search_notes(query, limit, project_id)
-
-
-@app.get("/api/vectors/map")
-def vectors_map(
-  project_id: str | None = None,
-  folder: str | None = None,
-  category: str | None = None,
-) -> dict[str, Any]:
-  return vector_memory_map(project_id, folder, category)
-
-
-@app.get("/api/notes/{note_id}")
-def note(note_id: str) -> dict[str, Any]:
-  result = get_note_by_id(note_id)
-  if result is None:
-    raise HTTPException(status_code=404, detail="Note not found")
-  return result
-
-
-@app.post("/api/inbox/analyze")
-async def analyze_inbox(request: AnalyzeRequest) -> dict[str, Any]:
-  system_prompt = """
-You classify raw memory for Neuronotes 2.0.
-Return strict JSON with this shape:
-{
-  "project_suggested": string,
-  "type": string,
-  "author": string,
-  "tags": string[],
-  "summary": string,
-  "proposed_notes": [{"title": string, "type": string, "content": string}],
-  "proposed_decisions": [{"decision": string, "reason": string}],
-  "proposed_tasks": [{"title": string, "priority": "low" | "medium" | "high"}]
-}
-Use concise Spanish without markdown.
-"""
-  user_prompt = f"""
-Project id: {request.project_id}
-Source agent hint: {request.source_agent or "unknown"}
-
-Raw content:
-{request.content}
-"""
-
-  try:
-    proposal = await ask_qwen_json(system_prompt, user_prompt)
-    proposal["used_model"] = model_settings()["model"]
-    proposal["local_fallback"] = False
-  except Exception:
-    proposal = heuristic_proposal(request.content, request.source_agent)
-
-  proposal = normalize_proposal(proposal)
-  summary = str(proposal.get("summary", "Generated memory patch."))
-  insert_inbox_item(
-    request.project_id,
-    title=summary[:80] or "Inbox capture",
-    source=request.source_agent or proposal.get("author", "Unknown"),
-    content=request.content,
-    tags=proposal.get("tags", []),
-    status="processed",
-  )
-  insert_agent_run("qwen", request.project_id, request.content, summary)
-  insert_memory_patch(request.project_id, "qwen", proposal)
-  return proposal
-
-
-@app.post("/api/context/compile")
-def compile_context(request: CompileRequest) -> dict[str, Any]:
-  content = get_project_context(
-    project_id=request.project_id,
-    target_agent=request.target_agent,
-    goal=request.goal,
-    token_budget=request.token_budget,
-  )
-  return {
-    "target_agent": request.target_agent,
-    "token_budget": request.token_budget,
-    "content": content,
-  }
-
-
-@app.post("/api/context/export-codex")
-def export_context(request: CompileRequest) -> dict[str, Any]:
-  files = export_codex_context(
-    project_id=request.project_id,
-    target_agent=request.target_agent,
-    goal=request.goal,
-    token_budget=request.token_budget,
-  )
-  return {"files": files}
-
-
-@app.post("/api/memory-patches")
-def submit_patch(request: PatchRequest) -> dict[str, str]:
-  patch_id = insert_memory_patch(request.project_id, request.agent_id, request.payload)
-  return {"id": patch_id, "status": "pending"}
-
-
-@app.post("/api/memory/apply")
-def apply_patch(request: ApplyMemoryRequest) -> dict[str, Any]:
-  # Preferred path: approve a stored, human-reviewed patch by id.
-  if request.patch_id:
-    patch = get_memory_patch(request.patch_id)
-    if patch is None:
-      raise HTTPException(status_code=404, detail="Memory patch not found")
-    if patch["status"] != "pending":
-      raise HTTPException(status_code=409, detail=f"Patch already {patch['status']}")
-    if not request.approved:
-      raise HTTPException(status_code=403, detail="Patch requires explicit human approval (approved=true).")
-    try:
-      return apply_memory_patch(
-        patch["project_id"], patch["agent_id"], patch["payload"], source_patch_id=patch["id"]
-      )
-    except ValueError as error:
-      raise HTTPException(status_code=400, detail=str(error)) from error
-  # Legacy inline path: still allowed, but now requires an explicit approval flag.
-  if not request.approved:
-    raise HTTPException(
-      status_code=403,
-      detail="Inline memory apply requires explicit approval (approved=true). Prefer submitting a patch and approving it by id.",
-    )
-  try:
-    return apply_memory_patch(request.project_id, request.agent_id, request.proposal)
-  except ValueError as error:
-    raise HTTPException(status_code=400, detail=str(error)) from error
-
-
-@app.get("/api/memory-patches")
-def list_patches(status: str | None = None, project_id: str | None = None) -> list[dict[str, Any]]:
-  return list_memory_patches(status, project_id)
-
-
-@app.post("/api/memory-patches/{patch_id}/reject")
-def reject_patch(patch_id: str) -> dict[str, Any]:
-  try:
-    return reject_memory_patch(patch_id)
-  except ValueError as error:
-    detail = str(error)
-    raise HTTPException(status_code=409 if "already" in detail else 404, detail=detail) from error
-
-
-def heuristic_proposal(content: str, source_agent: str | None) -> dict[str, Any]:
-  lowered = content.lower()
-  tags = ["agents", "context", "writeback"]
-  if "mcp" in lowered:
-    tags.append("MCP")
-  if "sqlite" in lowered:
-    tags.append("SQLite")
-  if "codex" in lowered:
-    tags.append("Codex")
-
-  author = source_agent or ("Codex" if "codex" in lowered else "Claude")
-  return {
-    "project_suggested": "Agent Memory Hub",
-    "type": "agent output",
-    "author": author,
-    "tags": tags,
-    "summary": "El texto contiene memoria reutilizable para el proyecto y posibles acciones canonicas.",
-    "proposed_notes": [
-      {
-        "title": "Agent output summary",
-        "type": "technical_note",
-        "content": content[:600],
-      }
-    ],
-    "proposed_decisions": [
-      {
-        "decision": "Mantener SQLite y aprobacion humana para el MVP.",
-        "reason": "Reduce riesgo y mantiene control local-first.",
-      }
-    ],
-    "proposed_tasks": [
-      {"title": "Crear memory patch review flow.", "priority": "high"},
-      {"title": "Agregar export para Codex.", "priority": "medium"},
-    ],
-    "used_model": model_settings()["model"],
-    "local_fallback": True,
-  }
-
-
-def heuristic_note_improvement(note: dict[str, Any], sibling_notes: list[dict[str, Any]]) -> dict[str, Any]:
-  raw_content = str(note.get("content", "")).strip()
-  title = str(note.get("title") or "").strip()
-  metadata_text = f"{title} {raw_content}"
-  first_line = next((line.strip("# ").strip() for line in raw_content.splitlines() if line.strip()), "")
-  if not title or title.lower() == "untitled":
-    title = first_line[:80] or "Nota mejorada"
-
-  task_candidates: list[dict[str, str]] = []
-  formatted_lines: list[str] = []
-  for line in raw_content.splitlines():
-    stripped = line.strip()
-    cleaned = stripped.strip(" -[]\t")
-    lowered = cleaned.lower()
-    if not cleaned:
-      if formatted_lines and formatted_lines[-1] != "":
-        formatted_lines.append("")
-      continue
-    explicit_task = (
-      lowered.startswith(("todo", "tarea", "pendiente", "hacer", "implementar"))
-      or stripped.startswith(("- [ ]", "* [ ]", "[]"))
-    )
-    if explicit_task:
-      task_candidates.append({"title": cleaned[:120]})
-    formatted_lines.append(format_note_line(stripped))
-
-  body = "\n".join(formatted_lines).strip() or "Sin contenido original."
-  if len([line for line in formatted_lines if line.strip()]) > 4 and not body.lstrip().startswith("#"):
-    improved = f"## {title}\n\n{body}"
-  else:
-    improved = body
-
-  related_note_ids = find_related_note_ids(raw_content + " " + title, sibling_notes)
-  inferred_category = infer_category(metadata_text)
-  current_category = str(note.get("category") or "").strip()
-  return {
-    "project_id": note.get("project_id"),
-    "folder": note.get("folder") or infer_folder(metadata_text),
-    "category": current_category if current_category and current_category != "General" else inferred_category,
-    "title": title,
-    "content": improved,
-    "type": note.get("type") or "Human Note",
-    "status": "review",
-    "tasks": task_candidates[:6],
-    "related_note_ids": related_note_ids,
-    "relation_type": "related",
-    "used_model": model_settings()["model"],
-    "local_fallback": True,
-  }
-
-
-def infer_folder(text: str) -> str:
-  lowered = text.lower()
-  buckets = [
-    ("Producto", ("roadmap", "feedback", "prioridad", "usuario", "retencion", "feature", "producto")),
-    ("Investigacion", ("paper", "papers", "research", "rag", "memoria", "evaluacion", "hipotesis")),
-    ("Ingenieria", ("api", "backend", "frontend", "sqlite", "bug", "mcp", "codex", "deploy")),
-    ("Reuniones", ("meeting", "reunion", "acuerdo", "stakeholder", "seguimiento", "sync")),
-    ("Inbox", ("idea", "borrador", "captura", "quick", "nota suelta")),
-  ]
-  for folder, keywords in buckets:
-    if any(keyword in lowered for keyword in keywords):
-      return folder
-  return ""
-
-
-def infer_category(text: str) -> str:
-  lowered = text.lower()
-  buckets = [
-    ("Producto", ("roadmap", "feedback", "feature", "prioridad", "usuario", "retencion", "producto")),
-    ("Investigacion", ("paper", "research", "rag", "vector", "memoria", "contexto", "evaluacion")),
-    ("Desarrollo", ("api", "backend", "frontend", "sqlite", "bug", "mcp", "schema", "deploy")),
-    ("Reuniones", ("meeting", "reunion", "acuerdo", "seguimiento", "stakeholder", "decision")),
-    ("AI Notes", ("qwen", "llm", "codex", "claude", "chatgpt", "agente", "agent")),
-  ]
-  for category, keywords in buckets:
-    if any(keyword in lowered for keyword in keywords):
-      return category
-  return "General"
-
-
-def find_related_note_ids(text: str, sibling_notes: list[dict[str, Any]]) -> list[str]:
-  words = {word for word in re_words(text) if len(word) > 4}
-  scored: list[tuple[int, str]] = []
-  for note in sibling_notes:
-    note_text = f"{note.get('title', '')} {note.get('excerpt', '')}"
-    note_words = {word for word in re_words(note_text) if len(word) > 4}
-    overlap = len(words & note_words)
-    if overlap > 0:
-      scored.append((overlap, note["id"]))
-  scored.sort(reverse=True)
-  return [note_id for _, note_id in scored[:3]]
-
-
-def re_words(text: str) -> list[str]:
-  import re
-
-  return re.findall(r"[^\W_]+", text.lower())
-
-
-def format_note_line(line: str) -> str:
-  replacements = {
-    "q ": "que ",
-    " xq ": " porque ",
-    " pq ": " porque ",
-    " tmb ": " tambien ",
-    " tb ": " tambien ",
-    " mejroar ": " mejorar ",
-    " notra ": " nota ",
-    " funcinamiento": "funcionamiento",
-    " proporsito": "proposito",
-  }
-  prefix = ""
-  body = line.strip()
-  if body.startswith(("-", "*")):
-    prefix = "- "
-    body = body.lstrip("-* ").strip()
-  lower_padded = f" {body.lower()} "
-  for wrong, right in replacements.items():
-    lower_padded = lower_padded.replace(wrong, right)
-  body = lower_padded.strip()
-  if body:
-    body = body[0].upper() + body[1:]
-  if body and body[-1] not in ".:;!?)]":
-    body += "."
-  return f"{prefix}{body}" if prefix else body
-
-
-def normalize_improvement(improvement: dict[str, Any], note: dict[str, Any]) -> dict[str, Any]:
-  fallback_text = f"{note.get('title', '')} {note.get('content', '')}"
-  improvement.setdefault("project_id", note.get("project_id"))
-  improvement.setdefault("folder", note.get("folder") or infer_folder(fallback_text))
-  improvement.setdefault("category", note.get("category") or infer_category(fallback_text))
-  improvement.setdefault("title", note.get("title") or "Nota")
-  improvement.setdefault("content", note.get("content") or "")
-  improvement.setdefault("type", note.get("type") or "Project Note")
-  improvement.setdefault("status", "review")
-  improvement.setdefault("tasks", [])
-  improvement.setdefault("related_note_ids", [])
-  improvement.setdefault("relation_type", "related")
-  if not isinstance(improvement["tasks"], list):
-    improvement["tasks"] = []
-  if not isinstance(improvement["related_note_ids"], list):
-    improvement["related_note_ids"] = []
-  improvement["folder"] = str(improvement.get("folder") or "").strip()
-  category = str(improvement.get("category") or "").strip()
-  improvement["category"] = infer_category(fallback_text) if not category or category == "General" else category
-  return improvement
-
-
-def normalize_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
-  proposal.setdefault("project_suggested", "Agent Memory Hub")
-  proposal.setdefault("type", "agent output")
-  proposal.setdefault("author", "unknown")
-  proposal.setdefault("tags", [])
-  proposal.setdefault("summary", "")
-  proposal.setdefault("proposed_notes", [])
-  proposal.setdefault("proposed_decisions", [])
-  proposal.setdefault("proposed_tasks", [])
-  return proposal
+def update_settings_endpoint(request: SettingsRequest) -> dict[str, str]:
+  return update_settings(request.model_dump(exclude_unset=True))

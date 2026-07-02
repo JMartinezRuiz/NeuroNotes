@@ -1,135 +1,48 @@
-# Neuronotes 2.0
+# NeuroNotes
 
-Local-first desktop MVP for notes, projects, and shared memory between humans and AI agents.
+Un segundo cerebro **local-first y AI-first**: tú escribes, la IA organiza.
 
-The app is intentionally Notion-like: quiet project sidebar, focused Markdown notes, project tasks, visual note map, compact context export, and visible agent provenance. It is not a chatbot-first product.
+No hay carpetas, proyectos ni enlaces manuales. Cada nota se convierte en un
+vector (embeddings locales) y de ahí se deriva todo:
 
-## Documentation
+- **Buscar por significado** — encuentra la nota aunque no compartas ni una palabra.
+- **Notas cercanas** — las conexiones aparecen solas, calculadas por cercanía semántica.
+- **Mapa 3D** — tu mente como constelación: la distancia entre notas ES su parecido de significado (PCA de los vectores).
+- **Pregunta a tu cerebro** — respuesta con citas usando solo tus notas (RAG local).
+- **Etiquetas y título automáticos** — al vuelo (heurística) o con el modelo local (botón ✨).
+- **Cualquier LLM se conecta** — servidor MCP (Claude, Codex y ChatGPT vía SSE con `search`/`fetch`).
 
-- Deep project documentation: `docs/PROJECT_DOCUMENTATION.md`
-- Routes and filesystem paths: `docs/ROUTES_AND_PATHS.md`
-- Agent operating rules: `AGENTS.md`
+**Privado de verdad:** SQLite en disco + modelos por Ollama en loopback;
+`privacy_mode=local_first` bloquea cualquier llamada fuera de tu equipo.
 
 ## Stack
 
-- Desktop: Electron
-- Frontend: React, Vite, TypeScript
-- Backend: FastAPI
-- Storage: SQLite
-- Search: basic SQLite `LIKE` search across notes, tasks, and decisions
-- Local model: Qwen 4B through configurable Ollama or LM Studio endpoint
-- MCP scaffold: `backend/app/mcp_server.py`
+- Frontend: React 19 + Vite + TypeScript (+ three.js para el mapa, lazy)
+- Backend: FastAPI + SQLite (3 tablas: `notes`, `note_vectors`, `app_settings`)
+- Embeddings: `nomic-embed-text` (768d) vía Ollama, con fallback hash offline
+- Chat local: `qwen3:4b` (opcional — todo funciona sin él)
+- Escritorio: Electron · Agentes: MCP (`backend/app/mcp_server.py`)
 
-## MVP Scope
+## Arrancar
 
-Included:
-
-- Three main modes: Notes, Map, LLM
-- Notes-first interface with a cleaner Notion-like writing surface
-- Light/dark mode toggle persisted locally
-- Create/edit projects
-- Create/edit Markdown notes
-- Improve note action powered by local Qwen with deterministic local fallback
-- Project tasks that can be created manually or extracted from improved notes
-- Visual memory map for notes, tasks, and relations
-- Manual relation linking between notes
-- Search with suggestions across notes, tasks, and decisions
-- Qwen-powered note improvement for structure, type, status, tasks, and relations
-- Human-reviewed memory patch apply flow: selected notes, tasks, and decisions become project memory
-- Agent colors for Usuario, Claude, Codex, and Qwen
-- Context Compiler with `AGENTS.md` and `docs/context.md` export
-- SQLite models: Agent, Project, Note, Task, Decision, Relation, AgentRun
-
-Not included:
-
-- Cloud sync
-- Mobile app
-- Multi-user collaboration
-- Canvas/graph editor
-- Complex block editor
-
-## Setup
-
-```powershell
-cd "D:\Neuronotes 2.0"
-python -m venv .venv
-.\.venv\Scripts\python -m pip install -r backend\requirements.txt
-npm install
-npm --prefix frontend install
+```bash
+npm run dev        # backend (8787) + frontend (5173)
+npm run desktop    # app de escritorio (Electron)
+npm run mcp        # MCP stdio (Claude / Codex)
+npm run mcp:http   # MCP SSE en :8788 (ChatGPT — túnel HTTPS + /sse)
 ```
 
-Pull the default local model:
+Requisitos: Python 3.12 (`.venv` en la raíz), Node 20+, y [Ollama](https://ollama.com)
+con `ollama pull nomic-embed-text` (y opcionalmente `ollama pull qwen3:4b`).
 
-```powershell
-ollama pull qwen3:4b
-```
+## API
 
-## Run In Browser
+`GET/POST/PUT/DELETE /api/notes` · `GET /api/notes?q=` (semántica) ·
+`GET /api/notes/{id}/related` · `GET /api/map` · `POST /api/ask` ·
+`POST /api/notes/{id}/enrich` · `GET /api/tags` · `POST /api/vectors/rebuild` ·
+`GET/PUT /api/settings` · `GET /api/health/model` · `GET /api/mcp/status`
 
-```powershell
-npm run dev
-```
+---
 
-Backend: http://127.0.0.1:8787
-
-Vite prints the frontend URL. It defaults to http://localhost:5173, but may use another port if 5173 is already busy.
-
-## Run As Desktop App
-
-```powershell
-npm run desktop
-```
-
-This builds the React app, starts the local FastAPI backend, and opens Electron.
-
-## Model Settings
-
-Default:
-
-- Provider: `ollama`
-- Base URL: `http://localhost:11434`
-- Model: `qwen3:4b`
-
-LM Studio/OpenAI-compatible mode:
-
-- Provider: `lmstudio`
-- Base URL: usually `http://localhost:1234`
-- Model: the loaded model name shown by LM Studio
-
-You can edit these from Settings in the app.
-
-## Useful Commands
-
-```powershell
-npm run build
-npm run mcp
-```
-
-## Agent Access
-
-Neuronotes exposes shared memory without binding it to one LLM vendor.
-
-- MCP server: `npm run mcp`
-- REST base: `http://127.0.0.1:8787`
-- Search: `GET /api/search?query=...`
-- Project notes: `GET /api/notes?project_id=...`
-- Create note: `POST /api/notes`
-- Update note: `PUT /api/notes/{note_id}`
-- Improve note: `POST /api/notes/{note_id}/improve`
-- Relations: `GET/POST /api/relations`
-- Tasks: `GET/POST/PUT /api/tasks`
-- Context handoff: `POST /api/context/compile`
-- Proposed writeback: `POST /api/memory-patches`
-
-Agents should search first, prefer approved/canonical items, keep source attribution, create or update durable notes, link related notes, and create tasks from actionable work.
-
-## Exported Context
-
-Context Compiler writes files to:
-
-```text
-exports/codex/AGENTS.md
-exports/codex/docs/context.md
-exports/codex/docs/decisions.md
-exports/codex/docs/tasks.md
-```
+*La versión anterior (proyectos/carpetas/tareas/parches de memoria) quedó
+archivada en el tag `v2-synapse-legacy`.*

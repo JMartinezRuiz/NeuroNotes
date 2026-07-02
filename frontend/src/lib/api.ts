@@ -31,10 +31,9 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-// Synapse agent-provenance colors. One normalizer maps an agent id OR display
-// name to a key, so "who authored this" is a consistent visual language across
-// note-card gutters, the editor, and the 3D map (which needs real hex, not vars).
-const AGENT_HEX: Record<string, string> = {
+// Synapse agent-provenance palette — one canonical set shared with the CSS vars
+// and the 3D map, so "who wrote this" reads the same everywhere.
+export const AGENT_HEX: Record<string, string> = {
   usuario: "#e8895e",
   claude: "#e0a33b",
   codex: "#8c99f0",
@@ -42,7 +41,7 @@ const AGENT_HEX: Record<string, string> = {
   chatgpt: "#5dcaa5",
 };
 
-function normalizeAgentKey(value?: string | null): keyof typeof AGENT_HEX {
+export function agentKey(value?: string | null): keyof typeof AGENT_HEX {
   const v = (value ?? "").toLowerCase();
   if (v.includes("claude")) return "claude";
   if (v.includes("codex")) return "codex";
@@ -51,10 +50,11 @@ function normalizeAgentKey(value?: string | null): keyof typeof AGENT_HEX {
   return "usuario";
 }
 
-export function agentColor(value?: string | null): string {
-  return `var(--agent-${normalizeAgentKey(value)})`;
+export function agentHex(value?: string | null): string {
+  return AGENT_HEX[agentKey(value)];
 }
 
-export function agentHex(value?: string | null): string {
-  return AGENT_HEX[normalizeAgentKey(value)];
+export function agentLabel(value?: string | null): string {
+  const key = agentKey(value);
+  return key === "usuario" ? "Tú" : key.charAt(0).toUpperCase() + key.slice(1);
 }

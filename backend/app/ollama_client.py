@@ -19,6 +19,7 @@ def model_settings() -> dict[str, str]:
     "provider": settings.get("model_provider", "ollama").lower(),
     "base_url": settings.get("model_base_url", OLLAMA_BASE_URL).rstrip("/"),
     "model": settings.get("model_name", QWEN_MODEL),
+    "embedding_model": settings.get("embedding_model", ""),
   }
 
 
@@ -27,6 +28,7 @@ async def get_model_health() -> dict[str, Any]:
   provider = settings["provider"]
   base_url = settings["base_url"]
   model = settings["model"]
+  embedding_model = settings["embedding_model"]
 
   try:
     async with httpx.AsyncClient(timeout=3.0) as client:
@@ -43,58 +45,77 @@ async def get_model_health() -> dict[str, Any]:
   except Exception:
     return {
       "online": False,
+      "embedding_online": False,
       "provider": provider,
       "model": model,
+      "embedding_model": embedding_model,
       "base_url": base_url,
-      "message": "Endpoint local no responde. Revisa Ollama/LM Studio y la configuracion.",
+      "message": "Endpoint local no responde. Revisa Ollama/LM Studio.",
     }
 
-  has_model = model in names
+  # Ollama tag names may carry a ":latest" suffix the settings omit.
+  def present(name: str) -> bool:
+    return bool(name) and any(candidate == name or candidate.split(":")[0] == name for candidate in names)
+
+  has_model = present(model)
+  has_embedding = present(embedding_model)
+  if has_model:
+    message = "Modelo local listo."
+  else:
+    message = f"Endpoint activo; falta el modelo {model}."
   return {
     "online": has_model,
+    "embedding_online": has_embedding,
     "provider": provider,
     "model": model,
+    "embedding_model": embedding_model,
     "base_url": base_url,
-    "message": "Qwen local listo." if has_model else f"Endpoint activo; no encontre el modelo {model}.",
+    "message": message,
   }
 
 
-async def ask_qwen_json(system_prompt: str, user_prompt: str) -> dict[str, Any]:
+async def _chat(messages: list[dict[str, str]], as_json: bool) -> str:
   settings = model_settings()
-  messages = [
-    {"role": "system", "content": system_prompt},
-    {"role": "user", "content": user_prompt},
-  ]
-
-  async with httpx.AsyncClient(timeout=45.0) as client:
+  async with httpx.AsyncClient(timeout=60.0) as client:
     if settings["provider"] == "lmstudio":
-      body = {
+      body: dict[str, Any] = {
         "model": settings["model"],
         "messages": messages,
         "temperature": 0.2,
-        "response_format": {"type": "json_object"},
       }
+      if as_json:
+        body["response_format"] = {"type": "json_object"}
       response = await client.post(f"{settings['base_url']}/v1/chat/completions", json=body)
-    else:
-      body = {
-        "model": settings["model"],
-        "stream": False,
-        "format": "json",
-        "messages": messages,
-        "options": {
-          "temperature": 0.2,
-          "num_ctx": 8192,
-        },
-      }
-      response = await client.post(f"{settings['base_url']}/api/chat", json=body)
+      response.raise_for_status()
+      return response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+    body = {
+      "model": settings["model"],
+      "stream": False,
+      "messages": messages,
+      "options": {"temperature": 0.2, "num_ctx": 8192},
+    }
+    if as_json:
+      body["format"] = "json"
+    response = await client.post(f"{settings['base_url']}/api/chat", json=body)
     response.raise_for_status()
-    payload = response.json()
+    return response.json().get("message", {}).get("content", "")
 
-  if settings["provider"] == "lmstudio":
-    content = payload.get("choices", [{}])[0].get("message", {}).get("content", "")
-  else:
-    content = payload.get("message", {}).get("content", "")
+
+async def ask_model_json(system_prompt: str, user_prompt: str) -> dict[str, Any]:
+  content = await _chat(
+    [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+    as_json=True,
+  )
   return parse_json_object(content)
+
+
+async def ask_model_text(system_prompt: str, user_prompt: str) -> str:
+  content = await _chat(
+    [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+    as_json=False,
+  )
+  # Strip any <think> blocks reasoning models may emit.
+  return re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
 
 
 def parse_json_object(content: str) -> dict[str, Any]:

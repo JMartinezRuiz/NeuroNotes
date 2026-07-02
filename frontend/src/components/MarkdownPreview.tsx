@@ -1,6 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { safeMarkdownUrl } from "../lib/helpers";
+import { safeMarkdownUrl } from "../lib/utils";
 
 export function MarkdownPreview({ content }: { content: string }) {
   return (
@@ -10,7 +10,7 @@ export function MarkdownPreview({ content }: { content: string }) {
           {content}
         </ReactMarkdown>
       ) : (
-        <p className="markdown-empty">No content yet.</p>
+        <p className="markdown-empty">Sin contenido todavía.</p>
       )}
     </div>
   );
